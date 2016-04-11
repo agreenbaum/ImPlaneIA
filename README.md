@@ -45,7 +45,6 @@ e.g., starting with a list of GPI files
 
 gpifiles = []
 
-    :::python
         import InstrumentData
         gpidata = InstrumentData.GPI(gpifiles[1]) # just need a reference file to get header information for this observation
 
