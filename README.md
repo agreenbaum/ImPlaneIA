@@ -43,14 +43,13 @@ driver 3 - 3 Main routines:
 ### Basic tutorial ###
 e.g., starting with a list of GPI files
 
-gpifiles = []
+		gpifiles = [] # list files in here
 
         import InstrumentData
         gpidata = InstrumentData.GPI(gpifiles[1]) # just need a reference file to get header information for this observation
 
 This creates an instance of GPI, which will read header keywords from a reference file and sets up the data according to GPI standards
 
-    :::python
         import NRM_Fringes  
 
         ff =  NRM_Fringes.FringeFitter(gpidata, oversample = 5, savedir=savedir, datadir=datadir, npix=121)
