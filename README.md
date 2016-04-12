@@ -7,13 +7,14 @@ Necessary Python packages:
 * numpy
 * scipy
 * astropy
-* a copy of Paul Boley's oifits.py in your python path
+* a copy of [Paul Boley's oifits.py](http://astro.ins.urfu.ru/pages/~pboley/oifits/) in your python path
+* emcee [available here](http://dan.iel.fm/emcee/current/) or by pip install
 
 Optional Python packages:
 
 * matplotlib
-* webbpsf
-* poppy
+* webbpsf [available here](https://github.com/mperrin/webbpsf) or by pip install
+* poppy [available here](https://github.com/mperrin/poppy) or by pip install
 * pysynphot
 
 *we recommend downloading the anaconda distribution for python*
@@ -59,7 +60,7 @@ First step import the main modules in this package:
 Start with test data provided in this package
 
 	targfiles = [f for f in os.listdir("f430_data") if "tcube" in f] # simulated data
-	calfiles = [f for f in os.listdir("f430_data") if "tcube" in f] # simulated data
+	calfiles = [f for f in os.listdir("f430_data") if "ccube" in f] # simulated data
 	nirissdata = InstrumentData.NIRISS(filt="F430M", objname="targ")
 
 Instance of NIRISS, which will set up the data according to NIRISS standards given a filter name and the name of the observed object. Now let's say I have 1 target and 2 calibrators:
