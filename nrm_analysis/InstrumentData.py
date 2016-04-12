@@ -285,7 +285,7 @@ class NIRISS:
 		else:
 			sys.exit("invalid data mode for NIRISS. 'UTR' and 'slice' supported")
 
-	def _generate_filter_files()
+	def _generate_filter_files():
 		"""Either from WEBBPSF, or tophat, etc. A set of filter files will also be provided"""
 		return None
 
