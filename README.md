@@ -58,31 +58,28 @@ First step import the main modules in this package:
 ###NIRISS Example ###
 Start with test data provided in this package
 
-	nirissfiles = [f for f in os.listdir("f430_data") if "tcube" in f] # simulated data
+	targfiles = [f for f in os.listdir("f430_data") if "tcube" in f] # simulated data
+	calfiles = [f for f in os.listdir("f430_data") if "tcube" in f] # simulated data
 	nirissdata = InstrumentData.NIRISS(filt="F430M", objname="targ")
 
 Instance of NIRISS, which will set up the data according to NIRISS standards given a filter name and the name of the observed object. Now let's say I have 1 target and 2 calibrators:
 
 	ff =  nrm_core.FringeFitter(nirissdata, oversample = 5, savedir="targ", datadir="f430_data", npix=121)
-	for exposure in nirissfiles:
+	for exposure in targfiles:
 		ff.fit_fringes(exposure)
 		
-	ff1 =  nrm_core.FringeFitter(nirissdata, oversample = 5, savedir="cal1", datadir="f430_data", npix=121)
-	for exposure in nirissfiles:
-		ff1.fit_fringes(exposure)
-	
-	ff2 =  nrm_core.FringeFitter(nirissdata, oversample = 5, savedir="cal2", datadir="f430_data", npix=121)
-	for exposure in nirissfiles:
+	ff2 =  nrm_core.FringeFitter(nirissdata, oversample = 5, savedir="cal1", datadir="f430_data", npix=121)
+	for exposure in calfiles:
 		ff2.fit_fringes(exposure)
+
 	
 This initializes the fringe fitter with the options you want for measuring fringe observables. Then it fits each fits file's data by calling the fit_fringes method. Saves the output to directory "targ", etc. in working directory. I usually name this by the object name. 
 
 	targdir = "targ/"
-	caldir = "cal1/"
-	cal2dir = "cal2/"
-	calib = nrm_core.Calibrate([targdir, caldir, cal2dir], nirissdata, savedir = "my_calibrated")
+	caldir = "cal1/"	
+	calib = nrm_core.Calibrate([targdir, caldir], nirissdata, savedir = "my_calibrated")
 
-Instance of Calibrate, gives 3 directories containing target and any calibration sources. The first directory in the list is always assumed to be the science target. Any number of calibrators may be provided. Argument savedir default is "calibrated." Argument sub_dir_tag not provided here because there is no wavelength axis (see below in GPI example for comparison).
+Instance of Calibrate, gives 2 directories containing target and calibration sources. The first directory in the list is always assumed to be the science target. Any number of calibrators may be provided. Argument savedir default is "calibrated." Argument sub_dir_tag not provided here because there is no wavelength axis (see below in GPI example for comparison).
 
 	calib.save_to_oifits("niriss_test.oifits")
 Saves results to oifits. phaseceil keyword arg optional to set a custom dataflag. Default flag is set when phases exceed  1.0e1.
