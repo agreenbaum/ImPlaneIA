@@ -5,7 +5,7 @@ import sys
 import time
 #import webbpsf.poppy as poppy
 import poppy
-from driverutils import makedisk
+from misctools.utils import makedisk
 import pyfits
 """
 
