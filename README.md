@@ -72,4 +72,8 @@ This initializes the fringe fitter with the options you want for measuring fring
 	cal2dir = "Calibrator2/"
 	calib = nrm_core.Calibrate([targdir, caldir, cal2dir], gpidata, savedir = "my_calibrated", sub_dir_tag = "130501")
 
-Instance of Calibrate, gives 3 directories containing target and any calibration sources. The first directory in the list is always assumed to be the science target. Any number of calibrators may be provided. Argument savedir default is "calibrated." Argument sub_dir_tag must be provided if there is an additional axis (multiple wavelengths, or pollarizations), to save results from each slice into sub directories separated by exposure. 
+
+Instance of Calibrate, gives 3 directories containing target and any calibration sources. The first directory in the list is always assumed to be the science target. Any number of calibrators may be provided. Argument savedir default is "calibrated." Argument sub_dir_tag must be provided if there is an additional axis (multiple wavelengths, or pollarizations), to save results from each slice into sub directories separated by exposure.
+ 
+	calib.save_to_oifits("targ_vis.oifits", phaseceil = 5.0)
+Saves results to oifits. phaseceil keyword arg can be used to flag phases (> 0.5 degrees in this case). Default is 1.0e1.
