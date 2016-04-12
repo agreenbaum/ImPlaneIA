@@ -466,14 +466,15 @@ class Calibrate:
 		   additional axis, denoted by the slice number."""
 		if hasattr(self, "naxis2"):
 			for slc in range(naxis2):
-				tag = "_{0}.txt".format(slc)
+				tag = "_deg_{0}.txt".format(slc)
 				fns = ["cps"+tag, "cperr"+tag, "v2"+tag, "v2err"+tag]
-				arrs = [self.cp_calibrated, self.cp_err_calibrated, \
+				arrs = [self.cp_calibrated_deg, self.cp_err_calibrated_deg, \
 						self.v2_calibrated, self.v2_err_calibrated]
 				self._save_txt(fns, arrs)
 		else:
+			tag = "_deg.txt".format(slc)
 			fns = ["cps"+tag, "cperr"+tag, "v2"+tag, "v2err"+tag]
-			arrs = [self.cp_calibrated, self.cp_err_calibrated, \
+			arrs = [self.cp_calibrated_deg, self.cp_err_calibrated_deg, \
 					self.v2_calibrated, self.v2_err_calibrated]
 			self._save_txt(fns, arrs)
 
@@ -538,7 +539,7 @@ class Calibrate:
 					self.instrument_data.wavextension[1], clip=None)
 		oif.oi_data(read_from_txt=False, v2=self.v2_calibrated, \
 					v2err=self.v2_err_calibrated,
-					cps=self.cp_calibrated, cperr=self.cp_err_calibrated) 
+					cps=self.cp_calibrated_deg, cperr=self.cp_err_calibrated_deg) 
 		oif.write(fn_out)
 
 	def txt_2_oifits():
