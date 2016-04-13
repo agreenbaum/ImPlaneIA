@@ -59,6 +59,7 @@ First step import the main modules in this package:
 ###NIRISS Example ###
 Start with test data provided in this package
 
+	import os
 	targfiles = [f for f in os.listdir("f430_data") if "tcube" in f] # simulated data
 	calfiles = [f for f in os.listdir("f430_data") if "ccube" in f] # simulated data
 	nirissdata = InstrumentData.NIRISS(filt="F430M", objname="targ")
