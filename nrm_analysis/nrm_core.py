@@ -21,7 +21,7 @@ from scipy.misc import comb
 from scipy.stats import sem, mstats
 
 # Module imports
-from LG_Model import NRM_Model
+from fringefitting.LG_Model import NRM_Model
 import misctools.utils
 from misctools.utils import mas2rad
 

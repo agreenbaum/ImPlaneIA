@@ -12,10 +12,9 @@ import numpy as np
 import oifits
 import datetime
 from scipy.misc import comb
-from getwavls_gpi import wl_list
-from NRM_mask_definitions import NRM_mask_definitions
+from mask_definitions import NRM_mask_definitions
 import sys,os
-from analyticnrm2 import flip, rotatevectors
+from driverutils import flip, rotatevectors
 
 def count_bls(ctrs):
 	N = len(ctrs)

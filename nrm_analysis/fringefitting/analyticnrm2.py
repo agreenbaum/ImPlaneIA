@@ -6,8 +6,7 @@
 import numpy as np
 import scipy.special
 import sys
-import driverutils as utils
-from astropy.io import fits as pyfits
+from nrm_analysis.misctools import utils # April 2016 trying to get imports right
 import hexee
 
 def flip(holearray):
@@ -288,6 +287,7 @@ def match_niriss(img, fov, oversample):
 if __name__ == "__main__":
 
 	import pylab as pl
+	from astropy.io import fits 
 	np.set_printoptions(precision=2)
 
 	print 'script'
@@ -352,7 +352,7 @@ if __name__ == "__main__":
 	two_slice = np.zeros((2, np.shape(binnedpsf)[0], np.shape(binnedpsf)[1]))
 	two_slice[0] = binnedpsf
 	two_slice[1] = binnedpsf_corner
-	hdu = pyfits.PrimaryHDU()
+	hdu = fits.PrimaryHDU()
 	hdu.data = two_slice
 	hdu.header.update("SLICE0", 0.5,"offset for centering")
 	hdu.header.update("SLICE1", 2.0,"offset for centering")

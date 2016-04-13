@@ -5,8 +5,8 @@ import sys
 import time
 #import webbpsf.poppy as poppy
 import poppy
-from misctools.utils import makedisk
-import pyfits
+from nrm_analysis.misctools.utils import makedisk
+from astropy.io import fits
 """
 
 ================
@@ -141,7 +141,7 @@ class NRM_mask_definitions():
 		        makedisk(s=pupil.shape,  c=(pupil.shape[0]/2.0 - 0.5, pupil.shape[1]/2.0 - 0.5),
 				                   r=0.5*self.ID/puplscal, t=np.float64, grey=0) 
 
-		hdu = pyfits.PrimaryHDU ()
+		hdu = fits.PrimaryHDU ()
 		hdu.data = pupil.astype(np.uint8)
 		hdu.header.update("PUPLSCAL", puplscal, "Pupil pixel scale in m/pixels DL")
 		hdu.header.update("PIXSCALE", puplscal, "Pupil pixel scale in m/pixels MDP")
@@ -152,7 +152,7 @@ class NRM_mask_definitions():
 			hdu.writeto(fitsfile, clobber=True)
 		self.fullpupil = pupil.copy()
 		self.fullpuplscale = puplscal
-		hdulist = pyfits.HDUList([hdu])
+		hdulist = fits.HDUList([hdu])
 		return hdulist
 
 	def createnrmarray(self, puplscal=None, fitsfile=None, holeid=None, fullpupil=False):
@@ -178,7 +178,7 @@ class NRM_mask_definitions():
 		self.nrmpupil = pupil.copy()
 		self.puplscale = puplscal
 
-		hdu = pyfits.PrimaryHDU ()
+		hdu = fits.PrimaryHDU ()
 		hdu.data = pupil.astype(np.uint8)
 		hdu.header.update("PUPLSCAL", puplscal, "Pupil pixel scale in m/pixels MDP")
 		hdu.header.update("PIXSCALE", puplscal, "Pupil pixel scale in m/pixels DL")
@@ -192,7 +192,7 @@ class NRM_mask_definitions():
 		                 (year, month, day, hour, minute, second), "Date of calculation")
 		if fitsfile is not None:
 			hdu.writeto(fitsfile, clobber=True)
-		hdulist = pyfits.HDUList([hdu])
+		hdulist = fits.HDUList([hdu])
 		return hdulist
 
 

@@ -1,11 +1,9 @@
 #! /usr/bin/env python
 import numpy as np
 import numpy.fft as fft
-from astropy.io import fits as pyfits
+from astropy.io import fits
 import os, sys
-import pylab as plt  # if running __main__
-import binarymodel
-import pysynphot
+from nrm_analysis.modeling import binarymodel
 
 m_ = 1.0
 mm_ =  m_/1000.0
@@ -277,6 +275,7 @@ def specFromSpectralType(sptype, return_list=False):
 def combine_transmission(filt, SRC):
 	''' SRC is a spectral type string, e.g. A0V 
 		not the neatest, but gets the job done.'''
+	import pysynphot
 	filt_wls = np.zeros(len(filt))
 	filt_wght = np.zeros(len(filt))
 	for ii in range(len(filt)):
@@ -542,6 +541,7 @@ def trim_webbpsf_filter(filt, specbin=None, plot=False):
 	return band
 
 def testmain():
+	import matplotlib.pyplot as plt
 	fig = plt.figure(1,figsize=(6,4.5),dpi=150)
 	trim_webbpsf_filter("F277W", specbin=6, plot=True)
 	trim_webbpsf_filter("F380M", plot=True)
