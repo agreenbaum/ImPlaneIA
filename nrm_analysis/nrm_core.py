@@ -118,7 +118,7 @@ class FringeFitter:
 		#######################################################################
 
 		np.savetxt(self.savedir+"coordinates.txt", self.instrument_data.mask.ctrs)
-		np.savetxt(self.savedir+"wavelengths.txt", self.instrument_data.wls)
+		np.savetxt(self.savedir+"wavelengths.txt", self.instrument_data.wavextension[0])
 
 		nrm = NRM_Model(mask = self.instrument_data.mask, pixscale = self.instrument_data.pscale_rad, over = self.oversample)
 		# In future can just pass instrument_data to NRM_Model
