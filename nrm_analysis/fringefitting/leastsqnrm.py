@@ -6,7 +6,7 @@ import scipy.special
 import numpy.linalg as linalg
 import sys
 import analyticnrm2 as analytic
-import nrm_analysis.misctool.driverutils as utils # April 2016, trying to get imports right
+import nrm_analysis.misctool.utils as utils # April 2016, trying to get imports right
 import hexee
 from scipy.misc import comb
 
