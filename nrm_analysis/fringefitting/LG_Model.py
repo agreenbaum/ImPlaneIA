@@ -9,12 +9,10 @@ Imports:
 """
 import numpy as np
 import scipy.special
-import pylab as pl
 import hexee
 import math
-import misctools.utils as utils
-from driverutils import rebin
-#import AG_utils as utils
+import nrm_analysis.misctools.utils as utils
+from nrm_analysis.misctools.utils import rebin
 import sys, os
 import time
 from astropy.io import fits
@@ -530,8 +528,9 @@ class NRM_Model():
 		#except AttributeError:
 		#	print "A solved model has not been created for this object"
 		if show:
-			pl.imshow(self.modelpsf, interpolation='nearest', cmap='gray')
-			pl.show()
+			import matplotlib.pyplot as plt
+			plt.imshow(self.modelpsf, interpolation='nearest', cmap='gray')
+			plt.show()
 		return self.modelpsf, hdulist
 
 	def perfect_from_model(self, filename="perfect_from_model.fits"):
