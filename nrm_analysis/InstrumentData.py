@@ -204,7 +204,7 @@ class NIRISS:
 		#############################
 
 		# only one NRM on GPI:
-		self.arrname = "jwst_g7s6"
+		self.arrname = "jwst_g7s6c"
 		self.pscale_mas = 65
 		self.pscale_rad = utils.mas2rad(self.pscale_mas)
 		self.mask = NRM_mask_definitions(maskname=self.arrname)
