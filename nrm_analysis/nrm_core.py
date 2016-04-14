@@ -118,8 +118,8 @@ class FringeFitter:
 			pass
 		#######################################################################
 
-		np.savetxt(self.savedir+"coordinates.txt", self.instrument_data.mask.ctrs)
-		np.savetxt(self.savedir+"wavelengths.txt", self.instrument_data.wavextension[0])
+		np.savetxt(self.savedir+"/coordinates.txt", self.instrument_data.mask.ctrs)
+		np.savetxt(self.savedir+"/wavelengths.txt", self.instrument_data.wavextension[0])
 
 		nrm = NRM_Model(mask = self.instrument_data.mask, pixscale = self.instrument_data.pscale_rad, over = self.oversample)
 		# In future can just pass instrument_data to NRM_Model
@@ -384,7 +384,7 @@ class Calibrate:
 				nexps = len(exps)
 				amp = np.zeros((self.naxis2, nexps, self.nbl))
 				cps = np.zeros((self.naxis2, nexps, self.ncp))
-				for qq in range(len(exps)):
+				for qq in range(nexps):
 					# nwav files
 					cpfiles = [f for f in os.listdir(paths[ii]+exps[qq]) if "CPs" in f] 
 					ampfiles = [f for f in os.listdir(paths[ii]+exps[qq]) \
@@ -414,7 +414,7 @@ class Calibrate:
 				nexps = len(cpfiles)
 				amp = np.zeros((nexps, self.nbl))
 				cps = np.zeros((nexps, self.ncp))
-				for qq in range(len(exps)):
+				for qq in range(nexps):
 					amp[qq,:] = np.loadtxt(paths[ii]+"/"+ampfiles[qq])
 					cp[qq,:] = np.loadtxt(paths[ii]+"/"+cpfiles[qq])
 				if ii==0:
