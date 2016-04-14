@@ -506,7 +506,7 @@ class Calibrate:
 		print kwargs
 
 		
-		from write_oifits import OIfits
+		from misctools.write_oifits import OIfits
 		#except:
 		#	print "Need oifits.py nd write_oifits.py to use this method"
 		#	return None
@@ -532,7 +532,8 @@ class Calibrate:
 				'DEC':self.instrument_data.dec, \
 				'PARANG':self.instrument_data.parang, 
 				'PA':self.instrument_data.pa, 
-				'phaseceil':self.phaseceil}
+				'phaseceil':self.phaseceil
+				'flip':False}
 
 		oif = OIfits(self.instrument_data.mask,self.obskeywords)
 		oif.dummytables()
