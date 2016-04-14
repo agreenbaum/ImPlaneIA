@@ -20,7 +20,7 @@ Optional Python packages:
 *we recommend downloading the anaconda distribution for python*
 
 
-### Modules: ###
+### Core routines: ###
 
 * **FringeFitter** - fit fringes in the image plane. Support for masks on GPI, VISIR, and JWST-NIRISS
 * **Calibrate** - calibrate raw frame phases, closure phase, and squared visibilities, save to oifits option
@@ -52,19 +52,23 @@ User defines target and calibration sources in a list [target, cal, cal, ...],
 3. _mcmc_ - uses **emcee** code to find the best fit binary model to the measured fringe observables
 
 ## Basic tutorial ##
-First step import the main modules in this package:
+The main modules in this package are *InstrumentData* and *nrm_core*. **InstrumentData** sets up your dataset based on the instrument you're working with. **nrm_core** contains *FringeFitter*, *Calibrate*, and *Analyze*, described above. Here are basic examples of how to run this package with NIRISS or GPI data.
 
-	from nrm_analysis import InstrumentData, nrm_core
 
 ###NIRISS Example ###
-Start with test data provided in this package
+Start by importing main package modules. There is example data provided in this package that you can load to try this demo.
 
+	from nrm_analysis import InstrumentData, nrm_core
+	
+	# define data files
 	import os
 	targfiles = [f for f in os.listdir("f430_data") if "tcube" in f] # simulated data
 	calfiles = [f for f in os.listdir("f430_data") if "ccube" in f] # simulated data
+	
+	# set up instrument-specfic part
 	nirissdata = InstrumentData.NIRISS(filt="F430M", objname="targ")
 
-Instance of NIRISS, which will set up the data according to NIRISS standards given a filter name and the name of the observed object. Now let's say I have 1 target and 2 calibrators:
+This last call is an instance of 'NIRISS', which will set up the data according to NIRISS standards given a filter name and the name of the observed object. We are working with the test data provided, which includes images for 1 target and 1 calibrator:
 
 	ff =  nrm_core.FringeFitter(nirissdata, oversample = 5, savedir="targ", datadir="f430_data", npix=75)
 	for exposure in targfiles:
@@ -75,13 +79,13 @@ Instance of NIRISS, which will set up the data according to NIRISS standards giv
 		ff2.fit_fringes(exposure)
 
 	
-This initializes the fringe fitter with the options you want for measuring fringe observables. Then it fits each fits file's data by calling the fit_fringes method. Saves the output to directory "targ", etc. in working directory. I usually name this by the object name. 
+The fringe fitter (with the options you want) measures fringe observables - visibilities and closure phases. It fits each exposure by calling the fit_fringes method and saves the output to directories "targ" and "cal1." The default is to save to the working directory. I usually set savedir to a string with the object's name. 
 
 	targdir = "targ/"
 	caldir = "cal1/"	
 	calib = nrm_core.Calibrate([targdir, caldir], nirissdata, savedir = "my_calibrated")
 
-Instance of Calibrate, gives 2 directories containing target and calibration sources. The first directory in the list is always assumed to be the science target. Any number of calibrators may be provided. Argument savedir default is "calibrated." Argument sub_dir_tag not provided here because there is no wavelength axis (see below in GPI example for comparison).
+Instance of Calibrate, gives 2 directories containing target and calibration sources. The first directory in the list is always assumed to be the science target. Any number of calibrators may be provided. Argument savedir default is "calibrated." Argument sub_dir_tag is not provided here because there is no wavelength axis (see below in GPI example for comparison).
 
 	calib.save_to_oifits("niriss_test.oifits")
 Saves results to oifits. phaseceil keyword arg optional to set a custom dataflag. Default flag is set when phases exceed  1.0e1.
