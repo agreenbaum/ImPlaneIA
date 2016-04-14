@@ -279,7 +279,8 @@ class NIRISS:
 		fitsfile = fits.open(fn)
 		scidata=fitsfile[0].data
 		hdr=fitsfile[0].header
-		self.sub_dir_str = self.filt+"_"+self.objname
+		#self.sub_dir_str = self.filt+""
+		self.sub_dir_str = ""
 		if len(scidata.shape)==3:
 			return scidata, hdr
 		elif len(scidata.shape)==2:
