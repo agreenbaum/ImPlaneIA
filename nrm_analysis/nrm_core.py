@@ -24,6 +24,7 @@ from scipy.stats import sem, mstats
 from fringefitting.LG_Model import NRM_Model
 import misctools.utils
 from misctools.utils import mas2rad
+import misctools.utils as utils
 
 class FringeFitter:
 	def __init__(self, instrument_data, **kwargs):
@@ -133,7 +134,7 @@ class FringeFitter:
 
 		self.scidata, self.scihdr = self.instrument_data.read_data(self.datadir+"/"+fn)
 
-		#ctrref = driverutils.centerit(scidata[)
+		#ctrref = utils.centerit(scidata[)
 
 		self.sub_dir_str = self.instrument_data.sub_dir_str
 		try:
@@ -156,10 +157,10 @@ class FringeFitter:
 			nrm.bandpass = self.instrument_data.wls[slc]
 			#hdr['WAVL'] = wls[slc]
 
-			self.ctrd = driverutils.centerit(self.scidata[slc, :,:], r = self.npix//2)
-			refslice=driverutils.deNaN(5, self.ctrd)
+			self.ctrd = utils.centerit(self.scidata[slc, :,:], r = self.npix//2)
+			refslice=utils.deNaN(5, self.ctrd)
 			if True in np.isnan(refslice):
-				refslice = driverutils.deNaN(20,refslice)
+				refslice = utils.deNaN(20,refslice)
 
 
 			nrm.reference = self.ctrd
