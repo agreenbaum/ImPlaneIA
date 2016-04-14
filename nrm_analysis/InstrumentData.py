@@ -279,7 +279,7 @@ class NIRISS:
 		fitsfile = fits.open(fn)
 		scidata=fitsfile[0].data
 		hdr=fitsfile[0].header
-		self.sub_dir_str = self.filt+"_"+objname
+		self.sub_dir_str = self.filt+"_"+self.objname
 		if mode == "slice":
 			return np.array([scidata, ]), hdr
 		elif mode == "UTR":
