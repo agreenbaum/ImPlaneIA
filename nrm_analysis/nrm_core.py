@@ -158,9 +158,11 @@ class FringeFitter:
 			#hdr['WAVL'] = wls[slc]
 
 			self.ctrd = utils.centerit(self.scidata[slc, :,:], r = self.npix//2)
-			refslice=utils.deNaN(5, self.ctrd)
-			if True in np.isnan(refslice):
-				refslice = utils.deNaN(20,refslice)
+			refslice = self.ctrd.copy()
+			if True in np.isnan(self.refslice):
+				refslice=utils.deNaN(5, self.ctrd)
+				if True in np.isnan(refslice):
+					refslice = utils.deNaN(20,refslice)
 
 
 			nrm.reference = self.ctrd

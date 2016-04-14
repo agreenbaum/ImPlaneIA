@@ -3,7 +3,6 @@ import numpy as np
 import numpy.fft as fft
 from astropy.io import fits
 import os, sys
-from nrm_analysis.modeling import binarymodel
 
 m_ = 1.0
 mm_ =  m_/1000.0

@@ -280,12 +280,12 @@ class NIRISS:
 		scidata=fitsfile[0].data
 		hdr=fitsfile[0].header
 		self.sub_dir_str = self.filt+"_"+self.objname
-		if mode == "slice":
-			return np.array([scidata, ]), hdr
-		elif mode == "UTR":
+		if len(scidata.shape)==3:
 			return scidata, hdr
+		elif len(scidata.shape)==2:
+			return np.array([scidata,]), hdr
 		else:
-			sys.exit("invalid data mode for NIRISS. 'UTR' and 'slice' supported")
+			sys.exit("invalid data dimensions for NIRISS. Should have dimensionality of 2 or 3.")
 
 	def _generate_filter_files():
 		"""Either from WEBBPSF, or tophat, etc. A set of filter files will also be provided"""
