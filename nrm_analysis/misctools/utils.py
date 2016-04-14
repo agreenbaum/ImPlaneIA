@@ -66,6 +66,12 @@ def makehex(N, s, ctr=(0,0)):
 	  (y>-(d*x)-(d*s))] = 1
 	return array
 
+
+def flip(holearray):
+	fliparray= holearray.copy()
+	fliparray[:,1] = -1*holearray[:,1]
+	return fliparray
+
 def rotatevectors(vectors, thetarad):
 	"""
 	vectors is a list of vectors - e.g. nrm hole  centers
