@@ -416,18 +416,18 @@ class Calibrate:
 				cps = np.zeros((nexps, self.ncp))
 				for qq in range(nexps):
 					amp[qq,:] = np.loadtxt(paths[ii]+"/"+ampfiles[qq])
-					cp[qq,:] = np.loadtxt(paths[ii]+"/"+cpfiles[qq])
+					cps[qq,:] = np.loadtxt(paths[ii]+"/"+cpfiles[qq])
 				if ii==0:
 					# closure phases and squared visibilities
 					self.cp_mean_tar[0,:], self.cp_err_tar[0,:], \
 						self.v2_err_tar[0,:], self.v2_err_tar[0,:] = \
-						self.calib_steps(cp, amp, nexps)
+						self.calib_steps(cps, amp, nexps)
 				else:
 					# Fixed clunkiness!
 					# closure phases and visibilities
 					self.cp_mean_cal[ii-1,0, :], self.cp_err_cal[ii-1,0, :], \
 						self.v2_mean_cal[ii-1,0,:], self.v2_err_cal[ii-1,0,:] = \
-						self.calib_steps(cp[0,:,:], amp[0, :,:], nexps)
+						self.calib_steps(cps, amp, nexps)
 
 		# Combine mean calibrator values and errors
 		self.cp_mean_tot = np.zeros(self.cp_mean_cal[0].shape)
