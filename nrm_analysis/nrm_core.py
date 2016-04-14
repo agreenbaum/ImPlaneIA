@@ -532,8 +532,7 @@ class Calibrate:
 				'DEC':self.instrument_data.dec, \
 				'PARANG':self.instrument_data.parang, 
 				'PA':self.instrument_data.pa, 
-				'phaseceil':self.phaseceil
-				'flip':False}
+				'phaseceil':self.phaseceil}
 
 		oif = OIfits(self.instrument_data.mask,self.obskeywords)
 		oif.dummytables()
