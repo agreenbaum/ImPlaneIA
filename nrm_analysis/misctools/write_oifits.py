@@ -14,7 +14,7 @@ import datetime
 from scipy.misc import comb
 from mask_definitions import NRM_mask_definitions
 import sys,os
-from driverutils import flip, rotatevectors
+from nrm_analysis.misctools.utils import flip, rotatevectors
 
 def count_bls(ctrs):
 	N = len(ctrs)
