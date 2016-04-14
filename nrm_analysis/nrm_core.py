@@ -131,7 +131,7 @@ class FringeFitter:
 
 	def fit_fringes(self, fn):
 
-		self.scidata, self.scihdr = self.instrument_data.read_data(self.datadir+"/"fn)
+		self.scidata, self.scihdr = self.instrument_data.read_data(self.datadir+"/"+fn)
 
 		#ctrref = driverutils.centerit(scidata[)
 
