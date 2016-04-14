@@ -236,7 +236,7 @@ class NIRISS:
 		except:
 			self.wls = [self.throughput, ]
 
-		self.wavextension = (lam_c[self.filt], lam_w[self.filt])
+		self.wavextension = ([lam_c[self.filt],], [lam_w[self.filt],])
 		self.nwav=1
 
 		#############################
