@@ -521,7 +521,7 @@ class Calibrate:
 			self.phaseceil = 1.0e1
 
 		self.obskeywords = {
-				'path':self.savedir,
+				'path':self.savedir+"/",
 				'year':self.instrument_data.year, 
 				'month':self.instrument_data.month,
 				'day':self.instrument_data.day,
