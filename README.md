@@ -66,11 +66,11 @@ Start with test data provided in this package
 
 Instance of NIRISS, which will set up the data according to NIRISS standards given a filter name and the name of the observed object. Now let's say I have 1 target and 2 calibrators:
 
-	ff =  nrm_core.FringeFitter(nirissdata, oversample = 5, savedir="targ", datadir="f430_data", npix=121)
+	ff =  nrm_core.FringeFitter(nirissdata, oversample = 5, savedir="targ", datadir="f430_data", npix=75)
 	for exposure in targfiles:
 		ff.fit_fringes(exposure)
 		
-	ff2 =  nrm_core.FringeFitter(nirissdata, oversample = 5, savedir="cal1", datadir="f430_data", npix=121)
+	ff2 =  nrm_core.FringeFitter(nirissdata, oversample = 5, savedir="cal1", datadir="f430_data", npix=75)
 	for exposure in calfiles:
 		ff2.fit_fringes(exposure)
 
