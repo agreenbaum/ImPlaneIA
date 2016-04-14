@@ -173,7 +173,7 @@ class VISIR:
 
 	def read_data(self, fn):
 		# for datacube of exposures, need to read as 3D (nexp, npix, npix)
-		fitsfile = fits.open(self.datadir+fn)
+		fitsfile = fits.open(fn)
 		scidata=fitsfile[0].data
 		hdr=fitsfile[0].header
 		self.sub_dir_str = self.filt+"_"+objname
@@ -276,7 +276,7 @@ class NIRISS:
 		# mode options are slice or UTR
 		# for single slice data, need to read as 3D (1, npix, npix)
 		# for utr data, need to read as 3D (ngroup, npix, npix)
-		fitsfile = fits.open(self.datadir+fn)
+		fitsfile = fits.open(fn)
 		scidata=fitsfile[0].data
 		hdr=fitsfile[0].header
 		self.sub_dir_str = self.filt+"_"+objname
