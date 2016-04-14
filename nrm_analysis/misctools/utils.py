@@ -732,13 +732,6 @@ def baseline_info(mask, pscale_mas, lam_c):
 	print "Mask is Nyquist at",
 	print mas2rad(2*pscale_mas)*(bllengths.max())
 
-def bm(ctrs, contrast, separation, PA, oneoverwavl): 
-	# separation in mas
-	sepcoords = (mas2rad(separation)*np.cos(PA), mas2rad(separation)*np.sin(PA))
-	# PA in radians
-	cps = binarymodel.return_cps(ctrs, contrast, sepcoords, oneoverwavl)
-	return cps
-
 if __name__ == "__main__":
 
 	testmain()

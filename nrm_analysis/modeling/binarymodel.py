@@ -1,11 +1,9 @@
 #! /usr/bin/env python
 
 import numpy as np
-import pyfits
-import pylab as pl
 import os
 from scipy.misc import comb
-from analyticnrm2 import mas2rad, rad2mas
+from nrm_analysis.misctools.utils import mas2rad, rad2mas
 from argparse import ArgumentParser
 
 HOME = '/Users/agreenba/'
@@ -138,3 +136,10 @@ def return_cps(ctrs, ratio, position, scaling):
 					       visphase(side3, ratio, position)
 			n= n+j+1
 	return cps#,np.mean(cps), np.var(cps) * (comb(N,3)/((N*(N-1)/2) - 1 ))
+
+def bm(ctrs, contrast, separation, PA, oneoverwavl): 
+	# separation in mas
+	sepcoords = (mas2rad(separation)*np.cos(PA), mas2rad(separation)*np.sin(PA))
+	# PA in radians
+	cps = return_cps(ctrs, contrast, sepcoords, oneoverwavl)
+	return cps
