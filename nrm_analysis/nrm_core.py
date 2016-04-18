@@ -690,7 +690,7 @@ class BinaryAnalyze:
 			else:
 				pass
 
-	def vis_model(self, params, constant, spectrum = None, priors ==None):
+	def vis_model(self, params, constant, spectrum = None, priors = None):
 		# really want to be able to give this guy some general oi_data and have bm() sort it out.
 		# Need to figure out how to add in the priors
 
