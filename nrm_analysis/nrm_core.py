@@ -761,7 +761,7 @@ def logl(data, model):
 	if only considering cps then model is (cps,) size 1
 	"""
 	ll=0
-	for ii in range(len(model))
-		ll += -0.5*np.log(2*np.pi)*data[2*ii].size + np.sum(-np.log(data[2*ii+1]**2)
+	for ii in range(len(model)):
+		#ll += -0.5*np.log(2*np.pi)*data[2*ii].size + np.sum(-np.log(data[2*ii+1]**2)
 		ll += - np.sum(((model[ii] - data[2*ii]) / data[2*ii+1])**2) # something like this
 	return ll
