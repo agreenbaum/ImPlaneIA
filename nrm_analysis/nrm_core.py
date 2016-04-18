@@ -711,7 +711,7 @@ class BinaryAnalyze:
 		elif spectrum == 'slope':
 			wav_step = constant['wavl'][1] - constant['wavl'][0]
 			contrast = np.linspace(params['con_start'] + params['slope']*wav_step
-			model = bm(params['con'], params['sep'], params['pa'], constant['wavl'])
+			model = bm(contrast, params['sep'], params['pa'], constant['wavl'])
 		elif spectrum == 'free':
 			model = bm[params['con'], constant['sep'], constant['pa'], constant['wavl'])
 
