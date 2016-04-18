@@ -405,7 +405,7 @@ class Calibrate:
 					if ii==0:
 						# closure phases and squared visibilities
 						self.cp_mean_tar[slc,:], self.cp_err_tar[slc,:], \
-							self.v2_mean_tar[slc,:], self.v2_err_tar[slc,:] \
+							self.v2_mean_tar[slc,:], self.v2_err_tar[slc,:], \
 							self.pha_mean_tar[slc,:], self.pha_err_tar = \
 							self.calib_steps(cp[slc,:,:], amp[slc,:,:], pha[slc,:,:], nexps)
 					else:
