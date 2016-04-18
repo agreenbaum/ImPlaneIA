@@ -674,7 +674,7 @@ class BinaryAnalyze:
 		if priors is not None:
 			self.priors = priors
 		else:
-			self.priors = [(-np.inf, np.inf) for f in range(len(params.keys()))
+			self.priors = [(-np.inf, np.inf) for f in range( len(params.keys()) ) ]
 		
 	def plot_chain_convergence(self):
 		samples  = self.sampler.chain[:, 50:, :].reshape((-1, ndim))
