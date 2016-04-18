@@ -677,9 +677,9 @@ class BinaryAnalyze:
 			self.priors = [(-np.inf, np.inf) for f in range( len(params.keys()) ) ]
 		
 	def plot_chain_convergence(self):
-		samples  = self.sampler.chain[:, 50:, :].reshape((-1, ndim))
+		samples  = self.sampler.chain[:, 50:, :].reshape((-1, self.ndim))
 		for ii in range(chain.shape[-1]):
-			plt.subplot2grid((,1),(ii,0))
+			plt.subplot2grid((self.ndim,1),(ii,0))
 			plt.plot()
 
 	def logp(params, priors):
