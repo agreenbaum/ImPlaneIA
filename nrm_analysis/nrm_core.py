@@ -712,8 +712,10 @@ class BinaryAnalyze:
 			wav_step = constant['wavl'][1] - constant['wavl'][0]
 			contrast = np.linspace(params['con_start'] + params['slope']*wav_step)
 			model = bm(contrast, params['sep'], params['pa'], constant['wavl'])
-		elif spectrum == 'free':
-			model = bm[params['con'], constant['sep'], constant['pa'], constant['wavl'])
+		elif spectrum == 'free' :
+			model = bm(params['con'], constant['sep'], constant['pa'], constant['wavl'])
+		else:
+			sys.exit("Invalid spectrum model")
 
 		ll = logl(data, model)
 		return ll
