@@ -102,7 +102,7 @@ e.g., starting with a list of GPI files
 This creates an instance of GPI, which will read header keywords from a reference file and sets up the data according to GPI standards
 
 
-	ff =  nrm_core.FringeFitter(gpidata, oversample = 5, savedir="Target", datadir=datadir, npix=121)
+	ff =  nrm_core.FringeFitter(gpidata, oversample = 5, savedir="Target", npix=121)
 	for exposure in gpifiles:
 		ff.fit_fringes(exposure)
 
