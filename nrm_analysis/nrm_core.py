@@ -742,9 +742,9 @@ class BinaryAnalyze:
 			for ii in range(self.instrumentdata.ncp):
 				self.cp[:,ii] = self.oifdata.t3[ii].t3phi
 				self.cperr[:,ii] = self.oifdata.t3[ii].t3phierr
-				self.ucoord[:,ii] = self.oifdata.t3.u1coord, self.oifdata.t3.u2coord,
+				self.ucoord[:,ii] = self.oifdata.t3.u1coord, self.oifdata.t3.u2coord,\
 							-(self.oifdata.t3.u1coord+self.oifdata.t3.u2coord)
-				self.vcoord[:,ii] = self.oifdata.t3.v1coord, self.oifdata.t3.v2coord,
+				self.vcoord[:,ii] = self.oifdata.t3.v1coord, self.oifdata.t3.v2coord,\
 							-(self.oifdata.t3.v1coord+self.oifdata.t3.v2coord)
 			for jj in range(self.instrumentdata.nbl):
 				self.v2[:,jj] = self.oifdata.vis2[jj].vis2data
