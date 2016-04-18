@@ -202,6 +202,7 @@ class OIfits():
 		#define oifits arrays
 		self.oit3=[]
 		self.oivis2=[]
+		self.oivis=[]
 		self.nwav=len(self.wls)
 
 		# default is no flag -- can be reset by user after calling oi_data()
@@ -242,6 +243,8 @@ class OIfits():
 			# Add in vis observables
 			self.t3phi = kwargs["cps"]
 			self.t3phierr = kwargs["cperr"]
+			self.vispha = kwargs["pha"]
+			self.visphaerr = kwargs["phaerr"]
 
 		# T3 AMP data from V2 arrays
 		self.t3amp = np.ones((self.nwav, self.ncps))
@@ -257,8 +260,16 @@ class OIfits():
 				self.vcoord[qq], self.oiwav,self.target,array=self.array,\
 				station=[self.station,self.station])
 			self.oivis2.append(vis2data)
+
+			visdata = oifits.OI_VIS(self.timeobs,self.int_time, np.sqrt(self.v2[:,qq]), \
+				np.sqrt(self.v2_err[:,qq]), self.vispha, self.visphaerr, self.v2flag, \
+				self.ucoord[qq], self.vcoord[qq], self.oiwav,self.target,array=self.array,\
+				station=[self.station,self.station])
+			self.oivis.append(visdata)
+
 		#print 'oivis2 table set'
 		self.oivis2 = np.array(self.oivis2)
+		self.oivis = np.array(self.oivis)
 		#print self.oivis2
 
 			#print read_in(self.datapath, wl,kw='cp')
