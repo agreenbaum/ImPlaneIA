@@ -371,11 +371,15 @@ class Calibrate:
 		self.cp_err_cal = np.zeros((self.ncals, self.naxis2, self.ncp))
 		self.v2_mean_cal = np.zeros((self.ncals, self.naxis2, self.nbl))
 		self.v2_err_cal = np.zeros((self.ncals, self.naxis2, self.nbl))
+		self.pha_mean_cal = np.zeros((self.ncals, self.naxis2, self.nbl))
+		self.pha_err_cal = np.zeros((self.ncals, self.naxis2, self.nbl))
 
 		self.cp_mean_tar = np.zeros((self.naxis2, self.ncp))
 		self.cp_err_tar = np.zeros((self.naxis2, self.ncp))
 		self.v2_mean_tar = np.zeros((self.naxis2, self.nbl))
 		self.v2_err_tar = np.zeros((self.naxis2, self.nbl))
+		self.pha_mean_tar = np.zeros((self.naxis2, self.nbl))
+		self.pha_err_tar = np.zeros((self.naxis2, self.nbl))
 
 		if sub_dir_tag is not None:
 			self.sub_dir_tag = sub_dir_tag
@@ -389,79 +393,99 @@ class Calibrate:
 					cpfiles = [f for f in os.listdir(paths[ii]+exps[qq]) if "CPs" in f] 
 					ampfiles = [f for f in os.listdir(paths[ii]+exps[qq]) \
 								if "amplitudes" in f]
+					phafiles = [f for f in os.listdir(paths[ii]+exps[qq]) if "phase" in f] 
 					amp = np.zeros((self.naxis2, nexps, self.nbl))
+					pha = np.zeros((self.naxis2, nexps, self.nbl))
 					cp = np.zeros((self.naxis2, nexps, self.ncp))
 					for slc in range(len(cpfiles)):
 						amp[slc, qq,:] = np.loadtxt(paths[ii]+exps[qq]+"/"+ampfiles[slc])
 						cp[slc, qq,:] = np.loadtxt(paths[ii]+exps[qq]+"/"+cpfiles[slc])
+						pha[slc, qq,:] = np.loadtxt(paths[ii]+exps[qq]+"/"+phafiles[slc])
 				for slc in range(self.naxis2):
 					if ii==0:
 						# closure phases and squared visibilities
 						self.cp_mean_tar[slc,:], self.cp_err_tar[slc,:], \
-									self.v2_err_tar[slc,:], self.v2_err_tar[slc,:] = \
-									self.calib_steps(cp[slc,:,:], amp[slc,:,:], nexps)
+							self.v2_mean_tar[slc,:], self.v2_err_tar[slc,:] \
+							self.pha_mean_tar[slc,:], self.pha_err_tar = \
+							self.calib_steps(cp[slc,:,:], amp[slc,:,:], pha[slc,:,:], nexps)
 					else:
 						# Fixed clunkiness!
 						# closure phases and visibilities
 						self.cp_mean_cal[ii-1,slc, :], self.cp_err_cal[ii-1,slc, :], \
-							self.v2_mean_cal[ii-1,slc,:], self.v2_err_cal[ii-1,slc,:] = \
-							self.calib_steps(cp[slc,:,:], amp[slc,:,:], nexps)
+							self.v2_mean_cal[ii-1,slc,:], self.v2_err_cal[ii-1,slc,:], \
+							self.pha_mean_cal[ii-1,slc,:], self.pha_err_cal[ii-1, slc,:] = \
+							self.calib_steps(cp[slc,:,:], amp[slc,:,:], pha[slc,:,:], nexps)
 
 		else:
 			for ii in range(self.nobjs):
 				cpfiles = [f for f in os.listdir(paths[ii]) if "CPs" in f] 
 				ampfiles = [f for f in os.listdir(paths[ii]) if "amplitudes" in f]
+				phafiles = [f for f in os.listdir(paths[ii]) if "phase" in f]
 				nexps = len(cpfiles)
 				amp = np.zeros((nexps, self.nbl))
+				pha = np.zeros((nexps, self.nbl))
 				cps = np.zeros((nexps, self.ncp))
 				for qq in range(nexps):
 					amp[qq,:] = np.loadtxt(paths[ii]+"/"+ampfiles[qq])
+					pha[qq,:] = np.loadtxt(paths[ii]+"/"+phafiles[qq])
 					cps[qq,:] = np.loadtxt(paths[ii]+"/"+cpfiles[qq])
 				if ii==0:
 					# closure phases and squared visibilities
 					self.cp_mean_tar[0,:], self.cp_err_tar[0,:], \
-						self.v2_err_tar[0,:], self.v2_err_tar[0,:] = \
-						self.calib_steps(cps, amp, nexps)
+						self.v2_err_tar[0,:], self.v2_err_tar[0,:], \
+						self.pha_mean_tar[slc,:], self.pha_err_tar = \
+						self.calib_steps(cps, amp, pha, nexps)
 				else:
 					# Fixed clunkiness!
 					# closure phases and visibilities
 					self.cp_mean_cal[ii-1,0, :], self.cp_err_cal[ii-1,0, :], \
-						self.v2_mean_cal[ii-1,0,:], self.v2_err_cal[ii-1,0,:] = \
-						self.calib_steps(cps, amp, nexps)
+						self.v2_mean_cal[ii-1,0,:], self.v2_err_cal[ii-1,0,:], \
+						self.pha_mean_cal[ii-1,0,:], self.pha_err_cal[ii-1,0,:] = \
+						self.calib_steps(cps, amp, pha, nexps)
 
 		# Combine mean calibrator values and errors
 		self.cp_mean_tot = np.zeros(self.cp_mean_cal[0].shape)
 		self.cp_err_tot = self.cp_mean_tot.copy()
 		self.v2_mean_tot = np.zeros(self.v2_mean_cal[0].shape)
 		self.v2_err_tot = self.v2_mean_tot.copy()
+		self.pha_mean_tot = np.zeros(self.pha_mean_cal[0].shape)
+		self.pha_err_tot = self.pha_mean_tot.copy()
 		for ww in range(self.ncals):
 			self.cp_mean_tot += self.cp_mean_cal[ww]
 			self.cp_err_tot += self.cp_err_cal[ww]**2
 			self.v2_mean_tot += self.v2_mean_cal[ww]
 			self.v2_err_tot += self.v2_err_cal[ww]**2
+			self.pha_mean_tot += self.pha_mean_cal[ww]
+			self.pha_err_tot += self.pha_err_cal[ww]**2
 		self.cp_mean_tot = self.cp_mean_tot/self.ncals
 		self.cp_err_tot = np.sqrt(self.cp_err_tot)
 		self.v2_mean_tot = self.v2_mean_tot/self.ncals
 		self.v2_err_tot = np.sqrt(self.v2_err_tot)
+		self.pha_mean_tot = self.pha_mean_tot/self.ncals
+		self.pha_err_tot = np.sqrt(self.pha_err_tot)
 
 		# Calibrate
 		self.cp_calibrated = self.cp_mean_tar - self.cp_mean_tot
 		self.cp_err_calibrated =  np.sqrt(self.cp_err_tar**2 + self.cp_err_tot**2)
 		self.v2_calibrated = self.v2_mean_tar/self.v2_mean_tot
 		self.v2_err_calibrated = np.sqrt(self.v2_err_tar**2 + self.v2_err_tot**2)
+		self.pha_calibrated = self.pha_mean_tar - self.pha_mean_tot
+		self.pha_err_calibrated = np.sqrt(self.pha_err_tar**2 + self.pha_err_tot**2)
 
 		self.cp_calibrated_deg = self.cp_calibrated * 180/np.pi
 		self.cp_err_calibrated_deg = self.cp_err_calibrated * 180/np.pi
-		self.v2_calibrated_deg = self.v2_calibrated * 180/np.pi
-		self.v2_err_calibrated_deg = self.v2_err_calibrated * 180/np.pi
+		self.pha_calibrated_deg = self.pha_calibrated * 180/np.pi
+		self.pha_err_calibrated_deg = self.pha_err_calibrated * 180/np.pi
 
-	def calib_steps(self, cps, amps, nexp):
+	def calib_steps(self, cps, amps, pha, nexp):
 		"Calculates closure phase and mean squared visibilities & standard error"
 		meancp = np.mean(cps, axis=0)
 		meanv2 = np.mean(amps, axis=0)**2
+		meanpha = np.mean(pha, axis=0)
 		errcp = mstats.moment(cps, moment=2, axis=0)/np.sqrt(nexp)
 		errv2 = mstats.moment(amps**2, moment=2, axis=0)/np.sqrt(nexp)
-		return meancp, errcp, meanv2, errv2
+		errpha = mstats.moment(pha, moment=2, axis=0)/np.sqrt(nexp)
+		return meancp, errcp, meanv2, errv2, meanpha, errpha
 
 	def save_to_txt(self):
 		"""Saves calibrated results to text files
@@ -472,13 +496,15 @@ class Calibrate:
 				tag = "_deg_{0}.txt".format(slc)
 				fns = ["cps"+tag, "cperr"+tag, "v2"+tag, "v2err"+tag]
 				arrs = [self.cp_calibrated_deg, self.cp_err_calibrated_deg, \
-						self.v2_calibrated, self.v2_err_calibrated]
+						self.v2_calibrated, self.v2_err_calibrated, \
+						self.pha_calibrated_deg, self.pha_err_calibrated_deg]
 				self._save_txt(fns, arrs)
 		else:
 			tag = "_deg.txt".format(slc)
 			fns = ["cps"+tag, "cperr"+tag, "v2"+tag, "v2err"+tag]
 			arrs = [self.cp_calibrated_deg, self.cp_err_calibrated_deg, \
-					self.v2_calibrated, self.v2_err_calibrated]
+					self.v2_calibrated, self.v2_err_calibrated, \
+					self.pha_calibrated_deg, self.pha_err_calibrated_deg]
 			self._save_txt(fns, arrs)
 
 	def _save_txt(self, fns, arrays):
@@ -514,11 +540,14 @@ class Calibrate:
 		# look for kwargs, e.g., phaseceil, anything else?
 		if "phaseceil" in kwargs.keys():
 			self.phaseceil = kwargs["phaseceil"]
-			print "phaseceil in kwargs", self.phaseceil
 		else:
-			print "phaseceil not in kwargs"
 			# default for flagging closure phases
 			self.phaseceil = 1.0e1
+		if "clip" in kwargs.keys():
+			self.clip_wls = clip
+		else:
+			# default is no clipping - maybe could set instrument-dependent clip in future
+			self.clip_wls = None
 
 		self.obskeywords = {
 				'path':self.savedir+"/",
@@ -539,10 +568,10 @@ class Calibrate:
 		# Option to clip out band edges for multiple wavelengths
 		# clip can be scalar or 2-element. scalar will do symmetric clipping
 		wavs = oif.wavextension(self.instrument_data.wavextension[0], \
-					self.instrument_data.wavextension[1], clip=None)
-		oif.oi_data(read_from_txt=False, v2=self.v2_calibrated, \
-					v2err=self.v2_err_calibrated,
-					cps=self.cp_calibrated_deg, cperr=self.cp_err_calibrated_deg) 
+					self.instrument_data.wavextension[1], clip=self.clip_wls)
+		oif.oi_data(read_from_txt=False, v2=self.v2_calibrated, v2err=self.v2_err_calibrated, \
+					cps=self.cp_calibrated_deg, cperr=self.cp_err_calibrated_deg, \
+					pha = self.pha_calibrated_deg, phaerr = self.pha_err_calibrated_deg) 
 		oif.write(fn_out)
 
 	def txt_2_oifits():
@@ -569,3 +598,168 @@ class Calibrate:
 
 	def _from_ami_header(fitsfiles):
 		return None
+
+class BinaryAnalyze:
+	def __init__(self, oifitsfn, instrumentdata):
+		"""
+		What do I want to do here?
+		Want to load an oifits file and look for a binary -- anything else?
+		"""
+
+		self.instrumentdata = instrumentdata
+		self.get_data(oifitsfn)
+
+		import matplotlib.pyplot as plt
+
+
+	def coarse_search(self, lims, nstep=20):
+		"""
+		For getting first guess on contrast, separation, and angle
+		"""
+		grid = np.zeros((nstep, nstep, nstep))
+		cons = np.linspace(lims[0][0], lims[0][1], num=nstep)
+		seps = np.linspace(lims[1][0], lims[1][1], num=nstep)
+		angs = np.linspace(lims[2][0], lims[2][1], num=nstep)
+		loglike = np.zeros((nstep, nstep, nstep))
+
+		for i in range(nstep):
+			for j in range(nstep):
+				for k in range(nstep):
+					params = [cons[i], seps[j], angs[k]]
+					loglike[i,j,k] = logl(params)
+
+		wheremax = np.where(loglike==loglike.max())
+		print "abs max", wheremax
+		print "loglike at max axis=0",wheremax[0][0], loglike[wheremax[0][0],:,:].shape
+		print "==================="
+		print "Max log likelikehood for contrast:", 
+		print cons[wheremax[0]]
+		print "Max log likelikehood for separation:", 
+		print seps[wheremax[1]]
+		print "Max log likelikehood for angle:", 
+		print angs[wheremax[2]]*180./np.pi
+		print "==================="
+
+		plt.figure()
+		plt.set_cmap("cubehelix")
+		plt.title("separation vs. pa at contrast of {0:.1f}".format(cons[wheremax[0][0]]))
+		plt.imshow(loglike[wheremax[0][0], :,:])
+		plt.xticks(np.arange(nstep)[::5], np.round(seps[::5],3))
+		plt.yticks(np.arange(nstep)[::5], np.round(angs[::5]*180/np.pi,3))
+		plt.xlabel("Separation")
+		plt.ylabel("PA")
+
+		plt.figure()
+		plt.title("contrast vs. separation, at PA of {0:.1f} deg".format(angs[wheremax[2][0]]*180/np.pi))
+		plt.xticks(np.arange(nstep)[::5], np.round(cons[::5],3))
+		plt.yticks(np.arange(nstep)[::5], np.round(seps[::5],3))
+		plt.xlabel("Contrast")
+		plt.ylabel("Separation")
+		plt.imshow(loglike[:,:,wheremax[2][0]])
+
+		plt.figure()
+		plt.title("contrast vs. angle, at separation of {0:.1f} mas".format(seps[wheremax[1][0]]))
+		plt.xticks(np.arange(nstep)[::5], np.round(cons[::5], 3))
+		plt.yticks(np.arange(nstep)[::5], np.round(angs[::5]*180/np.pi, 3))
+		plt.xlabel("Contrast")
+		plt.ylabel("PA")
+		plt.imshow(loglike[:,wheremax[1][0],:])
+
+		plt.show()
+
+	def run_emcee(self, nwalkers = 250, niter = 1000, find_spectrum=False, priors=None):
+		import emcee
+		self.chain = sampler.flatchain
+
+		if priors is not None:
+			self.priors = priors
+		else:
+			self.priors = [(-np.inf, np.inf) for f in range(len(params.keys()))
+		
+	def plot_chain_convergence(self):
+		samples  = self.sampler.chain[:, 50:, :].reshape((-1, ndim))
+		for ii in range(chain.shape[-1]):
+			plt.subplot2grid((,1),(ii,0))
+			plt.plot()
+
+	def logp(params, priors):
+		# priors:
+		for i in range(len(params)):
+			if (params[i] <priors[i,1] or params[i] > priors[i,0]):	
+				return -np.inf
+			else:
+				pass
+
+	def vis_model(self, params, constant, spectrum = None, priors ==None):
+		# really want to be able to give this guy some general oi_data and have bm() sort it out.
+		# Need to figure out how to add in the priors
+
+		##################################################
+		# HOW DO I TUNE THIS DEPENDING ON MY OBSERVATIONS? - need a keyword or something, need help.
+		data = self.cp, self.cperr#, self.v2, self.v2err
+		##################################################
+		
+		if spectrum == None:
+			# priors, here we're doing a general search, so it's a good idea to have some priors
+			for i in range(len(params)):
+				if (params[i] < priors[i,1] or params[i] > priors[i,0]):	
+					return -np.inf
+				else:
+					pass
+			# Model from params
+			model = bm(params['con'], params['sep'], params['pa'], constant['wavl'])
+		elif spectrum == 'slope':
+			wav_step = constant['wavl'][1] - constant['wavl'][0]
+			contrast = np.linspace(params['con_start'] + params['slope']*wav_step
+			model = bm(params['con'], params['sep'], params['pa'], constant['wavl'])
+		elif spectrum == 'free':
+			model = bm[params['con'], constant['sep'], constant['pa'], constant['wavl'])
+
+		ll = logl(data, model)
+		return ll
+
+	def get_data(self):
+		try:
+			self.oifdata = oifits.open(fn)
+			self.telescope = self.oifdata.wavelengths.keys()[0]
+			datasize = len(self.oifdata)
+			self.wavls = self.oifdata.wavelength[self.telescope].eff_wave
+			self.eff_band = self.oifdata.wavelength[self.telescope].eff_band
+			self.nwav = len(self.wavls)
+			self.ucoord = np.zeros((3, self.nwav))
+			self.vcoord = np.zeros((3, self.nwav))
+
+			# Now collect fringe observables and coordinates
+			self.cp = np.zeros((self.nwav, self.instrumentdata.ncp))
+			self.cperr = np.zeros((self.nwav, self.instrumentdata.ncp))
+			self.v2 = np.zeros((self.nwav, self.instrumentdata.nbl))
+			self.v2err = np.zeros((self.nwav, self.instrumentdata.nbl))
+			self.pha = np.zeros((self.nwav, self.instrumentdata.nbl))
+			self.phaerr = np.zeros((self.nwav, self.instrumentdata.nbl))
+
+			for ii in range(self.instrumentdata.ncp):
+				self.cp[:,ii] = self.oifdata.t3[ii].t3phi
+				self.cperr[:,ii] = self.oifdata.t3[ii].t3phierr
+				self.ucoord[:,ii] = self.oifdata.t3.u1coord, self.oifdata.t3.u2coord,
+							-(self.oifdata.t3.u1coord+self.oifdata.t3.u2coord)
+				self.vcoord[:,ii] = self.oifdata.t3.v1coord, self.oifdata.t3.v2coord,
+							-(self.oifdata.t3.v1coord+self.oifdata.t3.v2coord)
+			for jj in range(self.instrumentdata.nbl):
+				self.v2[:,jj] = self.oifdata.vis2[jj].vis2data
+				self.v2err[:,jj] = self.oifdata.vis2[jj].vis2err
+				self.pha[:,jj] = self.oifdata.vis2[jj].visphi
+				self.phaerr[:,jj] = self.oifdata.vis2[jj].visphierr
+			
+		except:
+			print "Unable to read oifits file"
+
+def logl(data, model):
+	"""
+	data must be 2x as long as model
+	if only considering cps then model is (cps,) size 1
+	"""
+	ll=0
+	for ii in range(len(model))
+		ll += -0.5*np.log(2*np.pi)*data[2*ii].size + np.sum(-np.log(data[2*ii+1]**2)
+		ll += - np.sum(((model[ii] - data[2*ii]) / data[2*ii+1])**2) # something like this
+	return ll
