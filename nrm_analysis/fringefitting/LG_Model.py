@@ -16,7 +16,6 @@ from nrm_analysis.misctools.utils import rebin
 import sys, os
 import time
 from astropy.io import fits
-import NRM_mask_definitions as NRM
 import logging
 from argparse import ArgumentParser
 #import leastsqnrm_smallangle as leastsqnrm
