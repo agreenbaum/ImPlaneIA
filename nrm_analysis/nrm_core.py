@@ -635,6 +635,7 @@ class BinaryAnalyze:
 		What do I want to do here?
 		Want to load an oifits file and look for a binary -- anything else?
 		"""
+		import oifits
 		self.oifitsfn = oifitsfn
 
 		get_data(self)
