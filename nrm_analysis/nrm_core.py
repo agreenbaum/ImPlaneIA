@@ -19,6 +19,7 @@ import numpy as np
 from astropy.io import fits
 from scipy.misc import comb
 from scipy.stats import sem, mstats
+import cPickle as pickle
 
 # Module imports
 from fringefitting.LG_Model import NRM_Model
@@ -48,6 +49,8 @@ class FringeFitter:
 
 		main method:
 		* fit_fringes
+
+		Idea: default interact == True. User can turn this off to have everything automatically overwrite?
 
 		"""
 		self.instrument_data = instrument_data
@@ -94,6 +97,10 @@ class FringeFitter:
 			self.verbose_save = kwargs["verbose_save"]
 		else:
 			self.verbose_save = False
+		if 'interactive' in kwargs:
+			self.interactive = kwargs['interactive']
+		else:
+			self.interavtive = True
 		#######################################################################
 
 
@@ -102,14 +109,17 @@ class FringeFitter:
 		try:
 			os.mkdir(self.savedir)
 		except:
-			print self.savedir+" Already exists, rewrite its contents? (y/n)"
-			ans = raw_input()
-			if ans == "y":
-				pass
-			elif ans == "n":
-				sys.exit("provide a different save directory with kwarg 'savedir' when calling FringeFitter")
+			if self.interactive is True:
+				print self.savedir+" Already exists, rewrite its contents? (y/n)"
+				ans = raw_input()
+				if ans == "y":
+					pass
+				elif ans == "n":
+					sys.exit("use alternative save directory with kwarg 'savedir' when calling FringeFitter")
+				else:
+					sys.exit("Invalid answer. Stopping.")
 			else:
-				sys.exit("Invalid answer. Stopping.")
+				pass
 
 		self.refimgs = self.instrument_data.ref_imgs_dir # could be taken care of in InstrumentData?
 		try:
@@ -130,79 +140,83 @@ class FringeFitter:
 		if self.debug==True:
 			import poppy.matrixDFT as mft
 
-	def fit_fringes(self, fn):
+	def fit_fringes(self, fns):
+		if type(fns) == str:
+			fns = [fns, ]
 
-		self.scidata, self.scihdr = self.instrument_data.read_data(self.datadir+"/"+fn)
+		for fn in fns:
+			self.scidata, self.scihdr = self.instrument_data.read_data(self.datadir+"/"+fn)
 
-		#ctrref = utils.centerit(scidata[)
+			#ctrref = utils.centerit(scidata[)
 
-		self.sub_dir_str = self.instrument_data.sub_dir_str
-		try:
-			os.mkdir(self.savedir+self.sub_dir_str)
-		except:
-			pass
-
-		for slc in range(self.instrument_data.nwav):
-			# create the reference PSF directory if doing any auto_scaling or rotation
+			self.sub_dir_str = self.instrument_data.sub_dir_str
 			try:
-				os.mkdir(self.refimgs+'{0:02d}'.format(slc)+'/')
+				os.mkdir(self.savedir+self.sub_dir_str)
 			except:
 				pass
 
-			# NRM_Model
-			nrm = NRM_Model(mask=self.instrument_data.mask, pixscale = self.instrument_data.pscale_rad,\
-						    over = self.oversample)
-
-			nrm.refdir=self.refimgs+'{0:02d}'.format(slc)+'/'
-			nrm.bandpass = self.instrument_data.wls[slc]
-			#hdr['WAVL'] = wls[slc]
-
-			self.ctrd = utils.centerit(self.scidata[slc, :,:], r = self.npix//2)
-			refslice = self.ctrd.copy()
-			if True in np.isnan(refslice):
-				refslice=utils.deNaN(5, self.ctrd)
-				if True in np.isnan(refslice):
-					refslice = utils.deNaN(20,refslice)
-
-
-			nrm.reference = self.ctrd
-			if self.hold_centering == False:
-				nrm.auto_find_center("ctrmodel.fits")
-				nrm.bestcenter = 0.5-nrm.over*nrm.xpos, 0.5-nrm.over*nrm.ypos
-			else:
-				nrm.bestcenter = nrm.centering
-
-			# similar if/else routines for auto scaling and rotation
-
-			nrm.make_model(fov = self.ctrd.shape[0], bandpass=nrm.bandpass, over=self.oversample,
-						   centering=nrm.bestcenter, pixscale=nrm.pixel)
-			nrm.fit_image(self.ctrd, modelin=nrm.model)
-			"""
-			Attributes now stored in nrm object:
-
-			-----------------------------------------------------------------------------
-			soln 			--- resulting sin/cos coefficients from least squares fitting
-			fringephase 	--- baseline phases in radians
-			fringeamp		---	baseline amplitudes (flux normalized)
-			redundant_cps	--- closure phases in radians
-			redundant_cas 	--- closure amplitudes
-			residual		--- fit residuals [data - model solution]
-			cond			--- matrix condition for inversion
-			-----------------------------------------------------------------------------
-			"""
-
-			if self.debug==True:
-				dataft = mft.matrix_dft(self.ctrd, 256, 512)
-				refft = mft.matrix_dft(nrm.refpsf, 256, 512)
-				plt.figure()
-				plt.title("Data")
-				plt.imshow(np.sqrt(abs(dataft)), cmap = "bone")
-				plt.figure()
-				plt.title("Reference")
-				plt.imshow(np.sqrt(abs(refft)), cmap="bone")
-				plt.show()
 			
-			self.save_output(slc, nrm)
+			for slc in range(self.instrument_data.nwav):
+				# create the reference PSF directory if doing any auto_scaling or rotation
+				try:
+					os.mkdir(self.refimgs+'{0:02d}'.format(slc)+'/')
+				except:
+					pass
+
+				# NRM_Model
+				nrm = NRM_Model(mask=self.instrument_data.mask, pixscale = self.instrument_data.pscale_rad,\
+								over = self.oversample)
+
+				nrm.refdir=self.refimgs+'{0:02d}'.format(slc)+'/'
+				nrm.bandpass = self.instrument_data.wls[slc]
+				#hdr['WAVL'] = wls[slc]
+
+				self.ctrd = utils.centerit(self.scidata[slc, :,:], r = self.npix//2)
+				refslice = self.ctrd.copy()
+				if True in np.isnan(refslice):
+					refslice=utils.deNaN(5, self.ctrd)
+					if True in np.isnan(refslice):
+						refslice = utils.deNaN(20,refslice)
+
+
+				nrm.reference = self.ctrd
+				if self.hold_centering == False:
+					nrm.auto_find_center("ctrmodel.fits")
+					nrm.bestcenter = 0.5-nrm.over*nrm.xpos, 0.5-nrm.over*nrm.ypos
+				else:
+					nrm.bestcenter = nrm.centering
+
+				# similar if/else routines for auto scaling and rotation
+
+				nrm.make_model(fov = self.ctrd.shape[0], bandpass=nrm.bandpass, over=self.oversample,
+							   centering=nrm.bestcenter, pixscale=nrm.pixel)
+				nrm.fit_image(self.ctrd, modelin=nrm.model)
+				"""
+				Attributes now stored in nrm object:
+
+				-----------------------------------------------------------------------------
+				soln 			--- resulting sin/cos coefficients from least squares fitting
+				fringephase 	--- baseline phases in radians
+				fringeamp		---	baseline amplitudes (flux normalized)
+				redundant_cps	--- closure phases in radians
+				redundant_cas 	--- closure amplitudes
+				residual		--- fit residuals [data - model solution]
+				cond			--- matrix condition for inversion
+				-----------------------------------------------------------------------------
+				"""
+
+				if self.debug==True:
+					dataft = mft.matrix_dft(self.ctrd, 256, 512)
+					refft = mft.matrix_dft(nrm.refpsf, 256, 512)
+					plt.figure()
+					plt.title("Data")
+					plt.imshow(np.sqrt(abs(dataft)), cmap = "bone")
+					plt.figure()
+					plt.title("Reference")
+					plt.imshow(np.sqrt(abs(refft)), cmap="bone")
+					plt.show()
+				
+				self.save_output(slc, nrm)
 
 	def save_output(self, slc, nrm):
 		# cropped & centered PSF
@@ -282,7 +296,7 @@ class Calibrate:
 
 	"""
 
-	def __init__(self, paths, instrument_data, savedir="calibrated", sub_dir_tag=None):
+	def __init__(self, paths, instrument_data, savedir="calibrated", sub_dir_tag=None, **kwargs):
 		"""
 		Initilize the class
 
@@ -318,6 +332,11 @@ class Calibrate:
 		v2_mean_tar ... size [naxis2, nbl]
 		v2_err_tar  ... size [naxis2, nbl]
 		"""
+
+		if 'interactive' in kwargs.keys():
+			self.interactive = kwargs['interactive']
+		else:
+			self.interactive = True
 	
 		try:
 			os.listdir(savedir)
@@ -342,30 +361,37 @@ class Calibrate:
 		# some warnings
 		if self.naxis2 == 1:
 			if sub_dir_tag is not None:
-				print "!! naxis2 is set to zero but sub_dir_tag is defined !!",
-				print "Are you sure you want to do this?",
-				print "Will look for files only in ",
-				print paths
-				print "proceed anyway? (y/n)"
-				ans = raw_input()
-				if ans =='y':
-					pass
-				elif ans == 'n':
-					sys.exit("stopping, naxis2 must be > 1 to use sub_dir_tag, see help")
+				if self.interactive==True:
+					print "!! naxis2 is set to zero but sub_dir_tag is defined !!",
+					print "Are you sure you want to do this?",
+					print "Will look for files only in ",
+					print paths
+					print "proceed anyway? (y/n)"
+					ans = raw_input()
+					if ans =='y':
+						pass
+					elif ans == 'n':
+						sys.exit("stopping, naxis2 must be > 1 to use sub_dir_tag, see help")
+					else:
+						sys.exit("invalid response, stopping")
 				else:
-					sys.exit("invalid response, stopping")
+					pass
+					
 		else:
 			if sub_dir_tag == None: 
-				print "!! naxis2 is set to a non-zero number but extra_layer"
-				print "is not defined !! naxis2 will be ignored."
-				print "proceed anyway? (y/n)"
-				ans = raw_input()
-				if ans =='y':
-					pass
-				elif ans == 'n':
-					sys.exit("stopping, define sub_dir_tag if naxis2>1")
+				if self.interactive==True:
+					print "!! naxis2 is set to a non-zero number but extra_layer"
+					print "is not defined !! naxis2 will be ignored."
+					print "proceed anyway? (y/n)"
+					ans = raw_input()
+					if ans =='y':
+						pass
+					elif ans == 'n':
+						sys.exit("stopping, define sub_dir_tag if naxis2>1")
+					else:
+						sys.exit("invalid response, stopping")
 				else:
-					sys.exit("invalid response, stopping")
+					pass
 
 		self.cp_mean_cal = np.zeros((self.ncals, self.naxis2, self.ncp))
 		self.cp_err_cal = np.zeros((self.ncals, self.naxis2, self.ncp))
@@ -600,19 +626,20 @@ class Calibrate:
 		return None
 
 class BinaryAnalyze:
-	def __init__(self, oifitsfn, instrumentdata):
+	def __init__(self, oifitsfn, savedir = "calibrated"):
 		"""
 		What do I want to do here?
 		Want to load an oifits file and look for a binary -- anything else?
 		"""
+		self.oifitsfn = oifitsfn
 
-		self.instrumentdata = instrumentdata
-		self.get_data(oifitsfn)
+		self.get_data()
+		self.savedir = savedir
 
 		import matplotlib.pyplot as plt
 
 
-	def coarse_search(self, lims, nstep=20):
+	def coarse_binary_search(self, lims, nstep=20):
 		"""
 		For getting first guess on contrast, separation, and angle
 		"""
@@ -625,8 +652,8 @@ class BinaryAnalyze:
 		for i in range(nstep):
 			for j in range(nstep):
 				for k in range(nstep):
-					params = [cons[i], seps[j], angs[k]]
-					loglike[i,j,k] = logl(params)
+					params = {'con':cons[i], 'sep':seps[j], 'pa':angs[k]}
+					loglike[i,j,k] = cp_binary_model(params, {"wavl:":self.wavls})
 
 		wheremax = np.where(loglike==loglike.max())
 		print "abs max", wheremax
@@ -648,6 +675,7 @@ class BinaryAnalyze:
 		plt.yticks(np.arange(nstep)[::5], np.round(angs[::5]*180/np.pi,3))
 		plt.xlabel("Separation")
 		plt.ylabel("PA")
+		plt.savefig(self.savedir+"/sep_pa.pdf")
 
 		plt.figure()
 		plt.title("contrast vs. separation, at PA of {0:.1f} deg".format(angs[wheremax[2][0]]*180/np.pi))
@@ -656,6 +684,7 @@ class BinaryAnalyze:
 		plt.xlabel("Contrast")
 		plt.ylabel("Separation")
 		plt.imshow(loglike[:,:,wheremax[2][0]])
+		plt.savefig(self.savedir+"/con_sep.pdf")
 
 		plt.figure()
 		plt.title("contrast vs. angle, at separation of {0:.1f} mas".format(seps[wheremax[1][0]]))
@@ -664,104 +693,214 @@ class BinaryAnalyze:
 		plt.xlabel("Contrast")
 		plt.ylabel("PA")
 		plt.imshow(loglike[:,wheremax[1][0],:])
+		plt.savefig(self.savedir+"/con_pa.pdf")
 
 		plt.show()
 
-	def run_emcee(self, nwalkers = 250, niter = 1000, find_spectrum=False, priors=None):
+	def run_emcee(self, params, constant, nwalkers = 250, niter = 1000, spectrum_model=None, priors=None, threads=4):
+		"""
+		A lot of options in this method, read carefully.
+
+		Arguments params and constant are dictionaries. 
+
+		For example if you wanted to search for 3 parameters, contrast, separation, and PA:
+			params = {'con': cr_val, 'sep': sep_rad, 'pa': pa_rad}
+			constant = {'wavls': array_of_wavelengths}
+		because  we are searching for con, sep, & pa, and we hold the wavelength constant
+
+		Priors are bounds here. 
+
+		"""
 		import emcee
-		self.chain = sampler.flatchain
+		self.ndim = len(params)
+		constant = {}
+		constant['wavl'] = self.wavls
+		# Options are None 'slope' or 'free'
+		self.spectrum_model = spectrum_model
+		self.params = params
 
 		if priors is not None:
 			self.priors = priors
 		else:
-			self.priors = [(-np.inf, np.inf) for f in range( len(params.keys()) ) ]
+			self.priors = [(-np.inf, np.inf) for f in range( len(self.params.keys()) ) ]
+
+		guess = np.zeros(self.ndim)
+		q=0
+		for key in self.params.keys():
+			guess[q] = self.params[key]
+			q+=1
+		p0 = [guess + 0.1*guess*np.random(self.ndim) for i in range(nwalkers)]
+
+		t0 = time.time()
+		self.sampler = EnsembleSampler(nwalkers, self.ndim, self.cp_binary_model, threads=threads, args=[constant,])
+
+		t2 = time.time()
+		pos, prob, state = self.sampler.run_mcmc(p0, niter)
+		t3 = time.time()
+		print("Mean acceptance fraction: {0:.3f}".format(np.mean(sampler.acceptance_fraction)))
+		print "This number should be between approximately 0.25 and 0.5 if everything went as planned."
+
+		print "ran mcmc, took", t3 - t2, "s"
+		self.chain = sampler.flatchain
+
+		self.mcmc_results = {}
+		print "========================="
+		print "emcee found...."
+		for ii, key in enumerate(self.params.keys()):
+			self.mcmc_results[key] = self.chain[:,ii]
+			mean = np.mean(self.mcmc_results[key])
+			err = np.std(self.mcmc_results[key])
+			print key, ":", mean, "+/-", err
+		print "========================="
+		# pickle self.mcmc_results here:
+		pickle.dump(self.mcmc_results, open(savedir+"/mcmc_results.pick", "wb"))
+
+		import corner
+		fig = corner.corner(chain, labels = self.params.keys(), bins = 100)
+		plt.savefig(self.savedir+"triangle_plot.pdf")
+		plt.show()
 		
 	def plot_chain_convergence(self):
-		samples  = self.sampler.chain[:, 50:, :].reshape((-1, self.ndim))
+		samples  = self.chain[:, 50:, :].reshape((-1, self.ndim))
+		plt.figure()
+		self.chain_convergence = {}
 		for ii in range(chain.shape[-1]):
 			plt.subplot2grid((self.ndim,1),(ii,0))
-			plt.plot()
+			plt.plot(samples[:,ii])
+			plt.ylabel(self.params.keys()[ii])
+			plt.xlabel("step number")
+			self.chain_convergence[self.params.keys()[ii]] = samples[:,ii]
+		plt.savefig(self.savedir+"/chain_convergence.pdf")
+		# Pickle and save this data?
+		pickle.dump(self.chain_convergence, open(savedir+"/chain_convergence.pick", "wb"))
+		plt.show()
 
-	def logp(params, priors):
-		# priors:
-		for i in range(len(params)):
-			if (params[i] <priors[i,1] or params[i] > priors[i,0]):	
-				return -np.inf
-			else:
-				pass
+	def diffphase_binary_model(self):
+		# Figure out how to do diff phase here in Calibrate first?
+		# Look for, e.g., emission features.
+		return None
 
-	def vis_model(self, params, constant, spectrum = None, priors = None):
+	def cp_binary_model(self, params, constant):
 		# really want to be able to give this guy some general oi_data and have bm() sort it out.
 		# Need to figure out how to add in the priors
 
 		##################################################
 		# HOW DO I TUNE THIS DEPENDING ON MY OBSERVATIONS? - need a keyword or something, need help.
-		data = self.cp, self.cperr#, self.v2, self.v2err
+		# data = self.cp, self.cperr#, self.v2, self.v2err
 		##################################################
-		
-		if spectrum == None:
-			# priors, here we're doing a general search, so it's a good idea to have some priors
-			for i in range(len(params)):
-				if (params[i] < priors[i,1] or params[i] > priors[i,0]):	
-					return -np.inf
+	
+		# priors, i.e. bounds here
+		for i in range(len(params)):
+			if (params[i] < self.priors[i,1] or params[i] > self.priors[i,0]):	
+				return -np.inf
+			else:
+
+				if self.spectrum_model == None:
+
+					# Model from params
+					model_cp = model_cp_uv(self.uvcoords, params['con'], params['sep'], \
+										params['pa'], 1.0/constant['wavl'])
+				elif spectrum == 'slope':
+					# params needs 'con_start' starting contrast and 'slope,' sep & pa constant?
+					wav_step = constant['wavl'][1] - constant['wavl'][0]
+					# contrast model is con_start + slope*delta_lambda
+					contrast = np.linspace(params['con_start'] + params['slope']*wav_step)
+					# Model from params
+					model_cp = model_cp_uv(self.uvcoords, contrast, params['sep'], \
+										params['pa'], 1.0/constant['wavl'])
+				elif spectrum == 'free' :
+					# Model from params - params is contrast array nwav long, sep & pa constant
+					model_cp = model_cp_uv(self.uvcoords, params['con'], constant['sep'], \
+										constant['pa'], 1.0/constant['wavl'])
 				else:
-					pass
-			# Model from params
-			model = bm(params['con'], params['sep'], params['pa'], constant['wavl'])
-		elif spectrum == 'slope':
-			wav_step = constant['wavl'][1] - constant['wavl'][0]
-			contrast = np.linspace(params['con_start'] + params['slope']*wav_step)
-			model = bm(contrast, params['sep'], params['pa'], constant['wavl'])
-		elif spectrum == 'free' :
-			model = bm(params['con'], constant['sep'], constant['pa'], constant['wavl'])
-		else:
-			sys.exit("Invalid spectrum model")
+					sys.exit("Invalid spectrum model")
 
-		ll = logl(data, model)
-		return ll
+				ll = logl(self.cp, self.cperr, model_cp)
+				return ll
 
-	def get_data(self):
-		try:
-			self.oifdata = oifits.open(fn)
-			self.telescope = self.oifdata.wavelengths.keys()[0]
-			datasize = len(self.oifdata)
-			self.wavls = self.oifdata.wavelength[self.telescope].eff_wave
-			self.eff_band = self.oifdata.wavelength[self.telescope].eff_band
-			self.nwav = len(self.wavls)
-			self.ucoord = np.zeros((3, self.nwav))
-			self.vcoord = np.zeros((3, self.nwav))
+def get_data(self):
+	# Move this function out, pass values to the object
+	try:
+		self.oifdata = oifits.open(self.oifitsfn)
+		self.telescope = self.oifdata.wavelengths.keys()[0]
+		datasize = len(self.oifdata)
+		self.wavls = self.oifdata.wavelength[self.telescope].eff_wave
+		self.eff_band = self.oifdata.wavelength[self.telescope].eff_band
+		self.nwav = len(self.wavls)
+		#self.ucoord = np.zeros((3, self.ncp))
+		self.uvcoords = np.zeros((2, 3, self.ncp))#, self.nwav))
 
-			# Now collect fringe observables and coordinates
-			self.cp = np.zeros((self.nwav, self.instrumentdata.ncp))
-			self.cperr = np.zeros((self.nwav, self.instrumentdata.ncp))
-			self.v2 = np.zeros((self.nwav, self.instrumentdata.nbl))
-			self.v2err = np.zeros((self.nwav, self.instrumentdata.nbl))
-			self.pha = np.zeros((self.nwav, self.instrumentdata.nbl))
-			self.phaerr = np.zeros((self.nwav, self.instrumentdata.nbl))
+		# Now collect fringe observables and coordinates
+		self.cp = np.zeros((self.nwav, self.instrumentdata.ncp))
+		self.cperr = np.zeros((self.nwav, self.instrumentdata.ncp))
+		self.v2 = np.zeros((self.nwav, self.instrumentdata.nbl))
+		self.v2err = np.zeros((self.nwav, self.instrumentdata.nbl))
+		self.pha = np.zeros((self.nwav, self.instrumentdata.nbl))
+		self.phaerr = np.zeros((self.nwav, self.instrumentdata.nbl))
 
-			for ii in range(self.instrumentdata.ncp):
-				self.cp[:,ii] = self.oifdata.t3[ii].t3phi
-				self.cperr[:,ii] = self.oifdata.t3[ii].t3phierr
-				self.ucoord[:,ii] = self.oifdata.t3.u1coord, self.oifdata.t3.u2coord,\
-							-(self.oifdata.t3.u1coord+self.oifdata.t3.u2coord)
-				self.vcoord[:,ii] = self.oifdata.t3.v1coord, self.oifdata.t3.v2coord,\
-							-(self.oifdata.t3.v1coord+self.oifdata.t3.v2coord)
-			for jj in range(self.instrumentdata.nbl):
-				self.v2[:,jj] = self.oifdata.vis2[jj].vis2data
-				self.v2err[:,jj] = self.oifdata.vis2[jj].vis2err
-				self.pha[:,jj] = self.oifdata.vis2[jj].visphi
-				self.phaerr[:,jj] = self.oifdata.vis2[jj].visphierr
-			
-		except:
-			print "Unable to read oifits file"
+		for ii in range(self.instrumentdata.ncp):
+			self.cp[:,ii] = self.oifdata.t3[ii].t3phi
+			self.cperr[:,ii] = self.oifdata.t3[ii].t3phierr
+			self.uvcoords[0,:,ii] = self.oifdata.t3[ii].u1coord, self.oifdata.t3[ii].u2coord,\
+						-(self.oifdata.t3[ii].u1coord+self.oifdata.t3[ii].u2coord)
+			self.uvcoords[1, :,ii] = self.oifdata.t3[ii].v1coord, self.oifdata.t3.v2coord,\
+						-(self.oifdata.t3.v1coord+self.oifdata.t3.v2coord)
+			# replicate the uv coordinates over the wavelength axis
+			self.uvcoords = np.tile(self.uvcoords, (self.nwav, 1, 1, 1))
+			# Now uvcoords is shape (nwav, 2, 3, ncps)
+			self.uvcoords = np.rollaxis(self.uvcoords, 0, 4)
+			#for q in range(self.nwav-1):
+			#	self.uvcoords[:,:,:,f] = self.uvcoords[:,:,:,0]
+		for jj in range(self.instrumentdata.nbl):
+			self.v2[:,jj] = self.oifdata.vis2[jj].vis2data
+			self.v2err[:,jj] = self.oifdata.vis2[jj].vis2err
+			self.pha[:,jj] = self.oifdata.vis2[jj].visphi
+			self.phaerr[:,jj] = self.oifdata.vis2[jj].visphierr
+		
+	except:
+		print "Unable to read oifits file"
 
-def logl(data, model):
+def logl(data, err, model):
 	"""
 	data must be 2x as long as model
 	if only considering cps then model is (cps,) size 1
 	"""
-	ll=0
-	for ii in range(len(model)):
-		#ll += -0.5*np.log(2*np.pi)*data[2*ii].size + np.sum(-np.log(data[2*ii+1]**2)
-		ll += - np.sum(((model[ii] - data[2*ii]) / data[2*ii+1])**2) # something like this
-	return ll
+	#for ii in range(len(model)):
+	#	#ll += -0.5*np.log(2*np.pi)*data[2*ii].size + np.sum(-np.log(data[2*ii+1]**2)
+	return -0.5*np.log(2*np.pi) - np.sum(np.log(err)) - np.sum((model - data)**2/(2*data**2))
+
+class DiskAnalyze:
+	def __init__(self):
+		print "not finished."
+
+	def diffvis_model(self, params, priors):
+		"""
+		polz data - look for differential visibilities and fit something from a radiative transfer code
+					> Hyperion? Does it have polz info
+					> mcfost? - Has polz info.
+		"""
+
+		# priors, here we're doing a general search, so it's a good idea to have some priors
+		for i in range(len(params)):
+			if (params[i] < priors[i,1] or params[i] > priors[i,0]):	
+				return -np.inf
+			else:
+				pass
+
+	def vis_model_ellipse(self, params, priors):
+
+		data = self.cp, self.cperr, self.v2, self.v2err
+
+		# priors, here we're doing a general search, so it's a good idea to have some priors
+		for i in range(len(params)):
+			if (params[i] < priors[i,1] or params[i] > priors[i,0]):	
+				return -np.inf
+			else:
+				pass
+
+				model_vis = model_vis_ellipse(params['semmaj'], params['semmin'], params['inc'])
+
+				ll = logl(data, model)
+				return ll
+
+

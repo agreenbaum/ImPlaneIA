@@ -176,7 +176,8 @@ class VISIR:
 		fitsfile = fits.open(fn)
 		scidata=fitsfile[0].data
 		hdr=fitsfile[0].header
-		self.sub_dir_str = self.filt+"_"+objname
+		#self.sub_dir_str = self.filt+"_"+objname
+		self.sub_dir_str = '/' + fn.split('/')[-1].replace('.fits', '')
 		self.nexp = scidata.shape[0]
 		# rewrite wavextension to be same length as nexp
 		self.wavextension = (self.lam_c*np.ones(self.nexp), self.lam_w*np.ones(self.nexp))
@@ -280,7 +281,7 @@ class NIRISS:
 		scidata=fitsfile[0].data
 		hdr=fitsfile[0].header
 		#self.sub_dir_str = self.filt+""
-		self.sub_dir_str = ""
+		self.sub_dir_str = '/' + fn.split('/')[-1].replace('.fits', '')
 		if len(scidata.shape)==3:
 			return scidata, hdr
 		elif len(scidata.shape)==2:

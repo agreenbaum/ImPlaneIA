@@ -50,7 +50,49 @@ def baselines4(quad):
 	x4x1 = ( (quad[3,0] - quad[0,0]) , (quad[3,1] - quad[0,1]) )
 	return x1x2, x2x3, x3x4, x4x1
 
-def visphase(baseline, ratio, position):
+
+#def visphase(baseline, ratio, position):
+#	"""
+#	From David L.'s NRM code V(u,v) = {1 + r exp[-i2pi(alpha.u + delta.v)]}/(1+r)
+#	2011 Sparse Aperture Masking at the VLT
+#
+#	r: flux ratio between sources
+#	alpha, delta: RA, DEC (radians)
+#	u, v: orthogonal spatial frequency vectors
+#
+#	Returns: the resulting phase given a baseline, flux ratio, and separation.
+#	To do: figure out the scaling & coordinates for the baseline.
+#	"""
+#	alpha, delta = position
+#	u,v = baseline
+#
+#	visibility = ( 1 + ratio * (np.exp((-1j*2*np.pi*(alpha*u +delta*v))) ) ) \
+#			/(1+ratio)
+#	phase = np.angle(visibility)
+#	return phase
+#
+#def visamp(baseline, ratio, position):
+#	"""
+#	From David L.'s NRM code V(u,v) = {1 + r exp[-i2pi(alpha.u + delta.v)]}/(1+r)
+#
+#	r: flux ratio between sources
+#	alpha, delta: RA, DEC (radians)
+#	u, v: orthogonal spatial frequency vectors
+#
+#	Returns: the resulting amplitude given a baseline, flux ratio, and separation.
+#	To do: figure out the scaling & coordinates for the baseline.
+#	"""
+#	alpha, delta = position
+#	u,v = baseline
+#
+#	visibility = ( 1 + ratio * (np.exp((-1j*2*np.pi*(alpha*u +delta*v))) ) ) \
+#			/(1+ratio)
+#	amplitude = np.absolute(visibility)
+#	return amplitude
+
+#######################################################################
+# Need to rewrite visamp and visphase to be more compatible with arrays
+def visphase(baseline, ratio, separation, angle):
 	"""
 	From David L.'s NRM code V(u,v) = {1 + r exp[-i2pi(alpha.u + delta.v)]}/(1+r)
 	2011 Sparse Aperture Masking at the VLT
@@ -59,18 +101,20 @@ def visphase(baseline, ratio, position):
 	alpha, delta: RA, DEC (radians)
 	u, v: orthogonal spatial frequency vectors
 
-	Returns: the resulting phase given a baseline, flux ratio, and separation.
+	Returns: the resulting phase given a baseline, flux ratio, separation, and angle.
 	To do: figure out the scaling & coordinates for the baseline.
 	"""
-	alpha, delta = position
-	u,v = baseline
+	alpha = separation*np.cos(angle)
+	delta = separation*np.sin(angle)
+	u = baseline[0]
+	v = baseline[1]
 
 	visibility = ( 1 + ratio * (np.exp((-1j*2*np.pi*(alpha*u +delta*v))) ) ) \
 			/(1+ratio)
 	phase = np.angle(visibility)
 	return phase
 
-def visamp(baseline, ratio, position):
+def visamp(baseline, ratio,  separation, angle):
 	"""
 	From David L.'s NRM code V(u,v) = {1 + r exp[-i2pi(alpha.u + delta.v)]}/(1+r)
 
@@ -81,15 +125,21 @@ def visamp(baseline, ratio, position):
 	Returns: the resulting amplitude given a baseline, flux ratio, and separation.
 	To do: figure out the scaling & coordinates for the baseline.
 	"""
-	alpha, delta = position
-	u,v = baseline
+
+	alpha = separation*np.cos(angle)
+	delta = separation*np.sin(angle)
+	u = baseline[0]
+	v = baseline[1]
 
 	visibility = ( 1 + ratio * (np.exp((-1j*2*np.pi*(alpha*u +delta*v))) ) ) \
 			/(1+ratio)
 	amplitude = np.absolute(visibility)
 	return amplitude
 
-def return_vis(ctrs, ratio, position,scaling):
+
+#######################################################################
+
+def model_vis(ctrs, ratio, position,scaling):
 	N = len(ctrs)
 	phases = np.zeros(N*(N-1)/2)
 	amps = phases.copy()
@@ -105,23 +155,41 @@ def return_vis(ctrs, ratio, position,scaling):
 	return phases, amps
 
 # Added Feb 16 2015: 
-def return_vis_uv(uvs, ratio, position, scaling):
-	"""
-	1/lambda scaling
-	"""
-	nbl = len(uvs)
-	phases = np.zeros(nbl)
-	amps = phases.copy()
-	uvs = scaling*uvs
-	for g in range(nbl):
-		phases[g] = visphase((uvs[g,0], uvs[g,1]),
-						ratio,position)
-		amps[g] = visamp((uvs[g,0], uvs[g,1]),
-						ratio,position)
-	return phases, amps
+#def model_vis_uv(uvs, ratio, position, scaling):
+#	"""
+#	1/lambda scaling
+#	"""
+#	nbl = len(uvs)
+#	phases = np.zeros(nbl)
+#	amps = phases.copy()
+#	uvs = scaling*uvs
+#	for g in range(nbl):
+#		phases[g] = visphase((uvs[g,0], uvs[g,1]),
+#						ratio,position)
+#		amps[g] = visamp((uvs[g,0], uvs[g,1]),
+#						ratio,position)
+#	return phases, amps
 
+def model_vis_uv(uvs, ratio, separation, pa, inv_wavl):
+	uvs = inv_wavl*tri_uv
+	model_visphi = visphase(uvs, ratio, separation, pa)
+	model_visamp = visphase(uvs, ratio, separation, pa)
 
-def return_cps(ctrs, ratio, position, scaling):
+def model_cp_uv(tri_uv, ratio, separation, pa, inv_wavl):
+	"""
+	Takes 3 cp uv coords, or a set of them and returns model cps based on
+	contrast ratio and position specified, at some wavelength. 
+	tri_uv = array( [[u1, v1], [u2, v2], [u3, v3],]  )
+	shape: [2, 3, ncp, nwavl]
+	contrast, separation, pa all should be len(inv_wavl) or scalar
+	"""
+	uvs = inv_wavl*tri_uv
+	model_cps = visphase(uvs[:,0, ...], ratio, separation, pa) + \
+				visphase(uvs[:,1, ...], ratio, separation, pa) + \
+				visphase(uvs[:,2, ...], ratio, separation, pa)
+	return model_cps
+
+def model_cps(ctrs, ratio, position, scaling):
 	N = len(ctrs)
 	cps = np.zeros(int(comb(N,3)))
 	n=0
@@ -137,9 +205,11 @@ def return_cps(ctrs, ratio, position, scaling):
 			n= n+j+1
 	return cps#,np.mean(cps), np.var(cps) * (comb(N,3)/((N*(N-1)/2) - 1 ))
 
-def bm(ctrs, contrast, separation, PA, oneoverwavl): 
-	# separation in mas
-	sepcoords = (mas2rad(separation)*np.cos(PA), mas2rad(separation)*np.sin(PA))
-	# PA in radians
-	cps = return_cps(ctrs, contrast, sepcoords, oneoverwavl)
-	return cps
+#def bm(ctrs, contrast, separation, PA, oneoverwavl): 
+#	cps = np.zeros(( comb(len(ctrs),3), len(oneoverwavl) ))
+#	for i in range(len(contrast)):
+#		# separation in mas
+#		sepcoords = (mas2rad(separation)*np.cos(PA), mas2rad(separation)*np.sin(PA))
+#		# PA in radians
+#		cps[ii, :] = return_cps(ctrs, contrast, sepcoords, oneoverwavl)
+#	return cps

@@ -2,6 +2,10 @@
 
 Reduces aperture masking images to fringe observables, calibrates, does basic model fitting. Package development led by Alexandra Greenbaum following legacy code by Greenbaum, Anand Sivaramakrishnan, and Laurent Pueyo. Contributions from Sivaramakrishnan, Deepashri Thatte, and Johannes Sahlmann.
 
+To get the source files:
+
+	git clone https://github.com/agreenbaum/nrm_analysis.git
+
 Necessary Python packages:
 
 * numpy
@@ -71,24 +75,24 @@ Start by importing main package modules. There is example data provided in this 
 This last call is an instance of 'NIRISS', which will set up the data according to NIRISS standards given a filter name and the name of the observed object. We are working with the test data provided, which includes images for 1 target and 1 calibrator:
 
 	ff =  nrm_core.FringeFitter(nirissdata, oversample = 5, savedir="targ", datadir="f430_data", npix=75)
-	for exposure in targfiles:
-		ff.fit_fringes(exposure)
+	ff.fit_fringes(targfiles)
 		
 	ff2 =  nrm_core.FringeFitter(nirissdata, oversample = 5, savedir="cal1", datadir="f430_data", npix=75)
-	for exposure in calfiles:
-		ff2.fit_fringes(exposure)
+	ff2.fit_fringes(calfiles)
 
 	
 The fringe fitter (with the options you want) measures fringe observables - visibilities and closure phases. It fits each exposure by calling the fit_fringes method and saves the output to directories "targ" and "cal1." The default is to save to the working directory. I usually set savedir to a string with the object's name. 
 
 	targdir = "targ/"
 	caldir = "cal1/"	
-	calib = nrm_core.Calibrate([targdir, caldir], nirissdata, savedir = "my_calibrated")
+	calib = nrm_core.Calibrate([targdir, caldir], nirissdata, savedir = "my_calibrated", sub_dir_tag="cube")
 
-Instance of Calibrate, gives 2 directories containing target and calibration sources. The first directory in the list is always assumed to be the science target. Any number of calibrators may be provided. Argument savedir default is "calibrated." Argument sub_dir_tag is not provided here because there is no wavelength axis (see below in GPI example for comparison).
+Instance of Calibrate, gives 2 directories containing target and calibration sources. The first directory in the list is always assumed to be the science target. Any number of calibrators may be provided. Argument savedir default is "calibrated." Argument sub_dir_tag is the common part of each file name. Each image reduction is stored in a subdirectory based on the file name (see below in GPI example for similar example).
 
 	calib.save_to_oifits("niriss_test.oifits")
-Saves results to oifits. phaseceil keyword arg optional to set a custom dataflag. Default flag is set when phases exceed  1.0e1.
+Saves results to oifits. phaseceil keyword arg optional to set a custom dataflag. Default flag is set when phases exceed  1.0e1. 
+
+*Keyword argument "interactive" in FringeFitter and Calibrate is by default set to True, which checks before overwriting directory contents and unusual settings. Set it to False if you know what you're doing and you want to speed up the process.*
 
 ### GPI Example ###
 e.g., starting with a list of GPI files
