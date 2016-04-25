@@ -637,7 +637,7 @@ class BinaryAnalyze:
 		"""
 		self.oifitsfn = oifitsfn
 
-		self.get_data()
+		get_data()
 		self.savedir = savedir
 
 		import matplotlib.pyplot as plt
