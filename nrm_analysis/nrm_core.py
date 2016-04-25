@@ -824,7 +824,7 @@ class BinaryAnalyze:
 
 def get_data(self):
 	# Move this function out, pass values to the object
-	try:
+	if 1:
 		self.oifdata = oifits.open(self.oifitsfn)
 		self.telescope = self.oifdata.wavelengths.keys()[0]
 		datasize = len(self.oifdata)
@@ -861,8 +861,8 @@ def get_data(self):
 			self.pha[:,jj] = self.oifdata.vis2[jj].visphi
 			self.phaerr[:,jj] = self.oifdata.vis2[jj].visphierr
 		
-	except:
-		print "Unable to read oifits file"
+	#except:
+	#	print "Unable to read oifits file"
 
 def logl(data, err, model):
 	"""
