@@ -826,25 +826,28 @@ class BinaryAnalyze:
 
 def get_data(self):
 	# Move this function out, pass values to the object
-	if 1:
+	try:
 		self.oifdata = oifits.open(self.oifitsfn)
+	except:
+		print "Unable to read oifits file"
 		self.telescope = self.oifdata.wavelength.keys()[0]
-		datasize = len(self.oifdata)
+		self.ncp = len(self.oifdata.t3)
+		self.nbl = len(self.oifdata.vis2)
 		self.wavls = self.oifdata.wavelength[self.telescope].eff_wave
 		self.eff_band = self.oifdata.wavelength[self.telescope].eff_band
 		self.nwav = len(self.wavls)
 		#self.ucoord = np.zeros((3, self.ncp))
-		self.uvcoords = np.zeros((2, 3, self.ncp))#, self.nwav))
+		self.uvcoords = np.zeros((2, 3, ncp))#, self.nwav))
 
 		# Now collect fringe observables and coordinates
-		self.cp = np.zeros((self.nwav, self.instrumentdata.ncp))
-		self.cperr = np.zeros((self.nwav, self.instrumentdata.ncp))
-		self.v2 = np.zeros((self.nwav, self.instrumentdata.nbl))
-		self.v2err = np.zeros((self.nwav, self.instrumentdata.nbl))
-		self.pha = np.zeros((self.nwav, self.instrumentdata.nbl))
-		self.phaerr = np.zeros((self.nwav, self.instrumentdata.nbl))
+		self.cp = np.zeros((self.nwav, self.ncp))
+		self.cperr = np.zeros((self.nwav, self.ncp))
+		self.v2 = np.zeros((self.nwav, self.nbl))
+		self.v2err = np.zeros((self.nwav, self.nbl))
+		self.pha = np.zeros((self.nwav, self.nbl))
+		self.phaerr = np.zeros((self.nwav, self.nbl))
 
-		for ii in range(self.instrumentdata.ncp):
+		for ii in range(self.ncp):
 			self.cp[:,ii] = self.oifdata.t3[ii].t3phi
 			self.cperr[:,ii] = self.oifdata.t3[ii].t3phierr
 			self.uvcoords[0,:,ii] = self.oifdata.t3[ii].u1coord, self.oifdata.t3[ii].u2coord,\
@@ -863,8 +866,6 @@ def get_data(self):
 			self.pha[:,jj] = self.oifdata.vis2[jj].visphi
 			self.phaerr[:,jj] = self.oifdata.vis2[jj].visphierr
 		
-	#except:
-	#	print "Unable to read oifits file"
 
 def logl(data, err, model):
 	"""
