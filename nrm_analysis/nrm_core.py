@@ -830,42 +830,42 @@ def get_data(self):
 		self.oifdata = oifits.open(self.oifitsfn)
 	except:
 		print "Unable to read oifits file"
-		self.telescope = self.oifdata.wavelength.keys()[0]
-		self.ncp = len(self.oifdata.t3)
-		self.nbl = len(self.oifdata.vis2)
-		self.wavls = self.oifdata.wavelength[self.telescope].eff_wave
-		self.eff_band = self.oifdata.wavelength[self.telescope].eff_band
-		self.nwav = len(self.wavls)
-		#self.ucoord = np.zeros((3, self.ncp))
-		self.uvcoords = np.zeros((2, 3, ncp))#, self.nwav))
+	self.telescope = self.oifdata.wavelength.keys()[0]
+	self.ncp = len(self.oifdata.t3)
+	self.nbl = len(self.oifdata.vis2)
+	self.wavls = self.oifdata.wavelength[self.telescope].eff_wave
+	self.eff_band = self.oifdata.wavelength[self.telescope].eff_band
+	self.nwav = len(self.wavls)
+	#self.ucoord = np.zeros((3, self.ncp))
+	self.uvcoords = np.zeros((2, 3, self.ncp))#, self.nwav))
 
-		# Now collect fringe observables and coordinates
-		self.cp = np.zeros((self.nwav, self.ncp))
-		self.cperr = np.zeros((self.nwav, self.ncp))
-		self.v2 = np.zeros((self.nwav, self.nbl))
-		self.v2err = np.zeros((self.nwav, self.nbl))
-		self.pha = np.zeros((self.nwav, self.nbl))
-		self.phaerr = np.zeros((self.nwav, self.nbl))
+	# Now collect fringe observables and coordinates
+	self.cp = np.zeros((self.nwav, self.ncp))
+	self.cperr = np.zeros((self.nwav, self.ncp))
+	self.v2 = np.zeros((self.nwav, self.nbl))
+	self.v2err = np.zeros((self.nwav, self.nbl))
+	self.pha = np.zeros((self.nwav, self.nbl))
+	self.phaerr = np.zeros((self.nwav, self.nbl))
 
-		for ii in range(self.ncp):
-			self.cp[:,ii] = self.oifdata.t3[ii].t3phi
-			self.cperr[:,ii] = self.oifdata.t3[ii].t3phierr
-			self.uvcoords[0,:,ii] = self.oifdata.t3[ii].u1coord, self.oifdata.t3[ii].u2coord,\
-						-(self.oifdata.t3[ii].u1coord+self.oifdata.t3[ii].u2coord)
-			self.uvcoords[1, :,ii] = self.oifdata.t3[ii].v1coord, self.oifdata.t3.v2coord,\
-						-(self.oifdata.t3.v1coord+self.oifdata.t3.v2coord)
-			# replicate the uv coordinates over the wavelength axis
-			self.uvcoords = np.tile(self.uvcoords, (self.nwav, 1, 1, 1))
-			# Now uvcoords is shape (nwav, 2, 3, ncps)
-			self.uvcoords = np.rollaxis(self.uvcoords, 0, 4)
-			#for q in range(self.nwav-1):
-			#	self.uvcoords[:,:,:,f] = self.uvcoords[:,:,:,0]
-		for jj in range(self.instrumentdata.nbl):
-			self.v2[:,jj] = self.oifdata.vis2[jj].vis2data
-			self.v2err[:,jj] = self.oifdata.vis2[jj].vis2err
-			self.pha[:,jj] = self.oifdata.vis2[jj].visphi
-			self.phaerr[:,jj] = self.oifdata.vis2[jj].visphierr
-		
+	for ii in range(self.ncp):
+		self.cp[:,ii] = self.oifdata.t3[ii].t3phi
+		self.cperr[:,ii] = self.oifdata.t3[ii].t3phierr
+		self.uvcoords[0,:,ii] = self.oifdata.t3[ii].u1coord, self.oifdata.t3[ii].u2coord,\
+					-(self.oifdata.t3[ii].u1coord+self.oifdata.t3[ii].u2coord)
+		self.uvcoords[1, :,ii] = self.oifdata.t3[ii].v1coord, self.oifdata.t3[ii].v2coord,\
+					-(self.oifdata.t3[ii].v1coord+self.oifdata.t3[ii].v2coord)
+	for jj in range(self.nbl):
+		self.v2[:,jj] = self.oifdata.vis2[jj].vis2data
+		self.v2err[:,jj] = self.oifdata.vis2[jj].vis2err
+		self.pha[:,jj] = self.oifdata.vis[jj].visphi
+		self.phaerr[:,jj] = self.oifdata.vis[jj].visphierr
+	
+	# replicate the uv coordinates over the wavelength axis
+	self.uvcoords = np.tile(self.uvcoords, (self.nwav, 1, 1, 1))
+	# Now uvcoords is shape (nwav, 2, 3, ncps)
+	self.uvcoords = np.rollaxis(self.uvcoords, 0, 4)
+	#for q in range(self.nwav-1):
+	#	self.uvcoords[:,:,:,f] = self.uvcoords[:,:,:,0]
 
 def logl(data, err, model):
 	"""
