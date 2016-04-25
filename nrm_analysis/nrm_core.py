@@ -27,6 +27,8 @@ import misctools.utils
 from misctools.utils import mas2rad
 import misctools.utils as utils
 
+import oifits
+
 class FringeFitter:
 	def __init__(self, instrument_data, **kwargs):
 		"""
@@ -635,7 +637,6 @@ class BinaryAnalyze:
 		What do I want to do here?
 		Want to load an oifits file and look for a binary -- anything else?
 		"""
-		import oifits
 		self.oifitsfn = oifitsfn
 
 		get_data(self)
