@@ -100,7 +100,7 @@ class FringeFitter:
 		if 'interactive' in kwargs:
 			self.interactive = kwargs['interactive']
 		else:
-			self.interavtive = True
+			self.interactive = True
 		#######################################################################
 
 
@@ -393,6 +393,8 @@ class Calibrate:
 				else:
 					pass
 
+		# Set up all the arrays
+		# Cal arrays have ncal axis, "wavelength" axis, and ncp axis
 		self.cp_mean_cal = np.zeros((self.ncals, self.naxis2, self.ncp))
 		self.cp_err_cal = np.zeros((self.ncals, self.naxis2, self.ncp))
 		self.v2_mean_cal = np.zeros((self.ncals, self.naxis2, self.nbl))
@@ -400,6 +402,7 @@ class Calibrate:
 		self.pha_mean_cal = np.zeros((self.ncals, self.naxis2, self.nbl))
 		self.pha_err_cal = np.zeros((self.ncals, self.naxis2, self.nbl))
 
+		# target arrays have "wavelength" axis and ncp axis
 		self.cp_mean_tar = np.zeros((self.naxis2, self.ncp))
 		self.cp_err_tar = np.zeros((self.naxis2, self.ncp))
 		self.v2_mean_tar = np.zeros((self.naxis2, self.nbl))
@@ -407,6 +410,7 @@ class Calibrate:
 		self.pha_mean_tar = np.zeros((self.naxis2, self.nbl))
 		self.pha_err_tar = np.zeros((self.naxis2, self.nbl))
 
+		# is there a subdirectory (e.g. for the exposure -- need to make this default)
 		if sub_dir_tag is not None:
 			self.sub_dir_tag = sub_dir_tag
 			for ii in range(self.nobjs):
