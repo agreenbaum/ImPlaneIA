@@ -828,7 +828,7 @@ def get_data(self):
 	# Move this function out, pass values to the object
 	if 1:
 		self.oifdata = oifits.open(self.oifitsfn)
-		self.telescope = self.oifdata.wavelengths.keys()[0]
+		self.telescope = self.oifdata.wavelength.keys()[0]
 		datasize = len(self.oifdata)
 		self.wavls = self.oifdata.wavelength[self.telescope].eff_wave
 		self.eff_band = self.oifdata.wavelength[self.telescope].eff_band
