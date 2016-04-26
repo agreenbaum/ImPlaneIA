@@ -857,8 +857,11 @@ def get_data(self):
 	for jj in range(self.nbl):
 		self.v2[:,jj] = self.oifdata.vis2[jj].vis2data
 		self.v2err[:,jj] = self.oifdata.vis2[jj].vis2err
-		self.pha[:,jj] = self.oifdata.vis[jj].visphi
-		self.phaerr[:,jj] = self.oifdata.vis[jj].visphierr
+		try:
+			self.pha[:,jj] = self.oifdata.vis[jj].visphi
+			self.phaerr[:,jj] = self.oifdata.vis[jj].visphierr
+		except:
+			pass
 	
 	# replicate the uv coordinates over the wavelength axis
 	self.uvcoords = np.tile(self.uvcoords, (self.nwav, 1, 1, 1))
