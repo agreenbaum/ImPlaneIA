@@ -729,6 +729,7 @@ class BinaryAnalyze:
 			self.priors = priors
 		else:
 			self.priors = [(-np.inf, np.inf) for f in range( len(self.params.keys()) ) ]
+		print "priors:"
 		print self.priors
 
 		guess = np.zeros(self.ndim)
@@ -809,8 +810,9 @@ def cp_binary_model(params, constant, priors, spectrum_model, uvcoords, cp, cper
 	# cp
 	# cperr
 
-	for i in range(len(params)):
-		if (params[i] < priors[i,1] or params[i] > priors[i,0]):	
+	par_keys = params.keys()
+	for i in range(len(par_keys)):
+		if (params[par_keys[i]] < priors[i,1] or params[par_keys[i]] > priors[i,0]):	
 			return -np.inf
 		else:
 
