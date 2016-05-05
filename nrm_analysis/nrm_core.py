@@ -810,9 +810,8 @@ def cp_binary_model(params, constant, priors, spectrum_model, uvcoords, cp, cper
 	# cp
 	# cperr
 
-	par_keys = params.keys()
-	for i in range(len(par_keys)):
-		if (params[par_keys[i]] < priors[i,1] or params[par_keys[i]] > priors[i,0]):	
+	for i in range(len(params)):
+		if (params[i] < priors[i][1] or params[i] > priors[i][0]):	
 			return -np.inf
 		else:
 
