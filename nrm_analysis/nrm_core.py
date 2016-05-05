@@ -749,11 +749,11 @@ class BinaryAnalyze:
 		t2 = time.time()
 		pos, prob, state = self.sampler.run_mcmc(p0, niter)
 		t3 = time.time()
-		print("Mean acceptance fraction: {0:.3f}".format(np.mean(sampler.acceptance_fraction)))
+		print("Mean acceptance fraction: {0:.3f}".format(np.mean(self.sampler.acceptance_fraction)))
 		print "This number should be between approximately 0.25 and 0.5 if everything went as planned."
 
 		print "ran mcmc, took", t3 - t2, "s"
-		self.chain = sampler.flatchain
+		self.chain = self.sampler.flatchain
 
 		self.mcmc_results = {}
 		print "========================="
