@@ -765,7 +765,7 @@ class BinaryAnalyze:
 			print key, ":", mean, "+/-", err
 		print "========================="
 		# pickle self.mcmc_results here:
-		pickle.dump(self.mcmc_results, open(savedir+"/mcmc_results.pick", "wb"))
+		pickle.dump(self.mcmc_results, open(self.savedir+"/mcmc_results.pick", "wb"))
 
 		import corner
 		fig = corner.corner(chain, labels = self.params.keys(), bins = 100)
@@ -784,7 +784,7 @@ class BinaryAnalyze:
 			self.chain_convergence[self.params.keys()[ii]] = samples[:,ii]
 		plt.savefig(self.savedir+"/chain_convergence.pdf")
 		# Pickle and save this data?
-		pickle.dump(self.chain_convergence, open(savedir+"/chain_convergence.pick", "wb"))
+		pickle.dump(self.chain_convergence, open(self.savedir+"/chain_convergence.pick", "wb"))
 		plt.show()
 
 def diffphase_binary_model(self):
