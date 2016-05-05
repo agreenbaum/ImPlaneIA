@@ -743,7 +743,7 @@ class BinaryAnalyze:
 		print "p0", len(p0)
 
 		t0 = time.time()
-		self.sampler = emcee.EnsembleSampler(nwalkers, self.ndim, cp_binary_model, threads=threads, args=[self,])
+		self.sampler = emcee.EnsembleSampler(nwalkers, self.ndim, cp_binary_model, threads=threads, args=[self.constant, self.priors, self.spectrum_model, self.uvcoords, self.cp, self.cperr])
 
 		t2 = time.time()
 		pos, prob, state = self.sampler.run_mcmc(p0, niter)
@@ -794,7 +794,7 @@ def diffphase_binary_model(self):
 def plot_diffphase_uv(self):
 	return None
 
-def cp_binary_model(params, self):
+def cp_binary_model(params, constant, priors, spectrum_model, uvcoords, cp, cperr):
 	# really want to be able to give this guy some general oi_data and have bm() sort it out.
 	# Need to figure out how to add in the priors
 
@@ -804,34 +804,39 @@ def cp_binary_model(params, self):
 	##################################################
 
 	# priors, i.e. bounds here
+	# constant
+	# uvcoords
+	# cp
+	# cperr
+
 	for i in range(len(params)):
-		if (params[i] < self.priors[i,1] or params[i] > self.priors[i,0]):	
+		if (params[i] < priors[i,1] or params[i] > priors[i,0]):	
 			return -np.inf
 		else:
 
-			if self.spectrum_model == None:
+			if spectrum_model == None:
 
 				# Model from params
 				#model_cp = model_cp_uv(self.uvcoords, params['con'], params['sep'], \
 				#					params['pa'], 1.0/self.constant['wavl'])
-				model_cp = model_cp_uv(self.uvcoords, params[0], params[1], \
-									params[2], 1.0/self.constant['wavl'])
+				model_cp = model_cp_uv(uvcoords, params[0], params[1], \
+									params[2], 1.0/constant['wavl'])
 			elif spectrum == 'slope':
 				# params needs 'con_start' starting contrast and 'slope,' sep & pa constant?
-				wav_step = self.constant['wavl'][1] - self.constant['wavl'][0]
+				wav_step = constant['wavl'][1] - constant['wavl'][0]
 				# contrast model is con_start + slope*delta_lambda
 				contrast = np.linspace(params['con_start'] + params['slope']*wav_step)
 				# Model from params
-				model_cp = model_cp_uv(self.uvcoords, contrast, params['sep'], \
-									params['pa'], 1.0/self.constant['wavl'])
+				model_cp = model_cp_uv(uvcoords, contrast, params['sep'], \
+									params['pa'], 1.0/constant['wavl'])
 			elif spectrum == 'free' :
 				# Model from params - params is contrast array nwav long, sep & pa constant
-				model_cp = model_cp_uv(self.uvcoords, params['con'], self.constant['sep'], \
-									self.constant['pa'], 1.0/self.constant['wavl'])
+				model_cp = model_cp_uv(uvcoords, params['con'], constant['sep'], \
+									constant['pa'], 1.0/constant['wavl'])
 			else:
 				sys.exit("Invalid spectrum model")
 
-			ll = logl(self.cp, self.cperr, model_cp)
+			ll = logl(cp, cperr, model_cp)
 			return ll
 
 def get_data(self):
