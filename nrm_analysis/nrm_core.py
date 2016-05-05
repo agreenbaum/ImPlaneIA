@@ -20,6 +20,7 @@ from astropy.io import fits
 from scipy.misc import comb
 from scipy.stats import sem, mstats
 import cPickle as pickle
+import matplotlib.pyplot as plt
 
 # Module imports
 from fringefitting.LG_Model import NRM_Model
@@ -642,7 +643,6 @@ class BinaryAnalyze:
 		get_data(self)
 		self.savedir = savedir
 
-		import matplotlib.pyplot as plt
 
 
 	def coarse_binary_search(self, lims, nstep=20):
