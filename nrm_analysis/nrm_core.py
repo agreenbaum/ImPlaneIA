@@ -768,7 +768,7 @@ class BinaryAnalyze:
 		pickle.dump(self.mcmc_results, open(self.savedir+"/mcmc_results.pick", "wb"))
 
 		import corner
-		fig = corner.corner(chain, labels = self.params.keys(), bins = 100)
+		fig = corner.corner(self.chain, labels = self.params.keys(), bins = 100)
 		plt.savefig(self.savedir+"triangle_plot.pdf")
 		plt.show()
 		
