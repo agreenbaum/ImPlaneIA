@@ -648,6 +648,8 @@ class BinaryAnalyze:
 	def coarse_binary_search(self, lims, nstep=20):
 		"""
 		For getting first guess on contrast, separation, and angle
+
+		lims:	[(c_low, c_hi), (sep_lo, sep_hi), (pa_low, pa_hi)]
 		"""
 		grid = np.zeros((nstep, nstep, nstep))
 		cons = np.linspace(lims[0][0], lims[0][1], num=nstep)
@@ -655,11 +657,13 @@ class BinaryAnalyze:
 		angs = np.linspace(lims[2][0], lims[2][1], num=nstep)
 		loglike = np.zeros((nstep, nstep, nstep))
 
+		priors = [,]
+
 		for i in range(nstep):
 			for j in range(nstep):
 				for k in range(nstep):
 					params = {'con':cons[i], 'sep':seps[j], 'pa':angs[k]}
-					loglike[i,j,k] = cp_binary_model(params, {"wavl:":self.wavls})
+					loglike[i,j,k] = cp_binary_model(params, {"wavl:":self.wavls}, priors, None, self.uvcoords, self.cp, self.cperr)
 
 		wheremax = np.where(loglike==loglike.max())
 		print "abs max", wheremax
