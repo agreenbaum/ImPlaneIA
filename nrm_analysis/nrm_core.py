@@ -657,7 +657,7 @@ class BinaryAnalyze:
 		angs = np.linspace(lims[2][0], lims[2][1], num=nstep)
 		loglike = np.zeros((nstep, nstep, nstep))
 
-		priors = [,]
+		priors = []
 
 		for i in range(nstep):
 			for j in range(nstep):
