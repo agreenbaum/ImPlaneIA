@@ -764,6 +764,7 @@ class BinaryAnalyze:
 			err = np.std(self.mcmc_results[key])
 			print key, ":", mean, "+/-", err
 		print "========================="
+		# To do: report separation in mas? pa in deg?
 		# pickle self.mcmc_results here:
 		pickle.dump(self.mcmc_results, open(self.savedir+"/mcmc_results.pick", "wb"))
 
@@ -813,32 +814,31 @@ def cp_binary_model(params, constant, priors, spectrum_model, uvcoords, cp, cper
 	for i in range(len(params)):
 		if (params[i] < priors[i][1] or params[i] > priors[i][0]):	
 			return -np.inf
-		else:
 
-			if spectrum_model == None:
+	if spectrum_model == None:
 
-				# Model from params
-				#model_cp = model_cp_uv(self.uvcoords, params['con'], params['sep'], \
-				#					params['pa'], 1.0/self.constant['wavl'])
-				model_cp = model_cp_uv(uvcoords, params[0], params[1], \
-									params[2], 1.0/constant['wavl'])
-			elif spectrum == 'slope':
-				# params needs 'con_start' starting contrast and 'slope,' sep & pa constant?
-				wav_step = constant['wavl'][1] - constant['wavl'][0]
-				# contrast model is con_start + slope*delta_lambda
-				contrast = np.linspace(params['con_start'] + params['slope']*wav_step)
-				# Model from params
-				model_cp = model_cp_uv(uvcoords, contrast, params['sep'], \
-									params['pa'], 1.0/constant['wavl'])
-			elif spectrum == 'free' :
-				# Model from params - params is contrast array nwav long, sep & pa constant
-				model_cp = model_cp_uv(uvcoords, params['con'], constant['sep'], \
-									constant['pa'], 1.0/constant['wavl'])
-			else:
-				sys.exit("Invalid spectrum model")
+		# Model from params
+		#model_cp = model_cp_uv(self.uvcoords, params['con'], params['sep'], \
+		#					params['pa'], 1.0/self.constant['wavl'])
+		model_cp = model_cp_uv(uvcoords, params[0], params[1], \
+							params[2], 1.0/constant['wavl'])
+	elif spectrum == 'slope':
+		# params needs 'con_start' starting contrast and 'slope,' sep & pa constant?
+		wav_step = constant['wavl'][1] - constant['wavl'][0]
+		# contrast model is con_start + slope*delta_lambda
+		contrast = np.linspace(params['con_start'] + params['slope']*wav_step)
+		# Model from params
+		model_cp = model_cp_uv(uvcoords, contrast, params['sep'], \
+							params['pa'], 1.0/constant['wavl'])
+	elif spectrum == 'free' :
+		# Model from params - params is contrast array nwav long, sep & pa constant
+		model_cp = model_cp_uv(uvcoords, params['con'], constant['sep'], \
+							constant['pa'], 1.0/constant['wavl'])
+	else:
+		sys.exit("Invalid spectrum model")
 
-			ll = logl(cp, cperr, model_cp)
-			return ll
+	ll = logl(cp, cperr, model_cp)
+	return ll
 
 def get_data(self):
 	# Move this function out, pass values to the object
