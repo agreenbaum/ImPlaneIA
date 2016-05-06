@@ -737,7 +737,7 @@ class BinaryAnalyze:
 		for key in self.params.keys():
 			guess[q] = self.params[key]
 			q+=1
-		guess = guess[::-1]
+		#guess = guess[::-1]
 
 		p0 = [guess + 0.1*guess*np.random.rand(self.ndim) for i in range(nwalkers)]
 		print guess
