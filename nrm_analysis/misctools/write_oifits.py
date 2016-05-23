@@ -218,12 +218,16 @@ class OIfits():
 			# VIS2 part:
 			self.v2 = np.ones((self.nwav, self.nbl))
 			self.v2_err = self.v2.copy()
+			self.vispha = np.ones((self.nwav, self.nbl))
+			self.visphaerr = self.vispha.copy()
 
 			if len(self.wls)==1:
 				self.v2[0,:], self.v2_err[0,:] = read_in(self.datapath, kw='v2')
+				self.vispha[0,:], self.viphaerr[0,:] = read_in(self.datapath, kw='pha')
 			else:
 				for qq,wl in enumerate(self.wls):
 					self.v2[qq,:], self.v2_err[qq,:] = read_in(self.datapath, wl=qq,kw='v2')
+					self.vispha[qq,:], self.viphaerr[qq,:] = read_in(self.datapath, kw='pha')
 
 			# T3 info:
 			self.t3amp = np.ones((self.nwav, self.ncps))
