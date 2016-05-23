@@ -25,8 +25,9 @@ import matplotlib.pyplot as plt
 # Module imports
 from fringefitting.LG_Model import NRM_Model
 import misctools.utils
-from misctools.utils import mas2rad, baselinify
+from misctools.utils import mas2rad, baselinify, rad2mas
 import misctools.utils as utils
+from modeling.binarymodel import model_cp_uv
 
 import oifits
 
@@ -420,6 +421,7 @@ class Calibrate:
 				exps = [f for f in os.listdir(paths[ii]) if self.sub_dir_tag in f]
 				nexps = len(exps)
 				amp = np.zeros((self.naxis2, nexps, self.nbl))
+				pha = np.zeros((self.naxis2, nexps, self.nbl))
 				cps = np.zeros((self.naxis2, nexps, self.ncp))
 				for qq in range(nexps):
 					# nwav files
@@ -427,12 +429,9 @@ class Calibrate:
 					ampfiles = [f for f in os.listdir(paths[ii]+exps[qq]) \
 								if "amplitudes" in f]
 					phafiles = [f for f in os.listdir(paths[ii]+exps[qq]) if "phase" in f] 
-					amp = np.zeros((self.naxis2, nexps, self.nbl))
-					pha = np.zeros((self.naxis2, nexps, self.nbl))
-					cp = np.zeros((self.naxis2, nexps, self.ncp))
 					for slc in range(len(cpfiles)):
 						amp[slc, qq,:] = np.loadtxt(paths[ii]+exps[qq]+"/"+ampfiles[slc])
-						cp[slc, qq,:] = np.loadtxt(paths[ii]+exps[qq]+"/"+cpfiles[slc])
+						cps[slc, qq,:] = np.loadtxt(paths[ii]+exps[qq]+"/"+cpfiles[slc])
 						pha[slc, qq,:] = np.loadtxt(paths[ii]+exps[qq]+"/"+phafiles[slc])
 				for slc in range(self.naxis2):
 					if ii==0:
@@ -440,14 +439,14 @@ class Calibrate:
 						self.cp_mean_tar[slc,:], self.cp_err_tar[slc,:], \
 							self.v2_mean_tar[slc,:], self.v2_err_tar[slc,:], \
 							self.pha_mean_tar[slc,:], self.pha_err_tar = \
-							self.calib_steps(cp[slc,:,:], amp[slc,:,:], pha[slc,:,:], nexps)
+							self.calib_steps(cps[slc,:,:], amp[slc,:,:], pha[slc,:,:], nexps)
 					else:
 						# Fixed clunkiness!
 						# closure phases and visibilities
 						self.cp_mean_cal[ii-1,slc, :], self.cp_err_cal[ii-1,slc, :], \
 							self.v2_mean_cal[ii-1,slc,:], self.v2_err_cal[ii-1,slc,:], \
 							self.pha_mean_cal[ii-1,slc,:], self.pha_err_cal[ii-1, slc,:] = \
-							self.calib_steps(cp[slc,:,:], amp[slc,:,:], pha[slc,:,:], nexps)
+							self.calib_steps(cps[slc,:,:], amp[slc,:,:], pha[slc,:,:], nexps)
 
 		else:
 			for ii in range(self.nobjs):
@@ -518,6 +517,9 @@ class Calibrate:
 		errcp = mstats.moment(cps, moment=2, axis=0)/np.sqrt(nexp)
 		errv2 = mstats.moment(amps**2, moment=2, axis=0)/np.sqrt(nexp)
 		errpha = mstats.moment(pha, moment=2, axis=0)/np.sqrt(nexp)
+		print "input:",cps
+		print "avg:", meancp
+		sys.exit()
 		return meancp, errcp, meanv2, errv2, meanpha, errpha
 
 	def save_to_txt(self):
@@ -574,8 +576,8 @@ class Calibrate:
 		if "phaseceil" in kwargs.keys():
 			self.phaseceil = kwargs["phaseceil"]
 		else:
-			# default for flagging closure phases
-			self.phaseceil = 1.0e1
+			# default for flagging closure phases (deg)
+			self.phaseceil = 1.0e2
 		if "clip" in kwargs.keys():
 			self.clip_wls = clip
 		else:
@@ -657,7 +659,7 @@ class BinaryAnalyze:
 		angs = np.linspace(lims[2][0], lims[2][1], num=nstep)
 		loglike = np.zeros((nstep, nstep, nstep))
 
-		priors = []
+		priors = [(-np.inf, np.inf) for f in range( len(self.params.keys()) ) ]
 
 		for i in range(nstep):
 			for j in range(nstep):
@@ -737,10 +739,17 @@ class BinaryAnalyze:
 		print self.priors
 
 		guess = np.zeros(self.ndim)
-		q=0
-		for key in self.params.keys():
-			guess[q] = self.params[key]
-			q+=1
+		# A few options here, can provide:
+		# 1. contrast, separation, angle -- 3 parameters to fit
+		# 2. contrast_min, slope, separation, angle -- 4 parameters
+		# 3. contrast_min, slope -- 2 parameters (position is given as constant)
+		# 4. nwav different contrasts - nwav parameters (position is given as constant)
+		guess = self.make_guess()
+
+		#q=0
+		#for key in self.params.keys():
+		#	guess[q] = self.params[key]
+		#	q+=1
 		#guess = guess[::-1]
 
 		p0 = [guess + 0.1*guess*np.random.rand(self.ndim) for i in range(nwalkers)]
@@ -748,6 +757,7 @@ class BinaryAnalyze:
 		print "p0", len(p0)
 
 		t0 = time.time()
+		#print "nwalkers", nwalkers, "args", self.constant, self.priors, self.spectrum_model, self.uvcoords, self.cp, self.cperr
 		self.sampler = emcee.EnsembleSampler(nwalkers, self.ndim, cp_binary_model, threads=threads, args=[self.constant, self.priors, self.spectrum_model, self.uvcoords, self.cp, self.cperr])
 
 		t2 = time.time()
@@ -762,11 +772,17 @@ class BinaryAnalyze:
 		self.mcmc_results = {}
 		print "========================="
 		print "emcee found...."
-		for ii, key in enumerate(self.params.keys()):
+		#for ii, key in enumerate(self.params.keys()):
+		for ii, key in enumerate(self.keys):
 			self.mcmc_results[key] = self.chain[:,ii]
 			mean = np.mean(self.mcmc_results[key])
 			err = np.std(self.mcmc_results[key])
-			print key, ":", mean, "+/-", err
+			if key=="sep":
+				print key, ":", rad2mas(mean), "+/-", rad2mas(err), "mas"
+			elif key=="pa":
+				print key, ":", 180*(mean)/np.pi, "+/-", 180*(err)/np.pi, "deg"
+			else:
+				print key, ":", mean, "+/-", err
 		print "========================="
 		# To do: report separation in mas? pa in deg?
 		# pickle self.mcmc_results here:
@@ -776,6 +792,26 @@ class BinaryAnalyze:
 		fig = corner.corner(self.chain, labels = self.params.keys(), bins = 100)
 		plt.savefig(self.savedir+"triangle_plot.pdf")
 		plt.show()
+
+	def make_guess(self):
+		guess = np.zeros(self.ndim)
+		if self.spectrum_model==None:
+			guess[0] = self.params['con']
+			guess[1] = self.params['sep']
+			guess[2] = self.params['pa']
+			self.keys = ['con', 'sep', 'pa']
+		elif self.spectrum_model=="slope":
+			guess[0] = self.params['con']
+			guess[1] = self.params["slope"]
+			guess[2] = self.params["sep"]
+			guess[3] = self.params["pa"]
+			self.keys = ['con', 'slope','sep', 'pa']
+		elif self.spectrum_model == "free":
+			guess = self.params["con"] # here con is given as an array size nwav
+			self.keys = ['con']
+		else:
+			print "invalid spectrum_model set"
+		return guess
 		
 	def plot_chain_convergence(self):
 		samples  = self.chain[:, 50:, :].reshape((-1, self.ndim))
@@ -816,7 +852,7 @@ def cp_binary_model(params, constant, priors, spectrum_model, uvcoords, cp, cper
 	# cperr
 
 	for i in range(len(params)):
-		if (params[i] < priors[i][1] or params[i] > priors[i][0]):	
+		if (params[i] < priors[i][0] or params[i] > priors[i][1]):	
 			return -np.inf
 
 	if spectrum_model == None:
@@ -860,44 +896,56 @@ def get_data(self):
 	self.uvcoords = np.zeros((2, 3, self.ncp))#, self.nwav))
 
 	# Now collect fringe observables and coordinates
-	self.cp = np.zeros((self.nwav, self.ncp))
-	self.cperr = np.zeros((self.nwav, self.ncp))
-	self.v2 = np.zeros((self.nwav, self.nbl))
-	self.v2err = np.zeros((self.nwav, self.nbl))
-	self.pha = np.zeros((self.nwav, self.nbl))
-	self.phaerr = np.zeros((self.nwav, self.nbl))
+	self.cp = np.zeros((self.ncp, self.nwav))
+	self.cperr = np.zeros((self.ncp, self.nwav))
+	self.v2 = np.zeros((self.nbl, self.nwav))
+	self.v2err = np.zeros((self.nbl, self.nwav))
+	self.pha = np.zeros((self.nbl, self.nwav))
+	self.phaerr = np.zeros((self.nbl, self.nwav))
 
 	for ii in range(self.ncp):
-		self.cp[:,ii] = self.oifdata.t3[ii].t3phi
-		self.cperr[:,ii] = self.oifdata.t3[ii].t3phierr
+		#self.cp[:,ii] = self.oifdata.t3[ii].t3phi
+		#self.cperr[:,ii] = self.oifdata.t3[ii].t3phierr
+		#self.uvcoords[0,:,ii] = self.oifdata.t3[ii].u1coord, self.oifdata.t3[ii].u2coord,\
+		#			-(self.oifdata.t3[ii].u1coord+self.oifdata.t3[ii].u2coord)
+		#self.uvcoords[1, :,ii] = self.oifdata.t3[ii].v1coord, self.oifdata.t3[ii].v2coord,\
+		#			-(self.oifdata.t3[ii].v1coord+self.oifdata.t3[ii].v2coord)
+		self.cp[ii, :] = self.oifdata.t3[ii].t3phi
+		self.cperr[ii, :] = self.oifdata.t3[ii].t3phierr
 		self.uvcoords[0,:,ii] = self.oifdata.t3[ii].u1coord, self.oifdata.t3[ii].u2coord,\
 					-(self.oifdata.t3[ii].u1coord+self.oifdata.t3[ii].u2coord)
 		self.uvcoords[1, :,ii] = self.oifdata.t3[ii].v1coord, self.oifdata.t3[ii].v2coord,\
 					-(self.oifdata.t3[ii].v1coord+self.oifdata.t3[ii].v2coord)
 	for jj in range(self.nbl):
-		self.v2[:,jj] = self.oifdata.vis2[jj].vis2data
-		self.v2err[:,jj] = self.oifdata.vis2[jj].vis2err
+		#self.v2[:,jj] = self.oifdata.vis2[jj].vis2data
+		#self.v2err[:,jj] = self.oifdata.vis2[jj].vis2err
+		self.v2[jj, :] = self.oifdata.vis2[jj].vis2data
+		self.v2err[jj, :] = self.oifdata.vis2[jj].vis2err
 		try:
-			self.pha[:,jj] = self.oifdata.vis[jj].visphi
-			self.phaerr[:,jj] = self.oifdata.vis[jj].visphierr
+			#self.pha[:,jj] = self.oifdata.vis[jj].visphi
+			#self.phaerr[:,jj] = self.oifdata.vis[jj].visphierr
+			self.pha[jj, :] = self.oifdata.vis[jj].visphi
+			self.phaerr[jj, :] = self.oifdata.vis[jj].visphierr
 		except:
 			pass
 	
 	# replicate the uv coordinates over the wavelength axis
 	self.uvcoords = np.tile(self.uvcoords, (self.nwav, 1, 1, 1))
 	# Now uvcoords is shape (nwav, 2, 3, ncps)
+	# So we move nwav axis to the end:
 	self.uvcoords = np.rollaxis(self.uvcoords, 0, 4)
 	#for q in range(self.nwav-1):
 	#	self.uvcoords[:,:,:,f] = self.uvcoords[:,:,:,0]
 
 def logl(data, err, model):
 	"""
-	data must be 2x as long as model
-	if only considering cps then model is (cps,) size 1
+	Likelihood given data, errors, and the model values
+	These are all shape (nobservable, nwav)
 	"""
 	#for ii in range(len(model)):
 	#	#ll += -0.5*np.log(2*np.pi)*data[2*ii].size + np.sum(-np.log(data[2*ii+1]**2)
-	return -0.5*np.log(2*np.pi) - np.sum(np.log(err)) - np.sum((model - data)**2/(2*data**2))
+	#return -0.5*np.log(2*np.pi) - np.sum(np.log(err)) - np.sum((model - data)**2/(2*data**2))
+	return -0.5*np.log(2*np.pi)*data.size + np.sum(-np.log(err) - 0.5*((model - data)/err)**2)
 
 class DiskAnalyze:
 	def __init__(self):
