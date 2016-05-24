@@ -645,13 +645,13 @@ class BinaryAnalyze:
 		get_data(self)
 		self.savedir = savedir
 
-
-
 	def coarse_binary_search(self, lims, nstep=20):
 		"""
 		For getting first guess on contrast, separation, and angle
 
 		lims:	[(c_low, c_hi), (sep_lo, sep_hi), (pa_low, pa_hi)]
+		contrast is in logspace, so provide powers for the range
+		separation in mas, pa in degrees
 		"""
 		#cons = np.linspace(lims[0][0], lims[0][1], num=nstep)
 		cons = np.logspace(lims[0][0], lims[0][1], num=nstep)
@@ -678,7 +678,7 @@ class BinaryAnalyze:
 		print "Max log likelikehood for separation:", 
 		print rad2mas(seps[wheremax[1]]), "mas"
 		print "Max log likelikehood for angle:", 
-		print angs[wheremax[2]]*180./np.pi, "deg"
+		print angs[wheremax[2]], "deg"
 		print "==================="
 
 		plt.figure()
@@ -686,34 +686,39 @@ class BinaryAnalyze:
 		plt.title("separation vs. pa at contrast of {0:.1f}".format(cons[wheremax[0][0]]))
 		plt.imshow(loglike[wheremax[0][0], :,:])
 		plt.xticks(np.arange(nstep)[::5], np.round(rad2mas(seps[::5]),3))
-		plt.yticks(np.arange(nstep)[::5], np.round(angs[::5]*180/np.pi,3))
+		plt.yticks(np.arange(nstep)[::5], np.round(angs[::5],3))
 		plt.xlabel("Separation")
 		plt.ylabel("PA")
+		plt.colorbar()
 		plt.savefig(self.savedir+"/sep_pa.pdf")
 
 		plt.figure()
-		plt.title("contrast vs. separation, at PA of {0:.1f} deg".format(angs[wheremax[2][0]]*180/np.pi))
+		plt.title("contrast vs. separation, at PA of {0:.1f} deg".format(angs[wheremax[2][0]]))
 		plt.xticks(np.arange(nstep)[::5], np.round(cons[::5],3))
 		plt.yticks(np.arange(nstep)[::5], np.round(seps[::5],3))
 		plt.xlabel("Contrast")
 		plt.ylabel("Separation")
 		plt.imshow(loglike[:,:,wheremax[2][0]])
+		plt.colorbar()
 		plt.savefig(self.savedir+"/con_sep.pdf")
 
 		plt.figure()
 		plt.title("contrast vs. angle, at separation of {0:.1f} mas".format(seps[wheremax[1][0]]))
 		plt.xticks(np.arange(nstep)[::5], np.round(cons[::5], 3))
-		plt.yticks(np.arange(nstep)[::5], np.round(angs[::5]*180/np.pi, 3))
+		plt.yticks(np.arange(nstep)[::5], np.round(angs[::5], 3))
 		plt.xlabel("Contrast")
 		plt.ylabel("PA")
 		plt.imshow(loglike[:,wheremax[1][0],:])
+		plt.colorbar()
 		plt.savefig(self.savedir+"/con_pa.pdf")
 
 		plt.show()
 
-	def correlation_plot(self, start=[0.16, mas2rad(64), 118.*np.pi/180.]):
+	def correlation_plot(self, start=[0.16, 64, 219]):
 		"""
 		A nice visualization to see how the data compares to model solutions. Plot is adjustable.
+
+		separation in mas, pa in degrees
 		"""
 		from matplotlib.widgets import Slider, Button, RadioButtons
 		fig, ax = plt.subplots()
@@ -744,9 +749,9 @@ class BinaryAnalyze:
 		axcrat = plt.axes([0.25, 0.1, 0.65, 0.03], axisbg=axcolor)
 		axsep = plt.axes([0.25, 0.15, 0.65, 0.03], axisbg=axcolor)
 
-		sang = Slider(axang, 'Theta', 0,360 , valinit=180.*start[2]/np.pi)
+		sang = Slider(axang, 'Theta', 0,360 , valinit=start[2])
 		scrat = Slider(axcrat, 'Cratio', 0.001, 0.9, valinit=start[0])
-		ssep = Slider(axsep, 'Sep (mas)', 20, 100, valinit=rad2mas(start[1]))
+		ssep = Slider(axsep, 'Sep (mas)', 20, 100, valinit=start[1])
 
 		def update(val):
 			theta = sang.val
@@ -756,7 +761,7 @@ class BinaryAnalyze:
 			sep = ssep.val
 			print "separation:", sep
 			newparams = [cratio, sep, theta]
-			modelcps = model_cp_uv(self.uvcoords, cratio, mas2rad(sep), np.pi*theta/180., 1.0/self.wavls)
+			modelcps = model_cp_uv(self.uvcoords, cratio, sep, theta, 1.0/self.wavls)
 			l.set_ydata(modelcps)
 			fig.canvas.draw_idle()
 		sang.on_changed(update)
@@ -787,7 +792,7 @@ class BinaryAnalyze:
 		Arguments params and constant are dictionaries. 
 
 		For example if you wanted to search for 3 parameters, contrast, separation, and PA:
-			params = {'con': cr_val, 'sep': sep_rad, 'pa': pa_rad}
+			params = {'con': cr_val, 'sep': sep_mas, 'pa': pa_deg}
 			constant = {'wavls': array_of_wavelengths}
 		because  we are searching for con, sep, & pa, and we hold the wavelength constant
 
@@ -817,12 +822,6 @@ class BinaryAnalyze:
 		# 4. nwav different contrasts - nwav parameters (position is given as constant)
 		guess = self.make_guess()
 
-		#q=0
-		#for key in self.params.keys():
-		#	guess[q] = self.params[key]
-		#	q+=1
-		#guess = guess[::-1]
-
 		p0 = [guess + 0.1*guess*np.random.rand(self.ndim) for i in range(nwalkers)]
 		print guess
 		print "p0", len(p0)
@@ -831,14 +830,18 @@ class BinaryAnalyze:
 		#print "nwalkers", nwalkers, "args", self.constant, self.priors, self.spectrum_model, self.uvcoords, self.cp, self.cperr
 		self.sampler = emcee.EnsembleSampler(nwalkers, self.ndim, cp_binary_model, threads=threads, args=[self.constant, self.priors, self.spectrum_model, self.uvcoords, self.cp, self.cperr])
 
+		pos, prob, state = self.sampler.run_mcmc(p0, 100)
+		self.sampler.reset()
 		t2 = time.time()
-		pos, prob, state = self.sampler.run_mcmc(p0, niter)
+		print "burn in complete, took ", t2-t0, "s"
+		pos, prob, state = self.sampler.run_mcmc(pos, niter)
 		t3 = time.time()
 		print("Mean acceptance fraction: {0:.3f}".format(np.mean(self.sampler.acceptance_fraction)))
 		print "This number should be between approximately 0.25 and 0.5 if everything went as planned."
 
 		print "ran mcmc, took", t3 - t2, "s"
 		self.chain = self.sampler.flatchain
+		self.fullchain = self.sampler.chain
 
 		self.mcmc_results = {}
 		print "========================="
@@ -849,9 +852,9 @@ class BinaryAnalyze:
 			mean = np.mean(self.mcmc_results[key])
 			err = np.std(self.mcmc_results[key])
 			if key=="sep":
-				print key, ":", rad2mas(mean), "+/-", rad2mas(err), "mas"
+				print key, ":", mean, "+/-", err, "mas"
 			elif key=="pa":
-				print key, ":", 180*(mean)/np.pi, "+/-", 180*(err)/np.pi, "deg"
+				print key, ":", mean, "+/-", err, "deg"
 			else:
 				print key, ":", mean, "+/-", err
 		print "========================="
@@ -863,14 +866,6 @@ class BinaryAnalyze:
 		fig = corner.corner(self.chain, labels = self.keys, bins = 200)
 		plt.savefig(self.savedir+"triangle_plot.pdf")
 		plt.show()
-
-	def corner_plot(self, pickfile):
-		"""
-		Make a corner plot after the fact using the pickled results from the mcmc
-		"""
-		import corner
-		fig = corner.corner(chain, labels = keys, bins=100)
-		plt.savefig(self.savedir+"triangle_plot.pdf")
 
 	def make_guess(self):
 		guess = np.zeros(self.ndim)
@@ -893,15 +888,15 @@ class BinaryAnalyze:
 		return guess
 		
 	def plot_chain_convergence(self):
-		samples  = self.chain[ 50:, :].reshape((-1, self.ndim))
+		samples  = self.fullchain[:, 50:, :].reshape((-1, self.ndim))
 		plt.figure()
 		self.chain_convergence = {}
-		for ii in range(self.chain.shape[-1]):
+		for ii in range(samples[-1]):
 			plt.subplot2grid((self.ndim,1),(ii,0))
 			plt.plot(samples[:,ii])
 			plt.ylabel(self.keys[ii])
 			plt.xlabel("step number")
-			self.chain_convergence[self.params.keys()[ii]] = samples[:,ii]
+			self.chain_convergence[self.keys[ii]] = samples[:,ii]
 		plt.savefig(self.savedir+"/chain_convergence.pdf")
 		# Pickle and save this data?
 		pickle.dump(self.chain_convergence, open(self.savedir+"/chain_convergence.pick", "wb"))
@@ -947,12 +942,12 @@ def cp_binary_model(params, constant, priors, spectrum_model, uvcoords, cp, cper
 		# contrast model is con_start + slope*delta_lambda
 		contrast = np.linspace(params['con_start'] + params['slope']*wav_step)
 		# Model from params
-		model_cp = model_cp_uv(uvcoords, contrast, params['sep'], \
-							params['pa'], 1.0/constant['wavl'])
+		model_cp = model_cp_uv(uvcoords, contrast, mas2rad(params['sep']), \
+							params['pa']*np.pi/180, 1.0/constant['wavl'])
 	elif spectrum == 'free' :
 		# Model from params - params is contrast array nwav long, sep & pa constant
-		model_cp = model_cp_uv(uvcoords, params['con'], constant['sep'], \
-							constant['pa'], 1.0/constant['wavl'])
+		model_cp = model_cp_uv(uvcoords, params['con'], mas2rad(constant['sep']), \
+							constant['pa']*np.pi/180., 1.0/constant['wavl'])
 	else:
 		sys.exit("Invalid spectrum model")
 
