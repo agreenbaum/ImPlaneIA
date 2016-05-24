@@ -362,40 +362,44 @@ class Calibrate:
 		# Additional axis (e.g., wavelength axis)
 		# Can be size one. Defined by instrument_data wavelength array
 		self.naxis2 = instrument_data.nwav
+
 		# some warnings
-		if self.naxis2 == 1:
-			if sub_dir_tag is not None:
-				if self.interactive==True:
-					print "!! naxis2 is set to zero but sub_dir_tag is defined !!",
-					print "Are you sure you want to do this?",
-					print "Will look for files only in ",
-					print paths
-					print "proceed anyway? (y/n)"
-					ans = raw_input()
-					if ans =='y':
-						pass
-					elif ans == 'n':
-						sys.exit("stopping, naxis2 must be > 1 to use sub_dir_tag, see help")
-					else:
-						sys.exit("invalid response, stopping")
-				else:
-					pass
+
+		# safer to just let this happen, commenting out
+		#if self.naxis2 == 1:
+		#	if sub_dir_tag is not None:
+		#		if self.interactive==True:
+		#			print "!! naxis2 is set to zero but sub_dir_tag is defined !!",
+		#			print "Are you sure you want to do this?",
+		#			print "Will look for files only in ",
+		#			print paths
+		#			print "proceed anyway? (y/n)"
+		#			ans = raw_input()
+		#			if ans =='y':
+		#				pass
+		#			elif ans == 'n':
+		#				sys.exit("stopping, naxis2 must be > 1 to use sub_dir_tag, see help")
+		#			else:
+		#				sys.exit("invalid response, stopping")
+		#		else:
+		#			pass
 					
-		else:
-			if sub_dir_tag == None: 
-				if self.interactive==True:
-					print "!! naxis2 is set to a non-zero number but extra_layer"
-					print "is not defined !! naxis2 will be ignored."
-					print "proceed anyway? (y/n)"
-					ans = raw_input()
-					if ans =='y':
-						pass
-					elif ans == 'n':
-						sys.exit("stopping, define sub_dir_tag if naxis2>1")
-					else:
-						sys.exit("invalid response, stopping")
-				else:
+		#else:
+		if sub_dir_tag == None: 
+			if self.interactive==True:
+				#print "!! naxis2 is set to a non-zero number but extra_layer"
+				print "extra_layer is not defined !! naxis2 will be ignored."
+				print "results will not be stored in a subdirectory"
+				print "proceed anyway? (y/n)"
+				ans = raw_input()
+				if ans =='y':
 					pass
+				elif ans == 'n':
+					sys.exit("stopping, try providing 'sub_dir_tag' keyword arg")
+				else:
+					sys.exit("invalid response, stopping. Try providing 'sub_dir_tag' keyword arg")
+			else:
+				pass
 
 		# Set up all the arrays
 		# Cal arrays have ncal axis, "wavelength" axis, and ncp axis
