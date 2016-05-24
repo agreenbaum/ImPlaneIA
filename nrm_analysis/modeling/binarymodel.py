@@ -188,7 +188,7 @@ def model_cp_uv(tri_uv, ratio, separation, pa, inv_wavl):
 				visphase(uvs[:,1, ...], ratio, separation, pa) + \
 				visphase(uvs[:,2, ...], ratio, separation, pa)
 	# Return in deg to match oifits standard
-	return 180*model_cps/np.pi
+	return 180.*model_cps/np.pi
 
 def model_cps(ctrs, ratio, position, scaling):
 	N = len(ctrs)
