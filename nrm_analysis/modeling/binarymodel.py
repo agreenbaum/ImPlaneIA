@@ -184,9 +184,9 @@ def model_cp_uv(tri_uv, ratio, separation, pa, inv_wavl):
 	contrast, separation, pa all should be len(inv_wavl) or scalar
 	"""
 	uvs = inv_wavl*tri_uv
-	model_cps = visphase(uvs[:,0, ...], ratio, separation, pa) + \
-				visphase(uvs[:,1, ...], ratio, separation, pa) + \
-				visphase(uvs[:,2, ...], ratio, separation, pa)
+	model_cps = visphase(uvs[:,0, ...], ratio, mas2rad(separation), np.pi*pa/180.) + \
+				visphase(uvs[:,1, ...], ratio, mas2rad(separation), np.pi*pa/180.) + \
+				visphase(uvs[:,2, ...], ratio, mas2rad(separation), np.pi*pa/180.)
 	# Return in deg to match oifits standard
 	return 180.*model_cps/np.pi
 
