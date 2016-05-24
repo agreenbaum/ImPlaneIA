@@ -793,10 +793,10 @@ class BinaryAnalyze:
 
 		For example if you wanted to search for 3 parameters, contrast, separation, and PA:
 			params = {'con': cr_val, 'sep': sep_mas, 'pa': pa_deg}
-			constant = {'wavls': array_of_wavelengths}
-		because  we are searching for con, sep, & pa, and we hold the wavelength constant
+			default constant contains only {'wavls': array_of_wavelengths (m)}
+			can provide separation and pa if trying to fit a spectrum
 
-		Priors are bounds here. 
+		Priors are bounds for the different parameters. Default is no bounds.
 
 		"""
 		import emcee
@@ -815,11 +815,6 @@ class BinaryAnalyze:
 		print self.priors
 
 		guess = np.zeros(self.ndim)
-		# A few options here, can provide:
-		# 1. contrast, separation, angle -- 3 parameters to fit
-		# 2. contrast_min, slope, separation, angle -- 4 parameters
-		# 3. contrast_min, slope -- 2 parameters (position is given as constant)
-		# 4. nwav different contrasts - nwav parameters (position is given as constant)
 		guess = self.make_guess()
 
 		p0 = [guess + 0.1*guess*np.random.rand(self.ndim) for i in range(nwalkers)]
@@ -837,7 +832,7 @@ class BinaryAnalyze:
 		pos, prob, state = self.sampler.run_mcmc(pos, niter)
 		t3 = time.time()
 		print("Mean acceptance fraction: {0:.3f}".format(np.mean(self.sampler.acceptance_fraction)))
-		print "This number should be between approximately 0.25 and 0.5 if everything went as planned."
+		print "This number should be between ~ 0.25 and 0.5 if everything went as planned."
 
 		print "ran mcmc, took", t3 - t2, "s"
 		self.chain = self.sampler.flatchain
@@ -868,6 +863,11 @@ class BinaryAnalyze:
 		plt.show()
 
 	def make_guess(self):
+		# A few options here, can provide:
+		# 1. contrast, separation, angle -- 3 parameters to fit
+		# 2. contrast_min, slope, separation, angle -- 4 parameters
+		# 3. contrast_min, slope -- 2 parameters (position is given as constant)
+		# 4. nwav different contrasts - nwav parameters (position is given as constant)
 		guess = np.zeros(self.ndim)
 		if self.spectrum_model==None:
 			guess[0] = self.params['con']
