@@ -11,12 +11,13 @@ Necessary Python packages:
 * numpy
 * scipy
 * astropy
+* matplotlib
 * a copy of [Paul Boley's oifits.py](http://astro.ins.urfu.ru/pages/~pboley/oifits/) in your python path
 * emcee [available here](http://dan.iel.fm/emcee/current/) or by pip install
+* DFM's corner [source here](https://github.com/dfm/corner.py) or by pip install
 
 Optional Python packages:
 
-* matplotlib
 * webbpsf [available here](https://github.com/mperrin/webbpsf) or by pip install
 * poppy [available here](https://github.com/mperrin/poppy) or by pip install
 * pysynphot

@@ -3,6 +3,7 @@ import numpy as np
 import numpy.fft as fft
 from astropy.io import fits
 import os, sys
+import cPickle as pickle
 
 m_ = 1.0
 mm_ =  m_/1000.0
@@ -736,6 +737,26 @@ def baseline_info(mask, pscale_mas, lam_c):
 	print "========================================"
 	print "Mask is Nyquist at",
 	print mas2rad(2*pscale_mas)*(bllengths.max())
+
+def corner_plot(pickfile, nbins = 100, save="my_calibrated/triangle_plot.png"):
+	"""
+	Make a corner plot after the fact using the pickled results from the mcmc
+	"""
+	import corner
+	import matplotlib.pyplot as plt
+
+	mcmc_results = pickle.load(open(pickfile))
+	keys = mcmc_results.keys()
+	print keys
+	chain = np.zeros((len(mcmc_results[keys[0]]), len(keys)))
+	print len(keys)
+	print chain.shape
+	for ii,key in enumerate(keys):
+		chain[:,ii] = mcmc_results[key]
+
+	fig = corner.corner(chain, labels = keys, bins=nbins, show_titles=True)
+	plt.savefig("triangle_plot.pdf")
+	plt.show()
 
 if __name__ == "__main__":
 
