@@ -504,6 +504,7 @@ class Calibrate:
 		self.pha_calibrated = self.pha_mean_tar - self.pha_mean_tot
 		self.pha_err_calibrated = np.sqrt(self.pha_err_tar**2 + self.pha_err_tot**2)
 
+		# convert to degrees
 		self.cp_calibrated_deg = self.cp_calibrated * 180/np.pi
 		self.cp_err_calibrated_deg = self.cp_err_calibrated * 180/np.pi
 		self.pha_calibrated_deg = self.pha_calibrated * 180/np.pi
@@ -519,7 +520,6 @@ class Calibrate:
 		errpha = mstats.moment(pha, moment=2, axis=0)/np.sqrt(nexp)
 		print "input:",cps
 		print "avg:", meancp
-		sys.exit()
 		return meancp, errcp, meanv2, errv2, meanpha, errpha
 
 	def save_to_txt(self):
@@ -653,19 +653,21 @@ class BinaryAnalyze:
 
 		lims:	[(c_low, c_hi), (sep_lo, sep_hi), (pa_low, pa_hi)]
 		"""
-		grid = np.zeros((nstep, nstep, nstep))
-		cons = np.linspace(lims[0][0], lims[0][1], num=nstep)
+		#cons = np.linspace(lims[0][0], lims[0][1], num=nstep)
+		cons = np.logspace(lims[0][0], lims[0][1], num=nstep)
 		seps = np.linspace(lims[1][0], lims[1][1], num=nstep)
 		angs = np.linspace(lims[2][0], lims[2][1], num=nstep)
 		loglike = np.zeros((nstep, nstep, nstep))
 
-		priors = [(-np.inf, np.inf) for f in range( len(self.params.keys()) ) ]
+		priors = np.array([(-np.inf, np.inf) for f in range( 3 ) ])
+		constant = {"wavl": self.wavls}
 
 		for i in range(nstep):
 			for j in range(nstep):
 				for k in range(nstep):
-					params = {'con':cons[i], 'sep':seps[j], 'pa':angs[k]}
-					loglike[i,j,k] = cp_binary_model(params, {"wavl:":self.wavls}, priors, None, self.uvcoords, self.cp, self.cperr)
+					#params = {'con':cons[i], 'sep':seps[j], 'pa':angs[k]}
+					params = [cons[i], seps[j], angs[k]]
+					loglike[i,j,k] = cp_binary_model(params, constant, priors, None, self.uvcoords, self.cp, self.cperr)
 
 		wheremax = np.where(loglike==loglike.max())
 		print "abs max", wheremax
@@ -674,16 +676,16 @@ class BinaryAnalyze:
 		print "Max log likelikehood for contrast:", 
 		print cons[wheremax[0]]
 		print "Max log likelikehood for separation:", 
-		print seps[wheremax[1]]
+		print rad2mas(seps[wheremax[1]]), "mas"
 		print "Max log likelikehood for angle:", 
-		print angs[wheremax[2]]*180./np.pi
+		print angs[wheremax[2]]*180./np.pi, "deg"
 		print "==================="
 
 		plt.figure()
 		plt.set_cmap("cubehelix")
 		plt.title("separation vs. pa at contrast of {0:.1f}".format(cons[wheremax[0][0]]))
 		plt.imshow(loglike[wheremax[0][0], :,:])
-		plt.xticks(np.arange(nstep)[::5], np.round(seps[::5],3))
+		plt.xticks(np.arange(nstep)[::5], np.round(rad2mas(seps[::5]),3))
 		plt.yticks(np.arange(nstep)[::5], np.round(angs[::5]*180/np.pi,3))
 		plt.xlabel("Separation")
 		plt.ylabel("PA")
@@ -706,6 +708,75 @@ class BinaryAnalyze:
 		plt.ylabel("PA")
 		plt.imshow(loglike[:,wheremax[1][0],:])
 		plt.savefig(self.savedir+"/con_pa.pdf")
+
+		plt.show()
+
+	def correlation_plot(self, start=[0.16, mas2rad(64), 118.*np.pi/180.]):
+		"""
+		A nice visualization to see how the data compares to model solutions. Plot is adjustable.
+		"""
+		from matplotlib.widgets import Slider, Button, RadioButtons
+		fig, ax = plt.subplots()
+		plt.subplots_adjust(left=0.25, bottom=0.25)
+		plt.title("Model vs. Data")
+		plt.xlim(-50, 50)
+		plt.ylim(-50, 50)
+
+		priors = np.array([(-np.inf, np.inf) for f in range( len(start) ) ])
+		#constant = {'wavl':self.wavls}
+
+		# Data and model both have shape ncp, nwav
+		modelcps = model_cp_uv(self.uvcoords, start[0], start[1], start[2], 1.0/self.wavls)
+		print "model shape:"
+		print modelcps.shape
+		print type(modelcps)
+		print "why are these closure phases so small??"
+		print self.cp
+		print self.cp.shape
+		plt.plot([-50, 50], [-50,50])
+		l, = plt.plot(self.cp, modelcps, '.')
+		plt.xlabel("Measured closure phase (degrees)")
+		plt.ylabel("Model closure phase (degrees)")
+
+		# Set up the widget plot from matplotlib demo
+		axcolor = "lightgoldenrodyellow"
+		axang = plt.axes([0.25, 0.05, 0.65, 0.03], axisbg=axcolor)
+		axcrat = plt.axes([0.25, 0.1, 0.65, 0.03], axisbg=axcolor)
+		axsep = plt.axes([0.25, 0.15, 0.65, 0.03], axisbg=axcolor)
+
+		sang = Slider(axang, 'Theta', 0,360 , valinit=180.*start[2]/np.pi)
+		scrat = Slider(axcrat, 'Cratio', 0.001, 0.9, valinit=start[0])
+		ssep = Slider(axsep, 'Sep (mas)', 20, 100, valinit=rad2mas(start[1]))
+
+		def update(val):
+			theta = sang.val
+			print "theta:", theta
+			cratio = scrat.val
+			print "cratio:", cratio
+			sep = ssep.val
+			print "separation:", sep
+			newparams = [cratio, sep, theta]
+			modelcps = model_cp_uv(self.uvcoords, cratio, mas2rad(sep), np.pi*theta/180., 1.0/self.wavls)
+			l.set_ydata(modelcps)
+			fig.canvas.draw_idle()
+		sang.on_changed(update)
+		scrat.on_changed(update)
+		ssep.on_changed(update)
+
+		resetax = plt.axes([0.8, 0.025, 0.1, 0.04])
+		button = Button(resetax, 'Reset', color=axcolor, hovercolor='0.975')
+		def reset(event):
+			sang.reset()
+			scrat.reset()
+			ssep.reset()
+		button.on_clicked(reset)
+
+		rax = plt.axes([0.025, 0.5, 0.15, 0.15], axisbg=axcolor)
+		radio = RadioButtons(rax, ('red', 'blue', 'green'), active=0)
+		def colorfunc(label):
+			l.set_color(label)
+			fig.canvas.draw_idle()
+		radio.on_clicked(colorfunc)
 
 		plt.show()
 
@@ -789,9 +860,17 @@ class BinaryAnalyze:
 		pickle.dump(self.mcmc_results, open(self.savedir+"/mcmc_results.pick", "wb"))
 
 		import corner
-		fig = corner.corner(self.chain, labels = self.params.keys(), bins = 100)
+		fig = corner.corner(self.chain, labels = self.keys, bins = 200)
 		plt.savefig(self.savedir+"triangle_plot.pdf")
 		plt.show()
+
+	def corner_plot(self, pickfile):
+		"""
+		Make a corner plot after the fact using the pickled results from the mcmc
+		"""
+		import corner
+		fig = corner.corner(chain, labels = keys, bins=100)
+		plt.savefig(self.savedir+"triangle_plot.pdf")
 
 	def make_guess(self):
 		guess = np.zeros(self.ndim)
@@ -814,13 +893,13 @@ class BinaryAnalyze:
 		return guess
 		
 	def plot_chain_convergence(self):
-		samples  = self.chain[:, 50:, :].reshape((-1, self.ndim))
+		samples  = self.chain[ 50:, :].reshape((-1, self.ndim))
 		plt.figure()
 		self.chain_convergence = {}
-		for ii in range(chain.shape[-1]):
+		for ii in range(self.chain.shape[-1]):
 			plt.subplot2grid((self.ndim,1),(ii,0))
 			plt.plot(samples[:,ii])
-			plt.ylabel(self.params.keys()[ii])
+			plt.ylabel(self.keys[ii])
 			plt.xlabel("step number")
 			self.chain_convergence[self.params.keys()[ii]] = samples[:,ii]
 		plt.savefig(self.savedir+"/chain_convergence.pdf")
@@ -916,6 +995,7 @@ def get_data(self):
 					-(self.oifdata.t3[ii].u1coord+self.oifdata.t3[ii].u2coord)
 		self.uvcoords[1, :,ii] = self.oifdata.t3[ii].v1coord, self.oifdata.t3[ii].v2coord,\
 					-(self.oifdata.t3[ii].v1coord+self.oifdata.t3[ii].v2coord)
+	#print self.cp
 	for jj in range(self.nbl):
 		#self.v2[:,jj] = self.oifdata.vis2[jj].vis2data
 		#self.v2err[:,jj] = self.oifdata.vis2[jj].vis2err

@@ -231,9 +231,9 @@ class OIfits():
 
 			# T3 info:
 			self.t3amp = np.ones((self.nwav, self.ncps))
-			self.t3phi = self.t3amp.copy()
+			self.t3phi = np.zeros((self.nwav, self.ncps))
 			self.t3amperr = self.t3amp.copy()
-			self.t3phierr = self.t3amp.copy()
+			self.t3phierr = self.t3pha.copy()
 			if len(self.wls)==1:
 				self.t3phi[0,:], self.t3phierr[0,:] = read_in(self.datapath,kw='cp')
 			else:
@@ -246,16 +246,18 @@ class OIfits():
 			self.v2_err = kwargs["v2err"]
 			# Add in vis observables
 			self.t3phi = kwargs["cps"]
+			print "cps given to oifits writer:"
+			print self.t3phi
 			self.t3phierr = kwargs["cperr"]
 			self.vispha = kwargs["pha"]
 			self.visphaerr = kwargs["phaerr"]
 
 		# T3 AMP data from V2 arrays
-		self.t3amp = np.ones((self.nwav, self.ncps))
-		self.t3amperr = np.ones((self.nwav, self.ncps))
-		for qq,wl in enumerate(self.wls):
-			self.t3amp[qq,:], self.t3amperr[qq,:] = get_t3ampdata(np.sqrt(self.v2[qq,:]),\
-											self.v2_err[qq,:], N=self.N)
+		self.t3amp = self.t3phi.copy() #np.ones((self.nwav, self.ncps))
+		self.t3amperr = self.t3phierr.copy() #np.ones((self.nwav, self.ncps))
+		#for qq,wl in enumerate(self.wls):
+		#	self.t3amp[qq,:], self.t3amperr[qq,:] = get_t3ampdata(np.sqrt(self.v2[qq,:]),\
+		#									self.v2_err[qq,:], N=self.N)
 
 		#print np.nan in np.isnan(self.v2)
 		for qq in range(self.nbl):
@@ -282,8 +284,12 @@ class OIfits():
 			#self.t3flag[abs(self.t3phierr)>np.pi] = 1
 		#print self.t3amperr
 
+		print "cps given to oifits writer, again:"
+		print self.t3phi
 		self.t3flag[abs(self.t3phi)>self.phaseceil]=1
 		for i in range(int(self.ncps)):
+			"""self, timeobs, int_time, t3amp, t3amperr, t3phi, t3phierr, flag, u1coord,
+			v1coord, u2coord, v2coord, wavelength, target, array=None, station=(None,None,None)"""
 			self.t3data=oifits.OI_T3(self.timeobs,self.int_time,self.t3amp[:,i],\
 				self.t3amperr[:,i],self.t3phi[:,i],self.t3phierr[:,i],\
 				self.t3flag[:,i],self.u1coord[i],self.v1coord[i],\
@@ -291,6 +297,8 @@ class OIfits():
 				array=self.array,station=(self.station,self.station,self.station))
 			self.oit3.append(self.t3data)
 		self.oit3=np.array(self.oit3)
+		print "cps understood by oifits obj:"
+		print self.oit3
 
 
 	def wavextension(self, wls, eff_band, clip=None):#mode, fitsfile, clip=None):
