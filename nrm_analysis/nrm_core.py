@@ -658,7 +658,7 @@ class BinaryAnalyze:
 		separation in mas, pa in degrees
 		"""
 		#cons = np.linspace(lims[0][0], lims[0][1], num=nstep)
-		cons = np.logspace(lims[0][0], lims[0][1], num=nstep)
+		cons = np.linspace(lims[0][0], lims[0][1], num=nstep)
 		seps = np.linspace(lims[1][0], lims[1][1], num=nstep)
 		angs = np.linspace(lims[2][0], lims[2][1], num=nstep)
 		loglike = np.zeros((nstep, nstep, nstep))
@@ -680,7 +680,7 @@ class BinaryAnalyze:
 		print "Max log likelikehood for contrast:", 
 		print cons[wheremax[0]]
 		print "Max log likelikehood for separation:", 
-		print rad2mas(seps[wheremax[1]]), "mas"
+		print seps[wheremax[1]], "mas"
 		print "Max log likelikehood for angle:", 
 		print angs[wheremax[2]], "deg"
 		print "==================="
@@ -689,7 +689,7 @@ class BinaryAnalyze:
 		plt.set_cmap("cubehelix")
 		plt.title("separation vs. pa at contrast of {0:.1f}".format(cons[wheremax[0][0]]))
 		plt.imshow(loglike[wheremax[0][0], :,:])
-		plt.xticks(np.arange(nstep)[::5], np.round(rad2mas(seps[::5]),3))
+		plt.xticks(np.arange(nstep)[::5], np.round(seps[::5],3))
 		plt.yticks(np.arange(nstep)[::5], np.round(angs[::5],3))
 		plt.xlabel("Separation")
 		plt.ylabel("PA")
@@ -862,7 +862,7 @@ class BinaryAnalyze:
 		pickle.dump(self.mcmc_results, open(self.savedir+"/mcmc_results.pick", "wb"))
 
 		import corner
-		fig = corner.corner(self.chain, labels = self.keys, bins = 200)
+		fig = corner.corner(self.chain, labels = self.keys, bins = 200, show_titles=True)
 		plt.savefig(self.savedir+"triangle_plot.pdf")
 		plt.show()
 
@@ -895,7 +895,7 @@ class BinaryAnalyze:
 		samples  = self.fullchain[:, 50:, :].reshape((-1, self.ndim))
 		plt.figure()
 		self.chain_convergence = {}
-		for ii in range(samples[-1]):
+		for ii in range(len(samples[-1])):
 			plt.subplot2grid((self.ndim,1),(ii,0))
 			plt.plot(samples[:,ii])
 			plt.ylabel(self.keys[ii])
@@ -946,12 +946,12 @@ def cp_binary_model(params, constant, priors, spectrum_model, uvcoords, cp, cper
 		# contrast model is con_start + slope*delta_lambda
 		contrast = np.linspace(params['con_start'] + params['slope']*wav_step)
 		# Model from params
-		model_cp = model_cp_uv(uvcoords, contrast, mas2rad(params['sep']), \
-							params['pa']*np.pi/180, 1.0/constant['wavl'])
+		model_cp = model_cp_uv(uvcoords, contrast, params['sep'], \
+							params['pa'], 1.0/constant['wavl'])
 	elif spectrum == 'free' :
 		# Model from params - params is contrast array nwav long, sep & pa constant
-		model_cp = model_cp_uv(uvcoords, params['con'], mas2rad(constant['sep']), \
-							constant['pa']*np.pi/180., 1.0/constant['wavl'])
+		model_cp = model_cp_uv(uvcoords, params['con'], constant['sep'], \
+							constant['pa'], 1.0/constant['wavl'])
 	else:
 		sys.exit("Invalid spectrum model")
 
@@ -1024,7 +1024,7 @@ def logl(data, err, model):
 	#for ii in range(len(model)):
 	#	#ll += -0.5*np.log(2*np.pi)*data[2*ii].size + np.sum(-np.log(data[2*ii+1]**2)
 	#return -0.5*np.log(2*np.pi) - np.sum(np.log(err)) - np.sum((model - data)**2/(2*data**2))
-	return -0.5*np.log(2*np.pi)*data.size + np.sum(-np.log(err) - 0.5*((model - data)/err)**2)
+	return -0.5*np.log(2*np.pi)*data.size + np.sum(-np.log(err**2) - 0.5*((model - data)/err)**2)
 
 class DiskAnalyze:
 	def __init__(self):
