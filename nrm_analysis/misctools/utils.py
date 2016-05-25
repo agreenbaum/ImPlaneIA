@@ -720,6 +720,32 @@ def baselinify(ctrs):
 		nn = nn+jj+1
 	return uvs, bllengths, label
 
+def count_cps(ctrs):
+	from scipy.misc import comb
+	N = len(ctrs)
+	ncps = comb(N,3)
+	cp_label = np.zeros((ncps, 3))
+	u1 = np.zeros(ncps)
+	v1 = np.zeros(ncps)
+	u2 = np.zeros(ncps)
+	v2 = np.zeros(ncps)
+	nn=0
+	for ii in range(N-2):
+		for jj in range(N-ii-2):
+			for kk in range(N-ii-jj-2):
+				#print '---------------'
+				#print nn+kk
+				cp_label[nn+kk,:] = np.array([ii, ii+jj+1, ii+jj+kk+2])
+				u1[nn+kk] = ctrs[ii,0] - ctrs[ii+jj+1, 0]
+				v1[nn+kk] = ctrs[ii,1] - ctrs[ii+jj+1, 1]
+				u2[nn+kk] = ctrs[ii+jj+1,0] - ctrs[ii+jj+kk+2, 0]
+				#print ii
+				#print ii+jj+1, ii+jj+kk+2
+				v2[nn+kk] = ctrs[ii+jj+1,1] - ctrs[ii+jj+kk+2, 1]
+				#print u1[nn+kk], u2[nn+kk], v1[nn+kk], v2[nn+kk]
+			nn = nn+kk+1
+	return u1, v1, u2, v2, cp_label
+
 def baseline_info(mask, pscale_mas, lam_c):
 	mask.ctrs = np.array(mask.ctrs)
 	uvs, bllengths, label = baselinify(mask.ctrs)
