@@ -804,7 +804,7 @@ class BinaryAnalyze:
 
 		"""
 		import emcee
-		self.ndim = len(params)
+		self.ndim = len(params) 
 		self.constant = constant
 		self.constant['wavl'] = self.wavls
 		# Options are None 'slope' or 'free'
@@ -854,6 +854,8 @@ class BinaryAnalyze:
 				print key, ":", mean, "+/-", err, "mas"
 			elif key=="pa":
 				print key, ":", mean, "+/-", err, "deg"
+			elif key=="lnf":
+				print "f:", np.exp(mean), "+/-", err
 			else:
 				print key, ":", mean, "+/-", err
 		print "========================="
@@ -877,16 +879,19 @@ class BinaryAnalyze:
 			guess[0] = self.params['con']
 			guess[1] = self.params['sep']
 			guess[2] = self.params['pa']
-			self.keys = ['con', 'sep', 'pa']
+			guess[3] = self.params['lnf']
+			self.keys = ['con', 'sep', 'pa', 'lnf']
 		elif self.spectrum_model=="slope":
 			guess[0] = self.params['con']
 			guess[1] = self.params["slope"]
 			guess[2] = self.params["sep"]
 			guess[3] = self.params["pa"]
-			self.keys = ['con', 'slope','sep', 'pa']
+			guess[4] = self.params['lnf']
+			self.keys = ['con', 'slope','sep', 'pa', 'lnf']
 		elif self.spectrum_model == "free":
 			guess = self.params["con"] # here con is given as an array size nwav
 			self.keys = ['con']
+			guess[-1] = self.params['lnf']
 		else:
 			print "invalid spectrum_model set"
 		return guess
@@ -955,7 +960,7 @@ def cp_binary_model(params, constant, priors, spectrum_model, uvcoords, cp, cper
 	else:
 		sys.exit("Invalid spectrum model")
 
-	ll = logl(cp, cperr, model_cp)
+	ll = logl(cp, cperr, model_cp, params[-1])
 	return ll
 
 def get_data(self):
@@ -1016,7 +1021,7 @@ def get_data(self):
 	#for q in range(self.nwav-1):
 	#	self.uvcoords[:,:,:,f] = self.uvcoords[:,:,:,0]
 
-def logl(data, err, model):
+def logl(data, err, model, lnf):
 	"""
 	Likelihood given data, errors, and the model values
 	These are all shape (nobservable, nwav)
@@ -1024,7 +1029,10 @@ def logl(data, err, model):
 	#for ii in range(len(model)):
 	#	#ll += -0.5*np.log(2*np.pi)*data[2*ii].size + np.sum(-np.log(data[2*ii+1]**2)
 	#return -0.5*np.log(2*np.pi) - np.sum(np.log(err)) - np.sum((model - data)**2/(2*data**2))
-	return -0.5*np.log(2*np.pi)*data.size + np.sum(-np.log(err**2) - 0.5*((model - data)/err)**2)
+	# suggestion in http://dan.iel.fm/emcee/current/user/line/ :
+	inv_sigma2 = 1.0/(err**2 + model**2*np.exp(2*lnf)) 
+	#return -0.5*np.log(2*np.pi)*data.size + np.sum(-np.log(err**2) - 0.5*((model - data)/err)**2)
+	return -0.5*(np.sum( (data-model)**2*inv_sigma2 - np.log(inv_sigma2)))
 
 class DiskAnalyze:
 	def __init__(self):
