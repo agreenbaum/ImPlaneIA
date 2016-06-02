@@ -111,7 +111,6 @@ This will plot the likelihood over a course grid for pairs of parameters and pri
 	params = {'con':c_val, 'sep':s_val, 'pa':p_val} # give params as a dictionary
 	priors = [(0.001, 0.999), (45, 500), (0, 360)] # set some bounds on the search
 
-	plt.ion() # Throw this in here to display plots continuously so you don't need to close them to continue
 	# method run_emcee uses dfm's emcee package to search for the location and relative brightness of a binary source. 
 	dataset.run_emcee(params, nwalkers=200, niter=1000, priors=priors) # default nwalkers is 250, niter is 1000
 	# if you want to see how the chains have behaved you can plot them easily:
