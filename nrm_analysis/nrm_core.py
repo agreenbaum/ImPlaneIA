@@ -21,6 +21,7 @@ from scipy.misc import comb
 from scipy.stats import sem, mstats
 import cPickle as pickle
 import matplotlib.pyplot as plt
+plt.ion() # Added after JA's suggestion - eventually will make plotting better.
 
 # Module imports
 from fringefitting.LG_Model import NRM_Model
@@ -639,12 +640,13 @@ class Calibrate:
 		return None
 
 class BinaryAnalyze:
-	def __init__(self, oifitsfn, savedir = "calibrated"):
+	def __init__(self, oifitsfn, savedir = "calibrated", extra_error=0):
 		"""
 		What do I want to do here?
 		Want to load an oifits file and look for a binary -- anything else?
 		"""
 		self.oifitsfn = oifitsfn
+		self.extra_error = extra_error
 
 		get_data(self)
 		self.savedir = savedir
@@ -989,7 +991,7 @@ def get_data(self):
 		#self.uvcoords[1, :,ii] = self.oifdata.t3[ii].v1coord, self.oifdata.t3[ii].v2coord,\
 		#			-(self.oifdata.t3[ii].v1coord+self.oifdata.t3[ii].v2coord)
 		self.cp[ii, :] = self.oifdata.t3[ii].t3phi
-		self.cperr[ii, :] = self.oifdata.t3[ii].t3phierr
+		self.cperr[ii, :] = np.sqrt(self.oifdata.t3[ii].t3phierr**2 + self.extra_error**2)
 		self.uvcoords[0,:,ii] = self.oifdata.t3[ii].u1coord, self.oifdata.t3[ii].u2coord,\
 					-(self.oifdata.t3[ii].u1coord+self.oifdata.t3[ii].u2coord)
 		self.uvcoords[1, :,ii] = self.oifdata.t3[ii].v1coord, self.oifdata.t3[ii].v2coord,\
@@ -1025,6 +1027,7 @@ def logl(data, err, model):
 	#	#ll += -0.5*np.log(2*np.pi)*data[2*ii].size + np.sum(-np.log(data[2*ii+1]**2)
 	#return -0.5*np.log(2*np.pi) - np.sum(np.log(err)) - np.sum((model - data)**2/(2*data**2))
 	return -0.5*np.log(2*np.pi)*data.size + np.sum(-np.log(err**2) - 0.5*((model - data)/err)**2)
+	#return -np.sum(-np.log(err**2) - 0.5*((model - data)/err)**2)
 
 class DiskAnalyze:
 	def __init__(self):
