@@ -91,20 +91,20 @@ The fringe fitter (with the options you want) measures fringe observables - visi
 Instance of Calibrate, gives 2 directories containing target and calibration sources. The first directory in the list is always assumed to be the science target. Any number of calibrators may be provided. Argument savedir default is "calibrated." Argument sub_dir_tag is the common part of each file name. Each image reduction is stored in a subdirectory based on the file name (see below in GPI example for similar example).
 
 	calib.save_to_oifits("niriss_test.oifits")
-Saves results to oifits. phaseceil keyword arg optional to set a custom dataflag. Default flag is set when phases exceed  1.0e1. 
+Saves results to oifits. phaseceil keyword arg optional to set a custom dataflag. Default flag is set when phases exceed  1.0e2. 
 
 *Keyword argument "interactive" in FringeFitter and Calibrate is by default set to True, which checks before overwriting directory contents and unusual settings. Set it to False if you know what you're doing and you want to speed up the process.*
 
 Now that you have calibrated data and you suspect there is a binary companion, you can try out a few different routines an instance of BinaryAnalyze using the oifits file created in the last step. Let's start with a coarse search within a range of reasonable parameters. 
 
 	# Initialize binary model with the oifits file you want to analyze
-	dataset = nrm_core.BinaryAnalyze("my_calibrate/niriss_test.oifits", savedir="my_calibrated/") 
+	dataset = nrm_core.BinaryAnalyze("my_calibrated/niriss_test.oifits", savedir="my_calibrated/") 
 	# as before you can specify a custom savedir argument for where you want to store the results
 
 	# set some bounds for the search
 	bounds = [(0.001, 0.99), (50, 200), (0, 360)] # contrast ratio, separation (mas), and pa (deg)
 	
-	dataset.coarse_binary_search(lims, nstep=25) # set the 'resolution' of the search with nstep. default is nstep=20
+	dataset.coarse_binary_search(bounds, nstep=25) # set the 'resolution' of the search with nstep. default is nstep=20
 
 This will plot the likelihood over a course grid for pairs of parameters and prints the location of the highest likelihood. Let's call these values c_val, s_val, and p_val (for contrast, separation, and pa). We canplug these 'close' guesses into the mcmc method:
 
