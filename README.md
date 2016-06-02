@@ -105,6 +105,7 @@ Now that you have calibrated data and you suspect there is a binary companion, y
 	bounds = [(0.001, 0.99), (50, 200), (0, 360)] # contrast ratio, separation (mas), and pa (deg)
 	
 	dataset.coarse_binary_search(bounds, nstep=25) # set the 'resolution' of the search with nstep. default is nstep=20
+	# If this is taking too long, decrease nstep. If you want more detail increase it. 
 
 This will plot the likelihood over a course grid for pairs of parameters and prints the location of the highest likelihood. Let's call these values c_val, s_val, and p_val (for contrast, separation, and pa). We canplug these 'close' guesses into the mcmc method:
 
