@@ -2,6 +2,7 @@
 
 """
 May 05 2014
+Update - user etc June 2016
 Author: Alex Greenbaum agreenba@pha.jhu.edu
 
 generate exposure times for GPI observations
