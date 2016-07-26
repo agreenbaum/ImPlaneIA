@@ -200,7 +200,9 @@ class FringeFitter:
 
                 # similar if/else routines for auto scaling and rotation
 
+                print "from nrm_core, centered shape:",self.ctrd.shape[0], self.ctrd.shape[1]
                 nrm.make_model(fov = self.ctrd.shape[0], bandpass=nrm.bandpass, over=self.oversample,
+                               holeshape=instrument_data.holeshape,\
                                centering=nrm.bestcenter, pixscale=nrm.pixel)
                 nrm.fit_image(self.ctrd, modelin=nrm.model)
                 """
@@ -477,7 +479,7 @@ class Calibrate:
                     # closure phases and squared visibilities
                     self.cp_mean_tar[0,:], self.cp_err_tar[0,:], \
                         self.v2_err_tar[0,:], self.v2_err_tar[0,:], \
-                        self.pha_mean_tar[slc,:], self.pha_err_tar = \
+                        self.pha_mean_tar[0,:], self.pha_err_tar[0,:] = \
                         self.calib_steps(cps, amp, pha, nexps)
                 else:
                     # Fixed clunkiness!
@@ -817,7 +819,7 @@ class BinaryAnalyze:
         Is my data consistent with Null Hypothesis?
         """
 
-    def detection_limits(self, ntrials = 1, seplims = [20, 200], conlims = [0.0001, 0.99], anglims = [0,360], nsep = 24, ncon=24, nang=24, threads=4):
+    def detection_limits(self, ntrials = 1, seplims = [20, 200], conlims = [0.0001, 0.99], anglims = [0,360], nsep = 24, ncon=24, nang=24, threads=4, save=False):
         """
         Inspired by pymask code.
         """
@@ -827,8 +829,11 @@ class BinaryAnalyze:
 
         self.seps = np.linspace(seplims[0], seplims[1], nsep)
         self.angs = np.linspace(anglims[0], anglims[1], nang)
-        self.cons = np.linspace(1.0/float(conlims[0]), 1.0/float(conlims[1]), ncon)
-        self.cons = 1.0 / self.cons
+        nn = np.arange(ncon)
+        r = (conlims[-1]/conlims[0])**(1 / float(ncon-1))
+        self.cons = conlims[0] * r**(nn)
+        #self.cons = np.linspace(1.0/float(conlims[0]), 1.0/float(conlims[1]), ncon)
+        #self.cons = 1.0 / self.cons
 
         # Set up the big grids and add a wavelength axis so this all works
         seps = np.tile(self.seps, (ncon, nang, self.nwav, 1))
@@ -883,6 +888,8 @@ class BinaryAnalyze:
         print "Time to finish detec_calc_loop:", t5-t3, "s"
 
         self.detec_grid = big_detec_grid.sum(axis=-1) / float(nang)
+        # Get the order right
+        self.detec_grid = self.detec_grid.transpose()
 
         """
         for ii in range(nsep):
@@ -918,9 +925,10 @@ class BinaryAnalyze:
         # pickle the data
         savdata = {"clevels": clevels, "separations": self.seps, "angles":self.angs, \
                    "contrasts":self.cons, "detections":self.detec_grid}
-        f = open(self.savedir+os.path.sep+"detection_limits.pick", "w")
-        pickle.dump(savdata, f)
-        f.close()
+        if save:
+            f = open(self.savedir+os.path.sep+"detection_limits.pick", "w")
+            pickle.dump(savdata, f)
+            f.close()
         plt.draw()
 
     def correlation_plot(self, start=[0.16, 64, 219]):
@@ -960,7 +968,7 @@ class BinaryAnalyze:
 
         sang = Slider(axang, 'Theta', 0,360 , valinit=start[2])
         scrat = Slider(axcrat, 'Cratio', 0.001, 0.999, valinit=start[0])
-        ssep = Slider(axsep, 'Sep (mas)', 20, 100, valinit=start[1])
+        ssep = Slider(axsep, 'Sep (mas)', 20, 300, valinit=start[1])
 
         def update(val):
             theta = sang.val
@@ -1190,6 +1198,10 @@ def get_data(self):
     self.pha = np.zeros((self.nbl, self.nwav))
     self.phaerr = np.zeros((self.nbl, self.nwav))
 
+    #Now, if extra_error is specified and there is a wavelength axis, we scale the 
+    # estimated error with wavelength - User specifies error at shorted wavl?
+    #self.extra_error = self.extra_error*np.ones(self.nwav)*self.wavls[0] / (self.wavls)
+
     for ii in range(self.ncp):
         #self.cp[:,ii] = self.oifdata.t3[ii].t3phi
         #self.cperr[:,ii] = self.oifdata.t3[ii].t3phierr
@@ -1266,7 +1278,7 @@ def logl(data, err, model):
     #return -np.sum(-np.log(err**2) - 0.5*((model - data)/err)**2)
 
 def reduced_chi2(data, err, model, dof=1.0):
-    return (1/float(dof))*np.sum(((model - data)/err)**2, axis=(-1,-2))
+    return (1/float(dof))*np.sum(((model - data)**2/(err**2)), axis=(-1,-2))
 
 
 class DiskAnalyze:
