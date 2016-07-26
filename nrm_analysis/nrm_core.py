@@ -143,7 +143,7 @@ class FringeFitter:
         np.savetxt(self.savedir+"/coordinates.txt", self.instrument_data.mask.ctrs)
         np.savetxt(self.savedir+"/wavelengths.txt", self.instrument_data.wavextension[0])
 
-        nrm = NRM_Model(mask = self.instrument_data.mask, pixscale = self.instrument_data.pscale_rad, over = self.oversample)
+        nrm = NRM_Model(mask = self.instrument_data.mask, pixscale = self.instrument_data.pscale_rad, over = self.oversample, holeshape=self.instrument_data.holeshape)
         # In future can just pass instrument_data to NRM_Model
 
         #plot conditions
@@ -202,7 +202,6 @@ class FringeFitter:
 
                 print "from nrm_core, centered shape:",self.ctrd.shape[0], self.ctrd.shape[1]
                 nrm.make_model(fov = self.ctrd.shape[0], bandpass=nrm.bandpass, over=self.oversample,
-                               holeshape=self.instrument_data.holeshape,\
                                centering=nrm.bestcenter, pixscale=nrm.pixel)
                 nrm.fit_image(self.ctrd, modelin=nrm.model)
                 """
