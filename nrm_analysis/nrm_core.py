@@ -143,7 +143,8 @@ class FringeFitter:
         np.savetxt(self.savedir+"/coordinates.txt", self.instrument_data.mask.ctrs)
         np.savetxt(self.savedir+"/wavelengths.txt", self.instrument_data.wavextension[0])
 
-        nrm = NRM_Model(mask = self.instrument_data.mask, pixscale = self.instrument_data.pscale_rad, over = self.oversample, holeshape=self.instrument_data.holeshape)
+        #nrm = NRM_Model(mask = self.instrument_data.mask, pixscale = self.instrument_data.pscale_rad, over = self.oversample, holeshape=self.instrument_data.holeshape)
+        #print nrm.holeshape
         # In future can just pass instrument_data to NRM_Model
 
         #plot conditions
@@ -177,7 +178,7 @@ class FringeFitter:
 
                 # NRM_Model
                 nrm = NRM_Model(mask=self.instrument_data.mask, pixscale = self.instrument_data.pscale_rad,\
-                                over = self.oversample)
+                                holeshape=self.instrument_data.holeshape, over = self.oversample)
 
                 nrm.refdir=self.refimgs+'{0:02d}'.format(slc)+'/'
                 nrm.bandpass = self.instrument_data.wls[slc]
@@ -196,11 +197,11 @@ class FringeFitter:
                     nrm.auto_find_center("ctrmodel.fits")
                     nrm.bestcenter = 0.5-nrm.over*nrm.xpos, 0.5-nrm.over*nrm.ypos
                 else:
-                    nrm.bestcenter = nrm.centering
+                    nrm.bestcenter = self.hold_centering
 
                 # similar if/else routines for auto scaling and rotation
 
-                print "from nrm_core, centered shape:",self.ctrd.shape[0], self.ctrd.shape[1]
+                #print "from nrm_core, centered shape:",self.ctrd.shape[0], self.ctrd.shape[1]
                 nrm.make_model(fov = self.ctrd.shape[0], bandpass=nrm.bandpass, over=self.oversample,
                                centering=nrm.bestcenter, pixscale=nrm.pixel)
                 nrm.fit_image(self.ctrd, modelin=nrm.model)
@@ -255,6 +256,7 @@ class FringeFitter:
                     self.sub_dir_str+"/residual{0:02d}.fits".format(slc), clobber=True)
         modelhdu.writeto(self.savedir+\
                     self.sub_dir_str+"/modelsolution{0:02d}.fits".format(slc), clobber=True)
+        sys.exit()
 
     def save_auto_figs(self, slc, nrm):
         # pixel scales
@@ -528,9 +530,9 @@ class Calibrate:
         meancp = np.mean(cps, axis=0)
         meanv2 = np.mean(amps, axis=0)**2
         meanpha = np.mean(pha, axis=0)
-        errcp = np.sqrt(mstats.moment(cps, moment=2, axis=0)/np.sqrt(nexp))
-        errv2 = np.sqrt(mstats.moment(amps**2, moment=2, axis=0)/np.sqrt(nexp))
-        errpha = np.sqrt(mstats.moment(pha, moment=2, axis=0)/np.sqrt(nexp))
+        errcp = np.sqrt(mstats.moment(cps, moment=2, axis=0))/np.sqrt(nexp)
+        errv2 = np.sqrt(mstats.moment(amps**2, moment=2, axis=0))/np.sqrt(nexp)
+        errpha = np.sqrt(mstats.moment(pha, moment=2, axis=0))/np.sqrt(nexp)
         print "input:",cps
         print "avg:", meancp
         return meancp, errcp, meanv2, errv2, meanpha, errpha
@@ -818,7 +820,7 @@ class BinaryAnalyze:
         Is my data consistent with Null Hypothesis?
         """
 
-    def detection_limits(self, ntrials = 1, seplims = [20, 200], conlims = [0.0001, 0.99], anglims = [0,360], nsep = 24, ncon=24, nang=24, threads=4, save=False):
+    def detection_limits(self, ntrials = 1, seplims = [20, 200], conlims = [0.0001, 0.99], anglims = [0,360], nsep = 24, ncon=24, nang=24, threads=4, save=False, scale=1.0):
         """
         Inspired by pymask code.
         """
@@ -846,7 +848,7 @@ class BinaryAnalyze:
         # Consider scaling random cperr by wavelength?
         randnums = np.random.randn(int(ntrials), len(self.cp), int(self.nwav))
         # randomize* the measurement errors
-        errors = self.cperr[None, ...]*randnums
+        errors = scale*self.cperr[None, ...]*randnums
         #errors = np.rollaxis(np.tile(self.cperr[None, ...]*randnums, (nsep, ncon, nang,1, 1, 1)),-3,0)
         print "errors shape:", errors.shape
 
