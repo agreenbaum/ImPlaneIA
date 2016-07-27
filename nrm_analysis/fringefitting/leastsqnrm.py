@@ -58,11 +58,13 @@ def primarybeam(kx, ky):
 	return pb * pb.conj()
 
 def hexpb():
+	print "HEX ENVELOPE"
 	pb = hexee.hex_eeAG(s=hexpb.size, c=(hexpb.offx, hexpb.offy), \
 			      d=hexpb.d, lam=hexpb.lam, pitch=hexpb.pitch)
 
 	#  Sept 2015 -- to fix coordinate confusion
-	pb = pb.transpose()
+    # July 2016, commented out transpose to be consistent w/simulation orientation
+	#pb = pb.transpose()
 
 	return pb * pb.conj()
 

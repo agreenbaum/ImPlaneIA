@@ -230,7 +230,8 @@ def ASFhex(pixel, fov, oversample, ctrs, d, lam, phi, centering = 'PIXELCENTERED
 					c=(offx,offy), d=d, lam=lam, pitch=pitch)
 
 	# Sept 2015 -- to fix fromfunc coordinate confusion
-	primarybeam = primarybeam.transpose()
+    # July 2016, commented out transpose to be consistent w/simulation orientation
+	#primarybeam = primarybeam.transpose()
 
 	fringing = np.fromfunction(interf,  (int((oversample*fov)), int((oversample*fov))))
 
