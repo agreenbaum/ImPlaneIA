@@ -149,7 +149,7 @@ def centerit(img, r=60):
 	print 'peak x,y:', peakx,peaky
 	cropped = img[peakx-r:peakx+r+1,peaky-r:peaky+r+1]
 	print 'Cropped image shape:',cropped.shape
-	print 'value at center:', cropped[60,60]
+	print 'value at center:', cropped[r,r]
 	print np.where(cropped == cropped.max())
 	#pl.imshow(cropped, interpolation='nearest', cmap='bone')
 	#pl.show()
@@ -482,7 +482,7 @@ def get_webbpsf_filter(filtfile, specbin=None, trim=False):
 	"""
 	W = 1 # remove confusion - wavelength index
 	T = 0 # remove confusion - trans index after reding in...
-	f = pyfits.open(filtfile)
+	f = fits.open(filtfile)
 	thru = f[1].data
 	f.close()
 	tmp_array = np.zeros((len(thru), 2))
@@ -530,12 +530,10 @@ def get_webbpsf_filter(filtfile, specbin=None, trim=False):
  
 	return spec
 
-
-
 def trim_webbpsf_filter(filt, specbin=None, plot=False):
 	print "================== " + filt + " ==================="
-	beta = {"F277W":0.6, "F380M":0.15, "F430M":0.2, "F480M":0.2}
-	lamc = {"F277W":2.77e-6, "F380M":3.8e-6, "F430M":4.3e-6, "F480M":4.8e-6}
+	beta = {"F277W":0.6, "F380M":0.15, "F430M":0.17, "F480M":0.2}
+	lamc = {"F277W":2.70e-6, "F380M":3.8e-6, "F430M":4.24e-6, "F480M":4.8e-6}
 	filterdirectory = os.getenv('WEBBPSF_PATH')+"/NIRISS/filters/" 
 	band = get_webbpsf_filter(filterdirectory+filt+"_throughput.fits", 
 	                          specbin=specbin, 

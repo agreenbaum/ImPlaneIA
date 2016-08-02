@@ -186,7 +186,7 @@ class VISIR:
         return scidata, hdr
 
 class NIRISS:
-    def __init__(self, filt, objname, src="A0V", **kwargs):
+    def __init__(self, filt, objname="obj", src="A0V", **kwargs):
         """
         Initialize NIRISS class
 
@@ -205,6 +205,7 @@ class NIRISS:
         #############################
         lam_c = {"F277W":2.77e-6, "F380M": 4.3e-6, "F430M": 4.3e-6, "F480M": 4.8e-6}
         lam_w = {"F277W":0.2, "F380M": 0.1, "F430M": 0.05, "F480M": 0.08}
+        lam_bin = {"F277W": 50, "F380M": 20, "F430M":20,"F480M":30}
         #############################
 
         # only one NRM on GPI:
@@ -231,8 +232,9 @@ class NIRISS:
         # Wavelength info for NIRISS bands F277W, F380M, F430M, or F480M
         try:
             # If user has webbpsf installed, this will work
-            self.throughput = utils.get_webbpsf_filter(self.filt+"_throughput.fits", \
-                trim = (lam_c[self.filt], lam_w[self.filt]))
+            #self.throughput = utils.get_webbpsf_filter(self.filt+"_throughput.fits", \
+            #    trim = (lam_c[self.filt], lam_w[self.filt]))
+            self.throughput = utils.trim_webbpsf_filter(self.filt, specbin=lam_bin[self.filt])
         except:
             self.throughput = utils.tophatfilter(lam_c[self.filt], lam_w[self.filt], npoints=11)
 
