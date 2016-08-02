@@ -256,7 +256,6 @@ class FringeFitter:
                     self.sub_dir_str+"/residual{0:02d}.fits".format(slc), clobber=True)
         modelhdu.writeto(self.savedir+\
                     self.sub_dir_str+"/modelsolution{0:02d}.fits".format(slc), clobber=True)
-        sys.exit()
 
     def save_auto_figs(self, slc, nrm):
         # pixel scales
@@ -429,6 +428,8 @@ class Calibrate:
         self.pha_mean_tar = np.zeros((self.naxis2, self.nbl))
         self.pha_err_tar = np.zeros((self.naxis2, self.nbl))
 
+        #self.cov_mat_cal = np.zeros(nexp*self.naxis2)
+
         # is there a subdirectory (e.g. for the exposure -- need to make this default)
         if sub_dir_tag is not None:
             self.sub_dir_tag = sub_dir_tag
@@ -462,6 +463,18 @@ class Calibrate:
                             self.v2_mean_cal[ii-1,slc,:], self.v2_err_cal[ii-1,slc,:], \
                             self.pha_mean_cal[ii-1,slc,:], self.pha_err_cal[ii-1, slc,:] = \
                             self.calib_steps(cps[slc,:,:], amp[slc,:,:], pha[slc,:,:], nexps)
+                """
+                ####################################
+                # calculate closure phase cov matrix
+                ####################################
+                # zero mean and stack wavelength+exposures
+                if ii ==0:
+                    flatcps = (cps-self.cp_mean_tar[:,None,:]).reshape(nexps*self.naxis2, self.ncp)
+                    self.cov_mat_tar = np.cov(flatcps)
+                else:
+                    flatcps = (cps-self.cp_mean_cal[ii-1, :,None,:]).reshape(nexps*self.naxis2, self.ncp)
+                    self.cov_mat_cal += np.cov(flatcps)
+                """
 
         else:
             for ii in range(self.nobjs):
@@ -528,8 +541,11 @@ class Calibrate:
     def calib_steps(self, cps, amps, pha, nexp):
         "Calculates closure phase and mean squared visibilities & standard error"
         meancp = np.mean(cps, axis=0)
+        #covmat_cps = np.cov(np.rollaxis(cps - meancp, -1,0))
         meanv2 = np.mean(amps, axis=0)**2
+        #covmat_v2 = np.cov(np.rollaxis(amps**2 - meanv2, -1,0))
         meanpha = np.mean(pha, axis=0)
+        #covmat_pha = np.cov(np.rollaxis(pha - meanpha, -1,0))
         errcp = np.sqrt(mstats.moment(cps, moment=2, axis=0))/np.sqrt(nexp)
         errv2 = np.sqrt(mstats.moment(amps**2, moment=2, axis=0))/np.sqrt(nexp)
         errpha = np.sqrt(mstats.moment(pha, moment=2, axis=0))/np.sqrt(nexp)
@@ -670,7 +686,10 @@ class BinaryAnalyze:
         separation in mas, pa in degrees
         """
         #cons = np.linspace(lims[0][0], lims[0][1], num=nstep)
-        cons = np.linspace(lims[0][0], lims[0][1], num=nstep)
+        nn = np.arange(nstep)
+        r = (lims[0][-1]/lims[0][0])**(1 / float(nstep-1))
+        cons = lims[0][0] * r**(nn)
+        #cons = np.linspace(lims[0][0], lims[0][1], num=nstep)
         seps = np.linspace(lims[1][0], lims[1][1], num=nstep)
         angs = np.linspace(lims[2][0], lims[2][1], num=nstep)
         loglike = np.zeros((nstep, nstep, nstep))
@@ -697,11 +716,12 @@ class BinaryAnalyze:
         print "Max log likelikehood for angle:", 
         print angs[wheremax[2]], "deg"
         print "==================="
+        coarse_params = cons[wheremax[0]], seps[wheremax[1]], angs[wheremax[2]]
 
         plt.figure()
         plt.set_cmap("cubehelix")
         plt.title("separation vs. pa at contrast of {0:.1f}".format(cons[wheremax[0][0]]))
-        plt.imshow(loglike[wheremax[0][0], :,:])
+        plt.imshow(loglike[wheremax[0][0], :,:].transpose())
         plt.xticks(np.arange(nstep)[::5], np.round(seps[::5],3))
         plt.yticks(np.arange(nstep)[::5], np.round(angs[::5],3))
         plt.xlabel("Separation")
@@ -715,7 +735,7 @@ class BinaryAnalyze:
         plt.yticks(np.arange(nstep)[::5], np.round(seps[::5],3))
         plt.xlabel("Contrast")
         plt.ylabel("Separation")
-        plt.imshow(loglike[:,:,wheremax[2][0]])
+        plt.imshow(loglike[:,:,wheremax[2][0]].transpose())
         plt.colorbar()
         plt.savefig(self.savedir+"/con_sep.pdf")
 
@@ -725,7 +745,7 @@ class BinaryAnalyze:
         plt.yticks(np.arange(nstep)[::5], np.round(angs[::5], 3))
         plt.xlabel("Contrast")
         plt.ylabel("PA")
-        plt.imshow(loglike[:,wheremax[1][0],:])
+        plt.imshow(loglike[:,wheremax[1][0],:].transpose())
         plt.colorbar()
         plt.savefig(self.savedir+"/con_pa.pdf")
 
@@ -750,6 +770,7 @@ class BinaryAnalyze:
         """
         
         plt.show()
+        return coarse_params
 
     def detec_map(self, lims, nstep=50, hyp = 0):
         """
@@ -763,7 +784,10 @@ class BinaryAnalyze:
         """
         from matplotlib.colors import LogNorm
         #cons = np.linspace(lims[0][0], lims[0][1], num=nstep)
-        cons = np.logspace(np.log10(lims[0][0]), np.log10(lims[0][1]), num=nstep)
+        nn = np.arange(nstep)
+        r = (lims[0][-1]/lims[0][0])**(1 / float(nstep-1))
+        cons = lims[0][0] * r**(nn)
+        #cons = np.logspace(np.log10(lims[0][0]), np.log10(lims[0][1]), num=nstep)
         ras = np.linspace(-lims[1][1], lims[1][1], num = nstep)
         decs = np.linspace(-lims[1][1], lims[1][1], num = nstep)
         #seps = np.sqrt(ras**2 + decs**2)
@@ -815,6 +839,34 @@ class BinaryAnalyze:
         plt.colorbar(label="Contrast")
         
         plt.show()
+
+    def chi2map(self, contrast, maxsep=300., nstep=50):
+    
+        nn = np.arange(nstep)
+        #r = (lims[0][-1]/lims[0][0])**(1 / float(nstep-1))
+        #cons = lims[0][0] * r**(nn)
+        ras = np.linspace(-maxsep, maxsep, num = nstep)
+        decs = np.linspace(-maxsep, maxsep, num = nstep)
+        chi2grid = np.zeros((nstep, nstep))
+
+        priors = np.array([(-np.inf, np.inf) for f in range( 3 ) ])
+        constant = {"wavl": self.wavls}
+
+        for i in range(nstep):
+            for j in range(nstep):
+                ang = 180*np.arctan2(decs[j], ras[i])/np.pi
+                sep = np.sqrt(ras[i]**2 + decs[j]**2)
+                params = [contrast, sep, ang]
+                chi2grid[i,j] = -cp_binary_model(params, constant, priors, None, self.uvcoords, self.cp, self.cperr, stat="chi2")
+        plt.figure()
+        plt.imshow(chi2grid.transpose())
+        plt.xlabel("RA (mas)")
+        plt.ylabel("DEC (deg)")
+        plt.xticks(np.linspace(0, nstep, 5), np.linspace(ras.min(), ras.max(), 4+1))
+        plt.yticks(np.linspace(0, nstep, 5), np.linspace(decs.min(), decs.max(), 4+1))
+
+        plt.show()
+
     def two_hyp_test():
         """
         Is my data consistent with Null Hypothesis?
@@ -930,9 +982,55 @@ class BinaryAnalyze:
             f = open(self.savedir+os.path.sep+"detection_limits.pick", "w")
             pickle.dump(savdata, f)
             f.close()
+            plt.savefig(self.savedir+os.path.sep+"detection_limits.pdf")
         plt.draw()
 
-    def correlation_plot(self, start=[0.16, 64, 219]):
+    def grid_spectrum(self, sep, pa, ncon=100, conlims=[1.0e-3, 0.999], plot=True):
+        """ If the position is known (sep, pa), look for best contrast at each wavelength."""
+        nn = np.arange(ncon)
+        r = (conlims[-1]/conlims[0])**(1 / float(ncon-1))
+        self.cons = conlims[0] * r**(nn)
+        cons = np.tile(self.cons, (self.nwav, 1))
+        cons = np.rollaxis(cons, -1, 0)
+        print "cons shape", cons.shape
+        uvcoords = np.rollaxis(np.rollaxis(np.rollaxis(np.tile(self.uvcoords, (ncon, 1, 1, 1, 1)), -2,0), -2, 0), -2, 0)
+        print "uvcoords shape", uvcoords.shape
+        print "Computing model cps over", ncon, "parameters."
+        t1 = time.time()
+        model_cps = model_cp_uv(uvcoords, cons, sep, pa, 1.0/self.wavls)
+        t2 = time.time()
+        print "Finished computing big grid, took", t2-t1, "s"
+        print "model shape:", model_cps.shape
+        model_cps = np.rollaxis(model_cps, 0, -1)
+        print "new model shape", model_cps.shape
+        datacps = np.tile(self.cp, (ncon, 1, 1))
+        dataerror = np.tile(self.cperr, (ncon, 1, 1))
+        print "datacps shape", datacps.shape
+
+        t4 = time.time()
+        self.con_spectrum = np.zeros((self.nwav, len(self.cons)))
+        for ll in range(self.nwav):
+            chi2 = np.sum((model_cps[:,:,ll] - datacps[:,:,ll])**2 / (dataerror[:,:,ll]**2), axis=-1)
+            minimum = chi2.min()
+            #print "chi2:", chi2.shape
+            self.con_spectrum[ll, :] = chi2#loglike
+        t5 = time.time()
+        print "Time to finish contrast loop:", t5-t4, "s"
+        if plot:
+            plt.figure()
+            plt.imshow(self.con_spectrum.transpose(), cmap="rainbow")
+            #plt.plot(self.wavls*1.0e6, self.con_spectrum, 'o')
+            plt.title("Rough fit spectrum in contrast ratio")
+            plt.xticks(np.arange(self.nwav)[::5], np.round(self.wavls*1e6, 3)[::5])
+            plt.yticks(np.arange(ncon)[::10], np.round(self.cons, 3)[::10])
+            plt.xlabel("Wavelength (um)")
+            plt.ylabel("Contrast Ratio $\chi^2$")
+            plt.axis('normal')
+            plt.colorbar()
+            plt.show()
+        return self.con_spectrum
+
+    def correlation_plot(self, start=[0.16, 64, 219], bnds=50):
         """
         A nice visualization to see how the data compares to model solutions. Plot is adjustable.
 
@@ -950,16 +1048,19 @@ class BinaryAnalyze:
 
         # Data and model both have shape ncp, nwav
         modelcps = model_cp_uv(self.uvcoords, start[0], start[1], start[2], 1.0/self.wavls)
-        print "model shape:"
-        print modelcps.shape
-        print type(modelcps)
-        print "why are these closure phases so small??"
-        print self.cp
-        print self.cp.shape
-        plt.plot([-50, 50], [-50,50])
+        #print "model shape:"
+        #print modelcps.shape
+        #print type(modelcps)
+        #print "why are these closure phases so small??"
+        #print self.cp
+        #print self.cp.shape
+        plt.plot([-bnds, bnds], [-bnds,bnds])
+        #plt.errorbar(self.cp.flatten(), modelcps.flatten(), yerr = self.cperr.flatten(), fmt='.')
         l, = plt.plot(self.cp.flatten(), modelcps.flatten(), '.')
         plt.xlabel("Measured closure phase (degrees)")
         plt.ylabel("Model closure phase (degrees)")
+        plt.ylim(-bnds, bnds)
+        plt.xlim(-bnds, bnds)
 
         # Set up the widget plot from matplotlib demo
         axcolor = "lightgoldenrodyellow"
@@ -1003,7 +1104,7 @@ class BinaryAnalyze:
 
         plt.show()
 
-    def run_emcee(self, params, constant={}, nwalkers = 250, niter = 1000, spectrum_model=None, priors=None, threads=4):
+    def run_emcee(self, params, constant={}, nwalkers = 250, niter = 1000, spectrum_model=None, priors=None, threads=4, scale=1.0):
         """
         A lot of options in this method, read carefully.
 
@@ -1041,7 +1142,7 @@ class BinaryAnalyze:
 
         t0 = time.time()
         #print "nwalkers", nwalkers, "args", self.constant, self.priors, self.spectrum_model, self.uvcoords, self.cp, self.cperr
-        self.sampler = emcee.EnsembleSampler(nwalkers, self.ndim, cp_binary_model, threads=threads, args=[self.constant, self.priors, self.spectrum_model, self.uvcoords, self.cp, self.cperr])
+        self.sampler = emcee.EnsembleSampler(nwalkers, self.ndim, cp_binary_model, threads=threads, args=[self.constant, self.priors, self.spectrum_model, self.uvcoords, self.cp, scale*self.cperr])
 
         pos, prob, state = self.sampler.run_mcmc(p0, 100)
         self.sampler.reset()
@@ -1154,15 +1255,15 @@ def cp_binary_model(params, constant, priors, spectrum_model, uvcoords, cp, cper
         #                   params['pa'], 1.0/self.constant['wavl'])
         model_cp = model_cp_uv(uvcoords, params[0], params[1], \
                             params[2], 1.0/constant['wavl'])
-    elif spectrum == 'slope':
+    elif spectrum_model == 'slope':
         # params needs 'con_start' starting contrast and 'slope,' sep & pa constant?
         wav_step = constant['wavl'][1] - constant['wavl'][0]
         # contrast model is con_start + slope*delta_lambda
-        contrast = np.linspace(params['con_start'] + params['slope']*wav_step)
+        contrast = params[0] + params[1]*wav_step
         # Model from params
-        model_cp = model_cp_uv(uvcoords, contrast, params['sep'], \
-                            params['pa'], 1.0/constant['wavl'])
-    elif spectrum == 'free' :
+        model_cp = model_cp_uv(uvcoords, contrast, params[2], \
+                            params[3], 1.0/constant['wavl'])
+    elif spectrum_model == 'free' :
         # Model from params - params is contrast array nwav long, sep & pa constant
         model_cp = model_cp_uv(uvcoords, params['con'], constant['sep'], \
                             constant['pa'], 1.0/constant['wavl'])
@@ -1230,7 +1331,7 @@ def get_data(self):
         except:
             pass
     # hack right now to take care of 0 values, set to some limit, 0.001 right now
-    floor = 0.001
+    floor = 0.000
     self.cperr[self.cperr<floor] = floor
     self.phaerr[self.phaerr<floor] = floor
     self.v2err[self.v2err<floor] = floor
@@ -1261,9 +1362,11 @@ def detec_calc_loop(dictlist):
     # ndetected should have shape (nsep, ncon, nang) -- the first 3 dimensions of the cp model
     simcps = dictlist['model'].copy()
     simcps += dictlist['randerrors']
-    chi2null = reduced_chi2(simcps, dictlist['dataerrors'], 0)
-    chi2bin = reduced_chi2(simcps, dictlist['dataerrors'], dictlist['model'])
-    detected = (chi2bin - chi2null)<0.0
+    #chi2null = reduced_chi2(simcps, dictlist['dataerrors'], 0)
+    #chi2bin = reduced_chi2(simcps, dictlist['dataerrors'], dictlist['model'])
+    chi2bin_m_chi2null = np.sum( ((dictlist['model'] - simcps)**2 - (simcps**2)) /(dictlist['dataerrors']**2), axis=(-1,-2))
+    #detected = (chi2bin - chi2null)<0.0
+    detected = chi2bin_m_chi2null<0.0
     #ndetected /= float(dictlist['ntrials'])
     return detected
 
@@ -1275,12 +1378,17 @@ def logl(data, err, model):
     #for ii in range(len(model)):
     #   #ll += -0.5*np.log(2*np.pi)*data[2*ii].size + np.sum(-np.log(data[2*ii+1]**2)
     #return -0.5*np.log(2*np.pi) - np.sum(np.log(err)) - np.sum((model - data)**2/(2*data**2))
-    return -0.5*np.log(2*np.pi)*data.size + np.sum(-np.log(err**2) - 0.5*((model - data)/err)**2)
-    #return -np.sum(-np.log(err**2) - 0.5*((model - data)/err)**2)
+    #return -0.5*np.log(2*np.pi)*data.size + np.sum(-np.log(err**2) - 0.5*((model - data)/err)**2)
+    return np.sum(-np.log(err**2) - 0.5*((model - data)/err)**2)
 
 def reduced_chi2(data, err, model, dof=1.0):
     return (1/float(dof))*np.sum(((model - data)**2/(err**2)), axis=(-1,-2))
 
+def assemble_cov_mat(self):
+    meancps = np.mean(self.cp, axis=0)
+    flat_mean_sub_cp = (self.cp - meancps[None,:]).flatten
+    covmat = flat_mean_sub_cp[None,:]*flat_mean_sub_cp[:,None]
+    return covmat
 
 class DiskAnalyze:
     def __init__(self):
