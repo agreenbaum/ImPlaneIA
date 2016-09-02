@@ -194,6 +194,7 @@ class FringeFitter:
 
                 nrm.reference = self.ctrd
                 if self.hold_centering == False:
+                    # this fn should be more descriptive
                     nrm.auto_find_center("ctrmodel.fits")
                     nrm.bestcenter = 0.5-nrm.over*nrm.xpos, 0.5-nrm.over*nrm.ypos
                 else:
@@ -831,7 +832,7 @@ class BinaryAnalyze:
         #plt.imshow(-(chi2cube.min(axis=0)), cmap="CMRmap")
         plt.pcolor(detec_array, norm=LogNorm(vmin=detec_array.min(), vmax=detec_array.max()), cmap="CMRmap")
         plt.xlabel("RA (mas)")
-        plt.ylabel("DEC (deg)")
+        plt.ylabel("DEC (mas)")
         #plt.yticks(np.arange(nstep)[::(nstep/4)], seps[::(nstep/4)]*np.sin(angs)[::(nstep/4)])
         #plt.xticks(np.arange(nstep)[::(nstep/4)], seps[::(nstep/4)]*np.cos(angs)[::(nstep/4)])
         plt.xticks(np.linspace(0, nstep, 5), np.linspace(ras.min(), ras.max(), 4+1))
@@ -840,32 +841,71 @@ class BinaryAnalyze:
         
         plt.show()
 
-    def chi2map(self, contrast, maxsep=300., nstep=50):
+    def chi2map(self, maxsep=300., clims = [0.001, 0.5], nstep=50, threads=4):
+        """
+        Makes a coarse chi^2 map at the contrast where chi^2 is minimum for each position. 
+        """
     
         nn = np.arange(nstep)
-        #r = (lims[0][-1]/lims[0][0])**(1 / float(nstep-1))
-        #cons = lims[0][0] * r**(nn)
-        ras = np.linspace(-maxsep, maxsep, num = nstep)
-        decs = np.linspace(-maxsep, maxsep, num = nstep)
-        chi2grid = np.zeros((nstep, nstep))
+        r = (clims[-1]/clims[0])**(1 / float(nstep-1))
+        self.cons = clims[0] * r**(nn)
+        self.ras = np.linspace(-maxsep, maxsep, num = nstep)
+        self.decs = np.linspace(-maxsep, maxsep, num = nstep)
 
-        priors = np.array([(-np.inf, np.inf) for f in range( 3 ) ])
-        constant = {"wavl": self.wavls}
+        # Make position grid
+        t0 = time.time()
+        ras = np.tile(self.ras, (nstep, self.nwav, 1))
+        ras = np.rollaxis(ras, -1, 0)
+        decs = np.tile(self.decs, (nstep, self.nwav, 1))
+        decs = np.rollaxis(decs, -1, 1)
+        # Need to add these onto uvcoords too
+        uvcoords = np.rollaxis(np.rollaxis(np.rollaxis(np.tile(self.uvcoords, (nstep, nstep, 1, 1, 1, 1)), -2,0), -2, 0), -2,0)
+        t1 = time.time()
+        print "took "+str(t1-t0)+"s to assemble position grids"
+        print uvcoords.shape
+        print self.cp.shape
+        print ras.shape
+        print np.shape(self.wavls)
 
-        for i in range(nstep):
-            for j in range(nstep):
-                ang = 180*np.arctan2(decs[j], ras[i])/np.pi
-                sep = np.sqrt(ras[i]**2 + decs[j]**2)
-                params = [contrast, sep, ang]
-                chi2grid[i,j] = -cp_binary_model(params, constant, priors, None, self.uvcoords, self.cp, self.cperr, stat="chi2")
+        t2 = time.time()
+        store_dict = [{"data":self.cp, "error":self.cperr, "uvcoords":uvcoords, \
+                      "params":[self.cons[i],np.sqrt(ras**2+decs**2),180*np.arctan2(decs,ras)/np.pi], \
+                      "wavls":self.wavls} for i in range(nstep)] 
+        if threads>0:
+            pool = Pool(processes=threads)
+            print "Threads:", threads
+            self.chi2grid = np.array(pool.map(chi2_grid_loop, store_dict))
+        else:
+            self.chi2grid = np.zeros((nstep, nstep, nstep))
+            for ii in range(len(self.cons)):
+                self.chi2grid[ii] = chi2_grid_loop(store_dict[ii])
+        t3 = time.time()
+        print "took "+str(t3-t2)+"s to compute all chi^2 grid points"
+
         plt.figure()
-        plt.imshow(chi2grid.transpose())
+        plt.plot(nstep/2.0 -0.5,nstep/2.0 - 0.5, marker="*", color='w', markersize=20)
+        plt.imshow(np.min(self.chi2grid, axis=0).transpose(), cmap="cubehelix")
         plt.xlabel("RA (mas)")
-        plt.ylabel("DEC (deg)")
-        plt.xticks(np.linspace(0, nstep, 5), np.linspace(ras.min(), ras.max(), 4+1))
-        plt.yticks(np.linspace(0, nstep, 5), np.linspace(decs.min(), decs.max(), 4+1))
+        plt.ylabel("DEC (mas)")
+        plt.xticks(np.linspace(0, nstep, 5), np.linspace(self.ras.min(), self.ras.max(), 4+1))
+        plt.yticks(np.linspace(0, nstep, 5), np.linspace(self.decs.min(), self.decs.max(), 4+1))
 
+        chi2min = np.where(self.chi2grid == self.chi2grid.min())
+        bestparams = np.array([self.cons[chi2min[0]][0], \
+                               np.sqrt(self.ras[chi2min[1]]**2 + self.decs[chi2min[2]]**2)[0], \
+                               np.arctan2(self.decs[chi2min[2]], self.ras[chi2min[1]])[0]*180/np.pi])
+        print "Best Contrast:", self.cons[chi2min[0]]
+        print "Best Separation:", np.sqrt(self.ras[chi2min[1]]**2 + self.decs[chi2min[2]]**2)
+        print "Best PA:", np.arctan2(self.decs[chi2min[2]], self.ras[chi2min[1]])*180/np.pi
+
+        savdata = {"chi2grid":self.chi2grid, "ra":self.ras, "dec":self.decs, "con": self.cons}
+        if save:
+            f = open(self.savedir+os.path.sep+"chi2map.pick", "w")
+            pickle.dump(savdata, f)
+
+        plt.savefig(self.savedir+"chi2map.pdf")
         plt.show()
+        return bestparams
 
     def two_hyp_test():
         """
@@ -1104,7 +1144,7 @@ class BinaryAnalyze:
 
         plt.show()
 
-    def run_emcee(self, params, constant={}, nwalkers = 250, niter = 1000, spectrum_model=None, priors=None, threads=4, scale=1.0):
+    def run_emcee(self, params, constant={}, nwalkers = 250, niter = 1000, spectrum_model=None, priors=None, threads=4, scale=1.0, show=True):
         """
         A lot of options in this method, read carefully.
 
@@ -1119,7 +1159,6 @@ class BinaryAnalyze:
 
         """
         import emcee
-        self.ndim = len(params)
         self.constant = constant
         self.constant['wavl'] = self.wavls
         # Options are None 'slope' or 'free'
@@ -1133,8 +1172,9 @@ class BinaryAnalyze:
         print "priors:"
         print self.priors
 
-        guess = np.zeros(self.ndim)
+        #guess = np.zeros(self.ndim)
         guess = self.make_guess()
+        self.ndim = len(guess)
 
         p0 = [guess + 0.1*guess*np.random.rand(self.ndim) for i in range(nwalkers)]
         print guess
@@ -1174,12 +1214,10 @@ class BinaryAnalyze:
         print "========================="
         # To do: report separation in mas? pa in deg?
         # pickle self.mcmc_results here:
-        pickle.dump(self.mcmc_results, open(self.savedir+"/mcmc_results.pick", "wb"))
+        pickle.dump(self.mcmc_results, \
+                    open(self.savedir+"/mcmc_results_{0}.pick".format(spectrum_model), "wb"))
 
-        import corner
-        fig = corner.corner(self.chain, labels = self.keys, bins = 200, show_titles=True)
-        plt.savefig(self.savedir+"triangle_plot.pdf")
-        plt.show()
+        return self.mcmc_results
 
     def make_guess(self):
         # A few options here, can provide:
@@ -1187,13 +1225,14 @@ class BinaryAnalyze:
         # 2. contrast_min, slope, separation, angle -- 4 parameters
         # 3. contrast_min, slope -- 2 parameters (position is given as constant)
         # 4. nwav different contrasts - nwav parameters (position is given as constant)
-        guess = np.zeros(self.ndim)
         if self.spectrum_model==None:
+            guess = np.zeros(len(self.params))
             guess[0] = self.params['con']
             guess[1] = self.params['sep']
             guess[2] = self.params['pa']
             self.keys = ['con', 'sep', 'pa']
         elif self.spectrum_model=="slope":
+            guess = np.zeros(len(self.params))
             guess[0] = self.params['con']
             guess[1] = self.params["slope"]
             guess[2] = self.params["sep"]
@@ -1201,10 +1240,17 @@ class BinaryAnalyze:
             self.keys = ['con', 'slope','sep', 'pa']
         elif self.spectrum_model == "free":
             guess = self.params["con"] # here con is given as an array size nwav
-            self.keys = ['con']
+            self.keys = ['wl_{0:02d}'.format(f) for f in range(len(guess))]
         else:
             print "invalid spectrum_model set"
         return guess
+    def corner_plot(self, fn):
+        import corner
+        plt.figure(1)
+        fig = corner.corner(self.chain, labels = self.keys, bins = 200, show_titles=True)
+        plt.savefig(self.savedir+fn)
+        plt.show()
+        return None
         
     def plot_chain_convergence(self):
         samples  = self.fullchain[:, 50:, :].reshape((-1, self.ndim))
@@ -1220,6 +1266,7 @@ class BinaryAnalyze:
         # Pickle and save this data?
         pickle.dump(self.chain_convergence, open(self.savedir+"/chain_convergence.pick", "wb"))
         plt.show()
+        return self.chain_convergence
 
 def diffphase_binary_model(self):
     # Figure out how to do diff phase here in Calibrate first?
@@ -1265,7 +1312,7 @@ def cp_binary_model(params, constant, priors, spectrum_model, uvcoords, cp, cper
                             params[3], 1.0/constant['wavl'])
     elif spectrum_model == 'free' :
         # Model from params - params is contrast array nwav long, sep & pa constant
-        model_cp = model_cp_uv(uvcoords, params['con'], constant['sep'], \
+        model_cp = model_cp_uv(uvcoords, params, constant['sep'], \
                             constant['pa'], 1.0/constant['wavl'])
     else:
         sys.exit("Invalid spectrum model")
@@ -1331,10 +1378,10 @@ def get_data(self):
         except:
             pass
     # hack right now to take care of 0 values, set to some limit, 0.001 right now
-    floor = 0.000
-    self.cperr[self.cperr<floor] = floor
-    self.phaerr[self.phaerr<floor] = floor
-    self.v2err[self.v2err<floor] = floor
+    floor = 0.001
+    self.cperr[self.cperr<floor] = self.cperr[self.cperr!=0.0].mean()
+    self.phaerr[self.phaerr<floor] = self.phaerr[self.phaerr!=0.0].mean()
+    self.v2err[self.v2err<floor] = self.v2err[self.v2err!=0.0].mean()
     
     # replicate the uv coordinates over the wavelength axis
     self.uvcoords = np.tile(self.uvcoords, (self.nwav, 1, 1, 1))
@@ -1389,6 +1436,19 @@ def assemble_cov_mat(self):
     flat_mean_sub_cp = (self.cp - meancps[None,:]).flatten
     covmat = flat_mean_sub_cp[None,:]*flat_mean_sub_cp[:,None]
     return covmat
+
+def chi2_grid_loop(args):
+    # Model from data, err, uvcoords, params, wavls
+    p0, p1, p2 = args['params']
+    #print "In Loop:"
+    #print np.shape(p0)
+    #print np.shape(p1)
+    #print np.shape(p2)
+    #print np.shape(args['wavls'])
+    #print np.shape(args['uvcoords'])
+    modelcps = np.rollaxis(model_cp_uv(args['uvcoords'], p0, p1, p2, 1/args['wavls']), 0, -1)
+    chi2 = np.sum( (modelcps - args['data'])**2 / args['error']**2, axis = (-1,-2))
+    return chi2
 
 class DiskAnalyze:
     def __init__(self):
