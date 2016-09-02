@@ -69,7 +69,7 @@ class GPI:
         elif "WOLLASTON" in self.mode:
             # GPI's pol mode. Will define this for the DIFFERENTIAL VISIBILITIES
             # diff vis: two channels 0/45 and 22/67
-            self.wav = 2
+            self.nwav = 2
             band_ctrs = {"Y":(1.14-0.95)*um/2., "J":(1.35-1.12)*um/2., \
                          "H":(1.80-1.50)*um/2., "1":(2.19-1.9)*um/2., \
                          "2":(2.4-2.13)*um/2.0}
@@ -92,6 +92,8 @@ class GPI:
         self.day = self.date[-2:]
         self.year = self.date[:4]
         self.parang = self.hdr0["PAR_ANG"]
+        # AVPARANG added Aug 2 2016
+        self.parang = self.hdr1["AVPARANG"]
         self.pa = self.hdr0["PA"]
         self.objname = self.hdr0["OBJECT"]
         self.itime = self.hdr1["ITIME"]
