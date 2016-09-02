@@ -162,6 +162,12 @@ class OIfits():
         except:
             print "no phases will be flagged as bad"
             self.phaseceil=1e10
+        try: 
+            # This really shouldn't be turned on but just in case the user is REALLY sure.
+            self.flip = kwdict['flip']
+        except:
+            self.flip=False
+
         self.oitarget = np.array([self.target])
 
         # uv coordinates
@@ -170,16 +176,18 @@ class OIfits():
             self.paoff = -24.5 # The lenslet rotation (cc)
         else:
             self.paoff = 0
-        if "flip" in kwdict.keys():
-            if kwdict['flip'] == True:
-                nrmobj.ctrs = rotatevectors(flip(rotatevectors(nrmobj.ctrs,\
-                                self.maskrotdeg*np.pi/180.)),\
-                        (self.parang+self.paoff)*np.pi/180)
-            else:
-                nrmobj.ctrs = rotatevectors(nrmobj.ctrs,\
-                        (self.parang+self.paoff+self.maskrotdeg)*np.pi/180.)
+
+        # Again this should not have to be turned on.
+        if self.flip == True:
+            nrmobj.ctrs = rotatevectors(flip(rotatevectors(nrmobj.ctrs,\
+                            self.maskrotdeg*np.pi/180.)),\
+                    (-self.parang+self.paoff)*np.pi/180)
+        # Rotate coordinates to get the correct sky position
         else:
             pass
+            #nrmobj.ctrs = rotatevectors(nrmobj.ctrs,\
+            #        (-self.parang+self.paoff+self.maskrotdeg)*np.pi/180.)
+
         self.ucoord, self.vcoord, self.labels = count_bls(nrmobj.ctrs)
         # closure phase coordinates
         self.u1coord, self.v1coord, self.u2coord, self.v2coord,\
