@@ -82,13 +82,13 @@ This last call is an instance of 'NIRISS', which will set up the data according 
 	ff2.fit_fringes(calfiles)
 
 	
-The fringe fitter (with the options you want) measures fringe observables - visibilities and closure phases. It fits each exposure by calling the fit_fringes method and saves the output to directories "targ" and "cal1." The default is to save to the working directory. I usually set savedir to a string with the object's name. 
+The fringe fitter (with the options you want) measures fringe observables - visibilities and closure phases. It fits each exposure by calling the fit_fringes method and saves the output to directories "targ" and "cal1." The default is to save to the working directory. I usually set savedir to a string with the object's name. FringeFitter, creates a subdirectory named after each fits file name passed. So if you provide a single image per fits file (as in this example) then there will be one FF reduction per new subdirectory created. If you fit a cube of images then the reduction of each slice will be saved in a directory corresponding to the file name. 
 
 	targdir = "targ/"
 	caldir = "cal1/"	
 	calib = nrm_core.Calibrate([targdir, caldir], nirissdata, savedir = "my_calibrated", sub_dir_tag="cube")
 
-Instance of Calibrate, gives 2 directories containing target and calibration sources. The first directory in the list is always assumed to be the science target. Any number of calibrators may be provided. Argument savedir default is "calibrated." Argument sub_dir_tag is the common part of each file name. Each image reduction is stored in a subdirectory based on the file name (see below in GPI example for similar example).
+Instance of Calibrate, gives 2 directories containing target and calibration sources. The first directory in the list is always assumed to be the science target. Any number of calibrators may be provided. Argument savedir default is "calibrated."  In example I provide, each exposure is a single fits file, so . Argument sub_dir_tag is the common part of each file name. If you choose to analyze a cube of NIRISS images, you should not set a "sub_dir_tag" argument, since each slice is a new exposure. If interactive is on (default) then it will warn you about this. (See below in GPI example for an alternative example, where the cube contains a wavelength axis).
 
 	calib.save_to_oifits("niriss_test.oifits")
 Saves results to oifits. phaseceil keyword arg optional to set a custom dataflag. Default flag is set when phases exceed  1.0e2. 
@@ -102,18 +102,26 @@ Now that you have calibrated data and you suspect there is a binary companion, y
 	# as before you can specify a custom savedir argument for where you want to store the results
 
 	# set some bounds for the search
-	bounds = [(0.001, 0.99), (50, 200), (0, 360)] # contrast ratio, separation (mas), and pa (deg)
+	bounds = [(0.001, 0.99), (40, 200), (0, 360)] # contrast ratio, separation (mas), and pa (deg)
 	
 	dataset.coarse_binary_search(bounds, nstep=25) # set the 'resolution' of the search with nstep. default is nstep=20
-	# If this is taking too long, decrease nstep. If you want more detail increase it. 
+	
+	# Now I have a new routine that plots a map the minimum chi^2 contrast at each position
+	dataset.chi2map()	
+	# If this is taking too long, make nstep smaller (default is nstep=50]). If you want more detail increase it. Default threads is 4. To remove parallel processing set threads=0.
 
-This will plot the likelihood over a course grid for pairs of parameters and prints the location of the highest likelihood. Let's call these values c_val, s_val, and p_val (for contrast, separation, and pa). We canplug these 'close' guesses into the mcmc method:
+	# Does it look like you have a single, strong minimum?
+
+(1) will plot the likelihood over a course grid for pairs of parameters and prints the location of the highest likelihood. (2) will plot the minimum chi^2 at each position in a coarse grid, and print/return the minimum chi^2 parameters. Either way, let's call these values c_val, s_val, and p_val (for contrast, separation, and pa). We can plug these 'close' guesses into the mcmc method:
 
 	params = {'con':c_val, 'sep':s_val, 'pa':p_val} # give params as a dictionary
-	priors = [(0.001, 0.999), (45, 500), (0, 360)] # set some bounds on the search
+	priors = [(0.0001, 0.999), (10, 500), (0, 360)] # set some bounds on the search
 
 	# method run_emcee uses dfm's emcee package to search for the location and relative brightness of a binary source. 
-	dataset.run_emcee(params, nwalkers=200, niter=1000, priors=priors) # default nwalkers is 250, niter is 1000
+	dataset.run_emcee(params, nwalkers=200, niter=1000, priors=priors, scale=np.sqrt(7/3.0)) # default nwalkers is 250, niter is 1000
+	# The last kwarg is a scaling factor to multiply by the error accounting for the ratio between total and independent closure phase (in this case 35 total, 15 independent)
+	# Triangle plot:
+	dataset.corner_plot() # it will also save "triangle_plot.pdf" to your savedir
 	# if you want to see how the chains have behaved you can plot them easily:
 	dataset.plot_chain_convergence()
 	# plots will be saved to the 'savedir' you set (default 'calibrated/')
