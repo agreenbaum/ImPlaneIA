@@ -317,7 +317,7 @@ class Calibrate:
 
         e.g., to run this in a driver 
             gpidata = InstrumentData.GPI(reffile)
-            calib = CalibrateNRM(paths, gpidata)
+            calib = Calibrate(paths, gpidata)
             calib.write_to_oifits("dataset.oifits")
         
         instrument_data - stores the mask geometry (namely # holes),
@@ -352,6 +352,16 @@ class Calibrate:
             self.interactive = kwargs['interactive']
         else:
             self.interactive = True
+
+        # Added 10/14/2016 -- here's a visibilities flag, where you can specify a 
+        # cutoff and only accept exposures with higher visibilities
+        # Or maybe we should have it just reject outliers?
+        # Let's have vflag be rejection of the fraction provided
+        # e.g. if vflag=0.25, then exposures with the 25% lowest avg visibilities will be flagged
+        if "vflag" in kwargs.keys():
+            self.vflag=kwargs['vflag']
+        else:
+            self.vflag=0.0
     
         try:
             os.listdir(savedir)
@@ -429,7 +439,9 @@ class Calibrate:
         self.pha_mean_tar = np.zeros((self.naxis2, self.nbl))
         self.pha_err_tar = np.zeros((self.naxis2, self.nbl))
 
-        #self.cov_mat_cal = np.zeros(nexp*self.naxis2)
+        #self.cov_mat_cal = np.zeros(nexp*self.naxi2)
+        self.cov_mat_cal = np.zeros((nexp, nexp))
+        self.cov_mat_tar = np.zeros((nexp, nexp))
 
         # is there a subdirectory (e.g. for the exposure -- need to make this default)
         if sub_dir_tag is not None:
@@ -446,24 +458,45 @@ class Calibrate:
                     ampfiles = [f for f in os.listdir(paths[ii]+exps[qq]) \
                                 if "amplitudes" in f]
                     phafiles = [f for f in os.listdir(paths[ii]+exps[qq]) if "phase" in f] 
+                    expflag=[]
                     for slc in range(len(cpfiles)):
                         amp[slc, qq,:] = np.loadtxt(paths[ii]+exps[qq]+"/"+ampfiles[slc])
                         cps[slc, qq,:] = np.loadtxt(paths[ii]+exps[qq]+"/"+cpfiles[slc])
                         pha[slc, qq,:] = np.loadtxt(paths[ii]+exps[qq]+"/"+phafiles[slc])
+                    # 10/14/2016 -- flag the exposure if we get amplitudes > 1
+                    # Also flag the exposure if vflag is set, to reject fraction indicated
+                    if True in (amp[:,qq,:]>1):
+                        expflag.append(qq)
+                if self.vflag>0.0:
+                    self.ncut = int(self.vflag*nexps) # how many are we cutting out
+                    sorted_exps = np.argsort(amp.mean(axis=(0,-1)))
+                    cut_exps = sorted_exps[:self.ncut] # flag the ncut lowest exposures
+                    expflag = expflag + list(cut_exps)
+                ############################
+                # Oct 14 2016 -- adding in a visibilities flag. Can't be >1 that doesn't make sense.
+                # So we will knock out any exposure where this is true
+                #blflag = np.zeros(amp.shape, dtype=bool)
+                #cpflag = np.zeros(cps.shape, dtype=bool)
+                #blflag[expflag, :,:] = True 
+                #cpflag[expflag, :,:] = True 
+                # how many exposures are we removing?
+                #minusexps = len(expflag)
+                # Also adding a mask to calib steps
+                ############################
                 for slc in range(self.naxis2):
                     if ii==0:
                         # closure phases and squared visibilities
                         self.cp_mean_tar[slc,:], self.cp_err_tar[slc,:], \
                             self.v2_mean_tar[slc,:], self.v2_err_tar[slc,:], \
                             self.pha_mean_tar[slc,:], self.pha_err_tar = \
-                            self.calib_steps(cps[slc,:,:], amp[slc,:,:], pha[slc,:,:], nexps)
+                            self.calib_steps(cps[slc,:,:], amp[slc,:,:], pha[slc,:,:], nexps, expflag=expflag)
                     else:
                         # Fixed clunkiness!
                         # closure phases and visibilities
                         self.cp_mean_cal[ii-1,slc, :], self.cp_err_cal[ii-1,slc, :], \
                             self.v2_mean_cal[ii-1,slc,:], self.v2_err_cal[ii-1,slc,:], \
                             self.pha_mean_cal[ii-1,slc,:], self.pha_err_cal[ii-1, slc,:] = \
-                            self.calib_steps(cps[slc,:,:], amp[slc,:,:], pha[slc,:,:], nexps)
+                            self.calib_steps(cps[slc,:,:], amp[slc,:,:], pha[slc,:,:], nexps, expflag=expflag)
                 """
                 ####################################
                 # calculate closure phase cov matrix
@@ -488,21 +521,28 @@ class Calibrate:
                 cps = np.zeros((nexps, self.ncp))
                 for qq in range(nexps):
                     amp[qq,:] = np.loadtxt(paths[ii]+"/"+ampfiles[qq])
+                    if True in (amp[qq,:]>1):
+                        expflag.append(qq)
                     pha[qq,:] = np.loadtxt(paths[ii]+"/"+phafiles[qq])
                     cps[qq,:] = np.loadtxt(paths[ii]+"/"+cpfiles[qq])
+                ############################
+                # Oct 14 2016 -- adding in a visibilities flag. Can't be >1 that doesn't make sense.
+                #v2flag = np.zeros(amp.shape, dtype=bool)
+                #v2flag[amp>1] = True 
+                # Also adding a mask to calib steps
                 if ii==0:
                     # closure phases and squared visibilities
                     self.cp_mean_tar[0,:], self.cp_err_tar[0,:], \
                         self.v2_err_tar[0,:], self.v2_err_tar[0,:], \
                         self.pha_mean_tar[0,:], self.pha_err_tar[0,:] = \
-                        self.calib_steps(cps, amp, pha, nexps)
+                        self.calib_steps(cps, amp, pha, nexps, expflag=expflag)
                 else:
                     # Fixed clunkiness!
                     # closure phases and visibilities
                     self.cp_mean_cal[ii-1,0, :], self.cp_err_cal[ii-1,0, :], \
                         self.v2_mean_cal[ii-1,0,:], self.v2_err_cal[ii-1,0,:], \
                         self.pha_mean_cal[ii-1,0,:], self.pha_err_cal[ii-1,0,:] = \
-                        self.calib_steps(cps, amp, pha, nexps)
+                        self.calib_steps(cps, amp, pha, nexps, expflag=expflag)
 
         # Combine mean calibrator values and errors
         self.cp_mean_tot = np.zeros(self.cp_mean_cal[0].shape)
@@ -539,19 +579,35 @@ class Calibrate:
         self.pha_calibrated_deg = self.pha_calibrated * 180/np.pi
         self.pha_err_calibrated_deg = self.pha_err_calibrated * 180/np.pi
 
-    def calib_steps(self, cps, amps, pha, nexp):
+    def calib_steps(self, cps, amps, pha, nexp, expflag=None):
         "Calculates closure phase and mean squared visibilities & standard error"
-        meancp = np.mean(cps, axis=0)
+        #########################
+        # 10/14/16 Change flags exposures where vis > 1 anywhere
+        # Apply the exposure flag
+        nexp -= len(expflag) # don't count the bad exposures
+        cpmask = np.zeros(cps.shape, dtype=bool)
+        cpmask[expflag, :] = True
+        blmask = np.zeros(amps.shape, dtype=bool)
+        cpmask[expflag, :] = True
+
+        #meancp = np.mean(cps, axis=0)
+        meancp = np.ma.masked_array(cps, mask=cpmask).mean(axis=0)
         #covmat_cps = np.cov(np.rollaxis(cps - meancp, -1,0))
-        meanv2 = np.mean(amps, axis=0)**2
+
+        #meanv2 = np.mean(amps, axis=0)**2
+        meanv2 = np.ma.masked_array(amps, mask=blmask).mean(axis=0)**2
         #covmat_v2 = np.cov(np.rollaxis(amps**2 - meanv2, -1,0))
-        meanpha = np.mean(pha, axis=0)
+
+        #meanpha = np.mean(pha, axis=0)
+        meanpha = np.ma.masked_array(pha, mask=blmask).mean(axis=0)**2
         #covmat_pha = np.cov(np.rollaxis(pha - meanpha, -1,0))
-        errcp = np.sqrt(mstats.moment(cps, moment=2, axis=0))/np.sqrt(nexp)
-        errv2 = np.sqrt(mstats.moment(amps**2, moment=2, axis=0))/np.sqrt(nexp)
-        errpha = np.sqrt(mstats.moment(pha, moment=2, axis=0))/np.sqrt(nexp)
+
+        errcp = np.sqrt(mstats.moment(np.ma.masked_array(cps, mask=cpmask), moment=2, axis=0))/np.sqrt(nexp)
+        errv2 = np.sqrt(mstats.moment(np.ma.masked_array(amps**2, mask=blmask), moment=2, axis=0))/np.sqrt(nexp)
+        errpha = np.sqrt(mstats.moment(np.ma.masked_array(pha, mask=blmask), moment=2, axis=0))/np.sqrt(nexp)
         print "input:",cps
         print "avg:", meancp
+        print "exposures flagged:", expflag
         return meancp, errcp, meanv2, errv2, meanpha, errpha
 
     def save_to_txt(self):
@@ -841,11 +897,11 @@ class BinaryAnalyze:
         
         plt.show()
 
-    def chi2map(self, maxsep=300., clims = [0.001, 0.5], nstep=50, threads=4):
+    def chi2map(self, maxsep=300., clims = [0.001, 0.5], nstep=50, threads=4, save=True):
         """
         Makes a coarse chi^2 map at the contrast where chi^2 is minimum for each position. 
         """
-    
+
         nn = np.arange(nstep)
         r = (clims[-1]/clims[0])**(1 / float(nstep-1))
         self.cons = clims[0] * r**(nn)
