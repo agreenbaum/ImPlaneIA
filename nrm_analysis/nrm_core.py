@@ -439,9 +439,7 @@ class Calibrate:
         self.pha_mean_tar = np.zeros((self.naxis2, self.nbl))
         self.pha_err_tar = np.zeros((self.naxis2, self.nbl))
 
-        #self.cov_mat_cal = np.zeros(nexp*self.naxi2)
-        self.cov_mat_cal = np.zeros((nexp, nexp))
-        self.cov_mat_tar = np.zeros((nexp, nexp))
+        #self.cov_mat_cal = np.zeros(nexps*self.naxi2)
 
         # is there a subdirectory (e.g. for the exposure -- need to make this default)
         if sub_dir_tag is not None:
@@ -452,6 +450,17 @@ class Calibrate:
                 amp = np.zeros((self.naxis2, nexps, self.nbl))
                 pha = np.zeros((self.naxis2, nexps, self.nbl))
                 cps = np.zeros((self.naxis2, nexps, self.ncp))
+
+                # Create the cov matrix arrays
+                if ii == 0:
+                    self.cov_mat_tar = np.zeros((self.naxis2, nexps, nexps))
+                    self.sigmasquared_tar = np.zeros((self.naxis2, nexps))
+                elif ii==1:
+                    self.cov_mat_cal = np.zeros((self.naxis2, nexps, nexps))
+                    self.sigmasquared_cal = np.zeros((self.naxis2, nexps))
+                else:
+                    pass
+
                 for qq in range(nexps):
                     # nwav files
                     cpfiles = [f for f in os.listdir(paths[ii]+exps[qq]) if "CPs" in f] 
@@ -490,6 +499,13 @@ class Calibrate:
                             self.v2_mean_tar[slc,:], self.v2_err_tar[slc,:], \
                             self.pha_mean_tar[slc,:], self.pha_err_tar = \
                             self.calib_steps(cps[slc,:,:], amp[slc,:,:], pha[slc,:,:], nexps, expflag=expflag)
+                        # measured cp shape: (nwav, nexps, ncp) mean cp shape: (nwav, ncp)
+                        meansub = cps[slc, :, :] - \
+                                  np.tile(self.cp_mean_tar[slc,:], (nexps, 1))
+                        self.cov_mat_tar[slc, :,:] = np.dot(meansub, meansub.transpose()) / (nexps - 1)
+                        # Uncertainties:
+                        self.sigmasquared_tar[slc,:] = np.diagonal(self.cov_mat_tar[slc, :,:])
+
                     else:
                         # Fixed clunkiness!
                         # closure phases and visibilities
@@ -497,18 +513,35 @@ class Calibrate:
                             self.v2_mean_cal[ii-1,slc,:], self.v2_err_cal[ii-1,slc,:], \
                             self.pha_mean_cal[ii-1,slc,:], self.pha_err_cal[ii-1, slc,:] = \
                             self.calib_steps(cps[slc,:,:], amp[slc,:,:], pha[slc,:,:], nexps, expflag=expflag)
-                """
-                ####################################
-                # calculate closure phase cov matrix
-                ####################################
-                # zero mean and stack wavelength+exposures
-                if ii ==0:
-                    flatcps = (cps-self.cp_mean_tar[:,None,:]).reshape(nexps*self.naxis2, self.ncp)
-                    self.cov_mat_tar = np.cov(flatcps)
-                else:
-                    flatcps = (cps-self.cp_mean_cal[ii-1, :,None,:]).reshape(nexps*self.naxis2, self.ncp)
-                    self.cov_mat_cal += np.cov(flatcps)
-                """
+                        print cps[slc, :,:].shape
+                        print self.cp_mean_cal[ii-1, slc,:].shape
+                        print np.tile(self.cp_mean_cal[ii-1,slc,:],(nexps, 1)).shape
+                        meansub = cps[slc, :, :] - \
+                                  np.tile(self.cp_mean_cal[ii-1, slc,:], (nexps, 1))
+                        self.cov_mat_cal[slc, :,:]  += np.dot(meansub, meansub.transpose()) / (nexps - 1)
+                        # Uncertainties:
+                        self.sigmasquared_cal[slc,:] = np.diagonal(self.cov_mat_cal[slc, :,:])
+
+            """
+            ####################################
+            # calculate closure phase cov matrix
+            ####################################
+            # zero mean and stack wavelength+exposures
+            if ii ==0:
+                flatcps = (cps-self.cp_mean_tar[:,None,:]).reshape(nexps*self.naxis2, self.ncp)
+                self.cov_mat_tar = np.cov(flatcps)
+            else:
+                flatcps = (cps-self.cp_mean_cal[ii-1, :,None,:]).reshape(nexps*self.naxis2, self.ncp)
+                self.cov_mat_cal += np.cov(flatcps)
+            UPDATE: Oct 18 2016 -- trying to implement description from Kraus et al. 2008
+            C_r = sum_i (phi_frame - phi_mean)^T (phi_frame - phi_mean) / (n - 1)
+            Q: how do we get a "calibrated" covariance matrix?
+            add to phase uncertainties:
+            sig^2 = (2 sig_r^2 + (n_c - 1)sig_c*2 ) / (n_c + 1)
+            """
+            nexp_c = self.sigmasquared_cal.shape[1]
+            self.sigmasquared = (2* self.sigmasquared_tar + \
+                                 (nexp_c - 1)*self.sigmasquared_cal) / (nexp_c + 1)
 
         else:
             for ii in range(self.nobjs):
@@ -584,11 +617,14 @@ class Calibrate:
         #########################
         # 10/14/16 Change flags exposures where vis > 1 anywhere
         # Apply the exposure flag
-        nexp -= len(expflag) # don't count the bad exposures
         cpmask = np.zeros(cps.shape, dtype=bool)
-        cpmask[expflag, :] = True
         blmask = np.zeros(amps.shape, dtype=bool)
-        cpmask[expflag, :] = True
+        if expflag is not None:
+            nexp -= len(expflag) # don't count the bad exposures
+            cpmask[expflag, :] = True
+            blmask[expflag, :] = True
+        else:
+            pass
 
         #meancp = np.mean(cps, axis=0)
         meancp = np.ma.masked_array(cps, mask=cpmask).mean(axis=0)
@@ -605,6 +641,10 @@ class Calibrate:
         errcp = np.sqrt(mstats.moment(np.ma.masked_array(cps, mask=cpmask), moment=2, axis=0))/np.sqrt(nexp)
         errv2 = np.sqrt(mstats.moment(np.ma.masked_array(amps**2, mask=blmask), moment=2, axis=0))/np.sqrt(nexp)
         errpha = np.sqrt(mstats.moment(np.ma.masked_array(pha, mask=blmask), moment=2, axis=0))/np.sqrt(nexp)
+        # Set cutoff accd to Kraus 2008 - 2/3 of median
+        errcp[errcp < (2/3.0)*np.median(errcp)] =(2/3.0)*np.median(errcp) 
+        errpha[errpha < (2/3.0)*np.median(errpha)] =(2/3.0)*np.median(errpha) 
+        errv2[errv2 < (2/3.0)*np.median(errv2)] =(2/3.0)*np.median(errv2) 
         print "input:",cps
         print "avg:", meancp
         print "exposures flagged:", expflag
