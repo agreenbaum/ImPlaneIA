@@ -89,6 +89,21 @@ class NRM_mask_definitions():
 			if rotdeg is not None:
 				self.rotdeg = rotdeg
 
+        elif self.maskname == "visir_sam":
+            self.hdia, self.ctrs = visir_sam(rescale=rescale)
+            self.rotdeg = 9.0 # By inspection of data
+            if rotdeg is not None:
+                self.rotdeg += rotdeg
+                print "rotating by {0} + 9 (hardcoded) deg".format(rotdeg)
+            else:
+                print "rotating by 9 deg -- hard coded"
+            self.ctrs = rotatevectors(self.ctrs, self.rotdeg*np.pi/180.0)
+            self.rotate = self.rotdeg
+            self.activeD = self.showmask() # calculated circle dia including all holes
+            self.OD = 8115.0 * mm   # DVLT = 8115.0 * mm -- but what is the M2 dia??
+                                    # From Eric Pantin Document
+            self.ID = 1000.0 * mm   # Don't know this, but this number shouldn't matter
+
 		elif self.maskname == "jwst_g7s6":
 			print "\tnot finished"
 		else:
