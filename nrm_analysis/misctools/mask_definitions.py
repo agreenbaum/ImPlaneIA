@@ -53,7 +53,9 @@ def rotatevectors(vectors, thetarad):
 class NRM_mask_definitions():
 
 	def __init__(self, maskname=None, rotdeg=None, holeshape="circ", rescale=False):
-		if maskname not in ["gpi_g10s40",  "jwst_g7s6", "jwst_g7s6c", "p1640", "keck_nirc2", "pharo",]:
+		if maskname not in ["gpi_g10s40",  "jwst_g7s6", "jwst_g7s6c", "visir_sam", \
+                            "p1640", "keck_nirc2", "pharo"]:
+            # Second row hopefully coming someday
 			raise ValueError("mask %s not supported" % maskname)
 		if holeshape == None:
 			holeshape = 'circ'
@@ -448,6 +450,111 @@ def jwst_g7s6c():
 	return 0.80*m, jwst_g7s6_centers_asdesigned()
 
 
+def visir_sam_asmanufactured(mag):
+	"""VISIR has hexagonal holes
+		The SAM plate has a main external diameter of 26 mm
+	"""
+	holedia = 2.8*mm # (=side length) => 0.61 m in telescope pupil of 8.115 m
+					 # Equivalenent diameter is thus 1.22m
+	# pupil footprint center (/= coordinates center in the drawing)
+	holectrs = [
+	[-5.707*mm, 	-2.885*mm],
+	[-5.834*mm, 	 3.804*mm],
+	[ 0.099*mm, 	 7.271*mm],
+	[ 7.989*mm, 	 0.422*mm],
+	[ 3.989*mm, 	-6.481*mm],
+	[-3.790*mm, 	-6.481*mm],
+	[-1.928*mm, 	-2.974*mm]
+	]
+
+	"""
+	xc, yc = 387., 294.75
+	holectrs = =[
+	[342.000-xc, 	272.000-yc],
+	[341.000-xc, 	324.750-yc],
+	[387.780-xc, 	352.080-yc],
+	[449.992-xc, 	298.080-yc],
+	[418.456-xc, 	243.648-yc],
+	[357.112-xc, 	243.648-yc],
+	[371.800-xc, 	271.296-yc]
+	]
+
+	There is an offset between the mechanical plate and the fottprint of the
+	cold stop of - 0.636 mm, which probably explains the need for manual (filing)
+	increase of the size of the fixing holes on the size after mounting and
+	checking the optical alignment on the instrument.
+	"""
+
+	# design2metal mag
+	holedia = holedia * mag
+	print mag
+	ctrs = []
+	REVERSE = 1 # The pupil we measure with VISIR pupil imaging lens is 
+				 # [probably] point symmetry reversed w.r.t reality. => OK checked
+	for r in holectrs:
+		ctrs.append([r[0]*mag*REVERSE, r[1]*mag*REVERSE])
+	# return mask coords
+	return holedia, ctrs
+
+def visir_mag_asdesigned():
+
+	#logging.basicConfig(level=logging.DEBUG,format='%(name)-10s: %(levelname)-8s %(message)s')
+	datapath='/Users/agreenba/data/visir/'
+
+	""" 
+	returns demag (dimensionless)
+
+	pupil dimensions * demag gives manufactured dimensions
+	"""
+
+	"""
+	The hexagons have radii of 1.4 mm (=side length) => 0.61 m in telescope
+	pupil of 8.115 m. Equivalenent diameter is thus 1.22m
+	"""
+
+	DVLT = 8115. * mm # 
+	DTH = 1220.*mm # diam of hex on primary 
+	D = DTH
+	d = 2.8 * mm # diam of hex in pupil
+	demag = d/D  # about 1/800...
+
+	flip = "_flip"
+
+	print """" 
+	This program (VISIR.py) uses GVLT = 8115.0 * mm from SAM report c/o Eric Pantin
+	(report_SAM_pupil.pdf)
+	
+	All X,Y dimensions in m from center of mask in PM space
+	All hole DIAMETERS are ... :\n"""
+
+	####print "DESIGN to PPM magnification is %.4f\n" % MAG
+	print demag
+	return demag
+
+
+def visir_sam(rescale=False):
+	"""
+	Multiply by the 'rescale' factor to adjust hole sizes and centers in entrance pupil (PM)
+	(Magnify the physical mask coordinates up to the primary mirror size)
+	"""
+	demag = visir_mag_asdesigned()
+	if rescale:
+		demag = demag/rescale # rescale 1.1 gives a bigger mask in PM pupil space
+	print ("VISIR SAM")
+	hdia, ctrs = visir_sam_asmanufactured(1.0/demag) # meters
+	return hdia, ctrs
+
+	"""  From VISIR documentation
+
+	   Filter        1/2 pwr       bandwidth
+	   name        wavelen/um        %
+
+		Spectral Resolution 34-36 35-39 44-49 62-70 75-83
+		# spectral pixels 12-13 13-15 16-18 18-20
+		18-20
+
+		pixels ??mas are nyquist at ??um
+	"""
 
 
 if __name__ == "__main__":
