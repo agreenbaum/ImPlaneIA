@@ -13,7 +13,6 @@ import numpy as np
 import sys, os
 from astropy.io import fits
 import matplotlib.pyplot as plt
-import AG_utils as AG
 import cPickle as pickle
 
 home = "/Users/agreenba/"
