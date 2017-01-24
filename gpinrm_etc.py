@@ -97,7 +97,7 @@ def main(argv):
     parser = argparse.ArgumentParser(description = "This script provides an estimate of exposure times including overheads for GPI NRM observations")
 
     # Instrument settings (band, mode)
-    parser.add_argument("band", type=str, help="GPI filter to be used. Must be one of Y, J, H, K1, or K2", choices=["Y", "y", "J", "j", "H", "h" "K1", "k1", "K2", "k2"], default=None)
+    parser.add_argument("band", type=str, help="GPI filter to be used. Must be one of Y, J, H, K1, or K2", choices=["Y", "y", "J", "j", "H", "h", "K1", "k1", "K2", "k2"], default=None)
     parser.add_argument("-disp", "--disperser", type=str, help="Disperser mode, options are PRISM or WOLLASTON", choices=["PRISM", "prism", "WOLLASTON", "wollaston"])
     # What is the apparent magnitude:
     parser.add_argument("-m","--appmagnitude", type=float, help="Apparent magnitude of unresolved object of interest in observing band")
