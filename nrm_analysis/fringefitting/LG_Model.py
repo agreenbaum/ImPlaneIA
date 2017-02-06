@@ -483,8 +483,8 @@ class NRM_Model():
 			self.soln, self.residual = leastsqnrm.weighted_operations(image, \
 						self.fittingmodel, weights=self.weighted)
 		else:
-			self.soln, self.residual, self.cond = leastsqnrm.matrix_operations(image, \
-									self.fittingmodel)
+			self.soln, self.residual, self.cond, self.linfit_result = leastsqnrm.matrix_operations(image, \
+									self.fittingmodel,verbose=False)
 		print "NRM_Model Raw Soln:", self.soln
 		self.rawDC = self.soln[-1]
 		self.flux = self.soln[0]
@@ -719,7 +719,7 @@ class NRM_Model():
 		return self.pixscale_factor, self.rot_measured,self.gof
 
 
-	def auto_find_center(self, modelfitsname, overwrite=0):
+	def auto_find_center(self, modelfitsname, overwrite=1):
 		"""
 		This is the major method in this driver to be called. It is basically
 		Deepashri's cormat driver & peak finder.

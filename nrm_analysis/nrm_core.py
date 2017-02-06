@@ -257,6 +257,14 @@ class FringeFitter:
                     self.sub_dir_str+"/residual{0:02d}.fits".format(slc), clobber=True)
         modelhdu.writeto(self.savedir+\
                     self.sub_dir_str+"/modelsolution{0:02d}.fits".format(slc), clobber=True)
+        
+        if 1:            
+			# JSA save linearfit results
+			myPickleFile = self.savedir+self.sub_dir_str+"/linearfit_result.pkl"
+			pickle.dump( (nrm.linfit_result), open( myPickleFile , "wb" ) ) 
+			print("Wrote pickled file  %s" % myPickleFile)
+            
+                    
 
     def save_auto_figs(self, slc, nrm):
         # pixel scales
