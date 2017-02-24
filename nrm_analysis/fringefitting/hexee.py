@@ -4,6 +4,7 @@ from astropy.io import fits
 import os
 #import matplotlib.pyplot as pl
 DEBUG = True
+DEBUG = False
 """ Python implementation: anand@stsci.edu 6 Mar 2013
 	Algorithm: eelliott@stsci.edu -  Applied Optics, Vol 44, No. 8 10 March 2005  Sabatke et al.
 	Erin Elliott's analytical hexagon-aperture PSF, page 1361 equation 5
@@ -163,10 +164,11 @@ def hex_ee(s=(201,201), c=None, D=0.0201):
 		print "hex imag mean max min",  hi.mean(), hi.max(), hi.min()
 	return np.abs(hex_complex)
 
-def hex_eeAG(s=(121,121), c=None, d=0.80, lam=4.3e-6, pitch=mas2rad(65)):
+def hex_eeAG(s=(121,121), c=None, d=0.80, lam=4.3e-6, pitch=mas2rad(65.6), verbose=False):
 	if c is None:
 		c = float(s[0])/2.0-0.5, float(s[1])/2.0 - 0.5
-	print "Center:",c, s
+	if verbose:	
+		print "Center:",c, s
 
 	g = np.fromfunction(g_eeAG, s, d=d, c=c, lam=lam, pixel=pitch, minus=False)
 	hex_complex = np.fromfunction(g_eeAG, s, d=d, c=c, lam=lam, pixel=pitch, minus=False) + \

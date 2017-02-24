@@ -188,7 +188,7 @@ class VISIR:
         return scidata, hdr
 
 class NIRISS:
-    def __init__(self, filt, objname="obj", src="A0V", **kwargs):
+    def __init__(self, filt, objname="obj", src="A0V", out_dir='', **kwargs):
         """
         Initialize NIRISS class
 
@@ -229,8 +229,16 @@ class NIRISS:
         #self.mode = self.hdr0["DISPERSR"]
         #self.obsmode = self.hdr0["OBSMODE"]
         #self.band = self.obsmode[-1] # K1 is two letters
-        self.ref_imgs_dir = "refimgs_"+self.filt+"/"
+        self.ref_imgs_dir = os.path.join(out_dir,"refimgs_"+self.filt+"/")
 
+        if 0:
+            PUPLSCAL= 0.006455708661417323
+            self.mask.ID = 0.80
+            self.mask.rotdeg = 0.0
+            self.mask.createpupilarray(puplscal=PUPLSCAL, fitsfile=os.path.join(self.ref_imgs_dir,'pupil.fits'))  
+            self.mask.createnrmarray(puplscal=PUPLSCAL, fitsfile=os.path.join(self.ref_imgs_dir,'pupil.fits'))#, holeid=None, fullpupil=False):  
+            1/0
+    
         # Wavelength info for NIRISS bands F277W, F380M, F430M, or F480M
         try:
             # If user has webbpsf installed, this will work

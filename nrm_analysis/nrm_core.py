@@ -113,6 +113,11 @@ class FringeFitter:
             self.interactive = kwargs['interactive']
         else:
             self.interactive = True
+        if 'flip' in kwargs:
+            self.flip = kwargs['flip']
+        else:
+            self.flip = False
+
         #######################################################################
 
 
@@ -157,86 +162,114 @@ class FringeFitter:
         if type(fns) == str:
             fns = [fns, ]
 
-        for fn in fns:
-            self.scidata, self.scihdr = self.instrument_data.read_data(self.datadir+"/"+fn)
 
-            #ctrref = utils.centerit(scidata[)
+#         store_dict = [{"data":self.cp, "error":self.cperr, "uvcoords":uvcoords, \
+#                       "params":[self.cons[i],np.sqrt(ras**2+decs**2),180*np.arctan2(decs,ras)/np.pi], \
+#                       "wavls":self.wavls} for i in range(nstep)] 
+                      
+        store_dict = [{"object":self, "file":self.datadir+"/"+fn} for fn in fns] 
+                      
 
-            self.sub_dir_str = self.instrument_data.sub_dir_str
-            try:
-                os.mkdir(self.savedir+self.sub_dir_str)
-            except:
-                pass
+        threads = 0
+        t2 = time.time()
+        if threads>0:
+            pool = Pool(processes=threads)
+            print "Running fit_fringes in parallel with %d threads" % threads
+#             self.chi2grid = np.array(pool.map(chi2_grid_loop, store_dict))
+            pool.map(fit_fringes_parallel , store_dict)
+            t3 = time.time()
+            print "Parallel with %d threads took %s s to fit all fringes" % (threads,str(t3-t2))
+      
+        else:
 
-            
-            for slc in range(self.instrument_data.nwav):
-                # create the reference PSF directory if doing any auto_scaling or rotation
-                try:
-                    os.mkdir(self.refimgs+'{0:02d}'.format(slc)+'/')
-                except:
-                    pass
-
-                # NRM_Model
-                nrm = NRM_Model(mask=self.instrument_data.mask, pixscale = self.instrument_data.pscale_rad,\
-                                holeshape=self.instrument_data.holeshape, over = self.oversample)
-
-                nrm.refdir=self.refimgs+'{0:02d}'.format(slc)+'/'
-                nrm.bandpass = self.instrument_data.wls[slc]
-                #hdr['WAVL'] = wls[slc]
-
-                self.ctrd = utils.centerit(self.scidata[slc, :,:], r = self.npix//2)
-                refslice = self.ctrd.copy()
-                if True in np.isnan(refslice):
-                    refslice=utils.deNaN(5, self.ctrd)
-                    if True in np.isnan(refslice):
-                        refslice = utils.deNaN(20,refslice)
-
-
-                nrm.reference = self.ctrd
-                if self.hold_centering == False:
-                    # this fn should be more descriptive
-                    nrm.auto_find_center("ctrmodel.fits")
-                    nrm.bestcenter = 0.5-nrm.over*nrm.xpos, 0.5-nrm.over*nrm.ypos
-                else:
-                    nrm.bestcenter = self.hold_centering
-
-                # similar if/else routines for auto scaling and rotation
-
-                #print "from nrm_core, centered shape:",self.ctrd.shape[0], self.ctrd.shape[1]
-                nrm.make_model(fov = self.ctrd.shape[0], bandpass=nrm.bandpass, over=self.oversample,
-                               centering=nrm.bestcenter, pixscale=nrm.pixel)
-                nrm.fit_image(self.ctrd, modelin=nrm.model)
-                """
-                Attributes now stored in nrm object:
-
-                -----------------------------------------------------------------------------
-                soln            --- resulting sin/cos coefficients from least squares fitting
-                fringephase     --- baseline phases in radians
-                fringeamp       --- baseline amplitudes (flux normalized)
-                redundant_cps   --- closure phases in radians
-                redundant_cas   --- closure amplitudes
-                residual        --- fit residuals [data - model solution]
-                cond            --- matrix condition for inversion
-                -----------------------------------------------------------------------------
-                """
-
-                if self.debug==True:
-                    dataft = mft.matrix_dft(self.ctrd, 256, 512)
-                    refft = mft.matrix_dft(nrm.refpsf, 256, 512)
-                    plt.figure()
-                    plt.title("Data")
-                    plt.imshow(np.sqrt(abs(dataft)), cmap = "bone")
-                    plt.figure()
-                    plt.title("Reference")
-                    plt.imshow(np.sqrt(abs(refft)), cmap="bone")
-                    plt.show()
+            for fn in fns:              
+                fit_fringes_parallel({"object":self, "file":self.datadir+"/"+fn})
+            t3 = time.time()
+            print "Linear processing        took %s s to fit all fringes" % (str(t3-t2))
                 
-                self.save_output(slc, nrm)
+            
+            
+ #                self.scidata, self.scihdr = self.instrument_data.read_data(self.datadir+"/"+fn)
+# 
+#                 #ctrref = utils.centerit(scidata[)
+# 
+#                 self.sub_dir_str = self.instrument_data.sub_dir_str
+#                 try:
+#                     os.mkdir(self.savedir+self.sub_dir_str)
+#                 except:
+#                     pass
+# 
+#             
+#                 for slc in range(self.instrument_data.nwav):
+#                     # create the reference PSF directory if doing any auto_scaling or rotation
+#                     try:
+#                         os.mkdir(self.refimgs+'{0:02d}'.format(slc)+'/')
+#                     except:
+#                         pass
+# 
+#                     # NRM_Model
+#                     nrm = NRM_Model(mask=self.instrument_data.mask, pixscale = self.instrument_data.pscale_rad,\
+#                                     holeshape=self.instrument_data.holeshape, over = self.oversample, flip=self.flip)
+# 
+#                     nrm.refdir=self.refimgs+'{0:02d}'.format(slc)+'/'
+#                     nrm.bandpass = self.instrument_data.wls[slc]
+#                     #hdr['WAVL'] = wls[slc]
+# 
+#                     self.ctrd = utils.centerit(self.scidata[slc, :,:], r = self.npix//2)
+#                     refslice = self.ctrd.copy()
+#                     if True in np.isnan(refslice):
+#                         refslice=utils.deNaN(5, self.ctrd)
+#                         if True in np.isnan(refslice):
+#                             refslice = utils.deNaN(20,refslice)
+# 
+# 
+#                     nrm.reference = self.ctrd
+#                     if self.hold_centering == False:
+#                         # this fn should be more descriptive
+#                         nrm.auto_find_center(os.path.join(self.savedir,"ctrmodel.fits"))
+#                         nrm.bestcenter = 0.5-nrm.over*nrm.xpos, 0.5-nrm.over*nrm.ypos
+#                     else:
+#                         nrm.bestcenter = self.hold_centering
+# 
+#                     # similar if/else routines for auto scaling and rotation
+# 
+#                     #print "from nrm_core, centered shape:",self.ctrd.shape[0], self.ctrd.shape[1]
+#                     nrm.make_model(fov = self.ctrd.shape[0], bandpass=nrm.bandpass, over=self.oversample,
+#                                    centering=nrm.bestcenter, pixscale=nrm.pixel, flip=self.flip)
+#                     nrm.fit_image(self.ctrd, modelin=nrm.model)
+#                     """
+#                     Attributes now stored in nrm object:
+# 
+#                     -----------------------------------------------------------------------------
+#                     soln            --- resulting sin/cos coefficients from least squares fitting
+#                     fringephase     --- baseline phases in radians
+#                     fringeamp       --- baseline amplitudes (flux normalized)
+#                     redundant_cps   --- closure phases in radians
+#                     redundant_cas   --- closure amplitudes
+#                     residual        --- fit residuals [data - model solution]
+#                     cond            --- matrix condition for inversion
+#                     -----------------------------------------------------------------------------
+#                     """
+# 
+#                     if self.debug==True:
+#                         dataft = mft.matrix_dft(self.ctrd, 256, 512)
+#                         refft = mft.matrix_dft(nrm.refpsf, 256, 512)
+#                         plt.figure()
+#                         plt.title("Data")
+#                         plt.imshow(np.sqrt(abs(dataft)), cmap = "bone")
+#                         plt.figure()
+#                         plt.title("Reference")
+#                         plt.imshow(np.sqrt(abs(refft)), cmap="bone")
+#                         plt.show()
+#                 
+#                     self.save_output(slc, nrm)
 
-    def save_output(self, slc, nrm):
+
+
+    def save_output(self, slc, nrm, verbose=False):
         # cropped & centered PSF
-        fits.PrimaryHDU(data=self.ctrd, header=self.scihdr).writeto(self.savedir+\
-                self.sub_dir_str+"/centered_"+str(slc)+".fits", clobber=True)
+        fits.PrimaryHDU(data=self.ctrd, header=self.scihdr).writeto(os.path.join(self.savedir+\
+                self.sub_dir_str,"centered_%02d.fits"%slc), clobber=True)
 
         model, modelhdu = nrm.plot_model(fits_true=1)
 
@@ -254,15 +287,16 @@ class FringeFitter:
 
         # save to fits files
         fits.PrimaryHDU(data=nrm.residual).writeto(self.savedir+\
-                    self.sub_dir_str+"/residual{0:02d}.fits".format(slc), clobber=True)
+                    self.sub_dir_str+"/residual_{0:02d}.fits".format(slc), clobber=True)
         modelhdu.writeto(self.savedir+\
-                    self.sub_dir_str+"/modelsolution{0:02d}.fits".format(slc), clobber=True)
+                    self.sub_dir_str+"/modelsolution_{0:02d}.fits".format(slc), clobber=True)
         
-        if 1:            
-			# JSA save linearfit results
-			myPickleFile = self.savedir+self.sub_dir_str+"/linearfit_result.pkl"
-			pickle.dump( (nrm.linfit_result), open( myPickleFile , "wb" ) ) 
-			print("Wrote pickled file  %s" % myPickleFile)
+        if 0:            
+            # JSA save linearfit results
+            myPickleFile = os.path.join(self.savedir+self.sub_dir_str,"linearfit_result_{0:02d}.pkl".format(slc))
+            pickle.dump( (nrm.linfit_result), open( myPickleFile , "wb" ) ) 
+            if verbose:
+                print("Wrote pickled file  %s" % myPickleFile)
             
                     
 
@@ -970,7 +1004,7 @@ class BinaryAnalyze:
         print self.cp.shape
         print ras.shape
         print np.shape(self.wavls)
-
+        
         t2 = time.time()
         store_dict = [{"data":self.cp, "error":self.cperr, "uvcoords":uvcoords, \
                       "params":[self.cons[i],np.sqrt(ras**2+decs**2),180*np.arctan2(decs,ras)/np.pi], \
@@ -1587,5 +1621,90 @@ class DiskAnalyze:
 
                 ll = logl(data, model)
                 return ll
+
+
+
+#JSA try to parallelise fit_fringes
+def fit_fringes_parallel(args):
+    self = args['object']
+    filename = args['file']
+    self.scidata, self.scihdr = self.instrument_data.read_data(filename)
+
+    #ctrref = utils.centerit(scidata[)
+
+    self.sub_dir_str = self.instrument_data.sub_dir_str
+    try:
+        os.mkdir(self.savedir+self.sub_dir_str)
+    except:
+        pass
+
+
+    for slc in range(self.instrument_data.nwav):
+        # create the reference PSF directory if doing any auto_scaling or rotation
+        try:
+            os.mkdir(self.refimgs+'{0:02d}'.format(slc)+'/')
+        except:
+            pass
+
+        # NRM_Model
+        nrm = NRM_Model(mask=self.instrument_data.mask, pixscale = self.instrument_data.pscale_rad,\
+                        holeshape=self.instrument_data.holeshape, over = self.oversample, flip=self.flip)
+
+        nrm.refdir=self.refimgs+'{0:02d}'.format(slc)+'/'
+        nrm.bandpass = self.instrument_data.wls[slc]
+
+        self.ctrd = utils.centerit(self.scidata[slc, :,:], r = self.npix//2)
+        refslice = self.ctrd.copy()
+        if True in np.isnan(refslice):
+            refslice=utils.deNaN(5, self.ctrd)
+            if True in np.isnan(refslice):
+                refslice = utils.deNaN(20,refslice)
+
+
+        nrm.reference = self.ctrd
+        if self.hold_centering == False:
+            # this fn should be more descriptive
+            nrm.auto_find_center(os.path.join(self.savedir,"ctrmodel.fits"))
+            nrm.bestcenter = 0.5-nrm.over*nrm.xpos, 0.5-nrm.over*nrm.ypos
+        else:
+            nrm.bestcenter = self.hold_centering
+
+        # similar if/else routines for auto scaling and rotation
+
+        #print "from nrm_core, centered shape:",self.ctrd.shape[0], self.ctrd.shape[1]
+        nrm.make_model(fov = self.ctrd.shape[0], bandpass=nrm.bandpass, over=self.oversample,
+                       centering=nrm.bestcenter, pixscale=nrm.pixel, flip=self.flip)
+        nrm.fit_image(self.ctrd, modelin=nrm.model)
+        """
+        Attributes now stored in nrm object:
+
+        -----------------------------------------------------------------------------
+        soln            --- resulting sin/cos coefficients from least squares fitting
+        fringephase     --- baseline phases in radians
+        fringeamp       --- baseline amplitudes (flux normalized)
+        redundant_cps   --- closure phases in radians
+        redundant_cas   --- closure amplitudes
+        residual        --- fit residuals [data - model solution]
+        cond            --- matrix condition for inversion
+        -----------------------------------------------------------------------------
+        """
+
+        if self.debug==True:
+            dataft = mft.matrix_dft(self.ctrd, 256, 512)
+            refft = mft.matrix_dft(nrm.refpsf, 256, 512)
+            plt.figure()
+            plt.title("Data")
+            plt.imshow(np.sqrt(abs(dataft)), cmap = "bone")
+            plt.figure()
+            plt.title("Reference")
+            plt.imshow(np.sqrt(abs(refft)), cmap="bone")
+            plt.show()
+    
+        self.save_output(slc, nrm)
+
+
+
+
+
 
 

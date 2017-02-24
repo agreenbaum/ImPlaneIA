@@ -57,8 +57,9 @@ def primarybeam(kx, ky):
 
     return pb * pb.conj()
 
-def hexpb():
-    print "HEX ENVELOPE"
+def hexpb(verbose=False):
+    if verbose:
+        print "HEX ENVELOPE"
     pb = hexee.hex_eeAG(s=hexpb.size, c=(hexpb.offx, hexpb.offy), \
                   d=hexpb.d, lam=hexpb.lam, pitch=hexpb.pitch)
 
@@ -139,7 +140,8 @@ def model_array(ctrs, lam, oversample, pitch, fov, d, centering ='PIXELCENTERED'
                 alist = np.append(alist, j + i + 1)
     alist = alist.reshape(len(alist)/2, 2)
 
-    print ffc.size
+    if verbose:
+        print ffc.size
     ffmodel = []
     ffmodel.append(ffc.N * np.ones(ffc.size))
     for q,r in enumerate(alist):
@@ -152,7 +154,8 @@ def model_array(ctrs, lam, oversample, pitch, fov, d, centering ='PIXELCENTERED'
         # Sept 2015 -- added in transpose to fix coordinate confusion
         ffmodel.append( np.transpose(np.fromfunction(ffc, ffc.size)) )
         ffmodel.append( np.transpose(np.fromfunction(ffs, ffs.size)) )
-    print "shape ffmodel", np.shape(ffmodel)
+    if verbose:
+        print "shape ffmodel", np.shape(ffmodel)
 
     if shape=='circ':
         return np.fromfunction(primarybeam,ffc.size), ffmodel
@@ -186,8 +189,9 @@ def matrix_operations(img, model, flux = None, verbose=False):
     flatmodel_nan = model.reshape(np.shape(model)[0] * np.shape(model)[1], np.shape(model)[2])
     #flatmodel = model.reshape(np.shape(model)[0] * np.shape(model)[1], np.shape(model)[2])
     flatmodel = np.zeros((len(flatimg), np.shape(model)[2]))
-    print "flat model dimensions ", np.shape(flatmodel)
-    print "flat image dimensions ", np.shape(flatimg)
+    if verbose:
+        print "flat model dimensions ", np.shape(flatmodel)
+        print "flat image dimensions ", np.shape(flatimg)
     for fringe in range(np.shape(model)[2]):
         flatmodel[:,fringe] = np.delete(flatmodel_nan[:,fringe], nanlist)
     # At (A transpose)
@@ -217,7 +221,7 @@ def matrix_operations(img, model, flux = None, verbose=False):
 
     
     # JSA test
-    if 1:
+    if 0:
         sys.path.append('/Users/jsahlmann/jwst/code/github/linearfit')
         import linearfit
         import os, pickle
@@ -245,7 +249,7 @@ def matrix_operations(img, model, flux = None, verbose=False):
         
         # do the fit 
         result.fit()        
-			        
+                    
         # delete inverse_covariance_matrix to reduce size of pickled file
         result.inverse_covariance_matrix = []
 
@@ -297,12 +301,13 @@ def weighted_operations(img, model, weights, verbose=False):
     
     return x, res,cond
 
-def multiplyenv(env, fringeterms):
+def multiplyenv(env, fringeterms, verbose = False):
     # The envelope is size (fov, fov). This multiplies the envelope by each of the 43 slices in the fringe model
     full = np.ones((np.shape(fringeterms)[1], np.shape(fringeterms)[2], np.shape(fringeterms)[0]+1))
     for i in range(len(fringeterms)):
         full[:,:,i] = env * fringeterms[i]
-    print "Total # fringe terms:", i
+    if verbose:    
+        print "Total # fringe terms:", i
     return full
 
 def deltapistons(pistons):
