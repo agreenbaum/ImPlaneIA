@@ -52,7 +52,7 @@ def rotatevectors(vectors, thetarad):
 
 class NRM_mask_definitions():
 
-    def __init__(self, maskname=None, rotdeg=None, holeshape="circ", rescale=False):
+    def __init__(self, maskname=None, rotdeg=None, holeshape="circ", rescale=False, verbose=False):
         if maskname not in ["gpi_g10s40",  "jwst_g7s6", "jwst_g7s6c", "visir_sam", \
                             "p1640", "keck_nirc2", "pharo"]:
             # Second row hopefully coming someday
@@ -62,8 +62,9 @@ class NRM_mask_definitions():
         if holeshape not in ["circ", "hex",]:
             raise ValueError("mask %s not supported" % maskname)
         self.maskname = maskname
-        print "\n\t====================================="
-        print "Mask %s being created" % self.maskname
+        if verbose:
+			print "\n\t====================================="
+			print "Mask %s being created" % self.maskname
 
         if self.maskname == "gpi_g10s40":
             self.hdia, self.ctrs = gpi_g10s40(rescale=rescale)

@@ -152,10 +152,10 @@ def centerit(img, r=60, verbose=False):
     if verbose:
         print 'peaking on: ',np.ma.masked_invalid(img[ann==1]).max()
         print 'peak x,y:', peakx,peaky
-    cropped = img[peakx-r:peakx+r+1,peaky-r:peaky+r+1]
+    cropped = img[np.int(peakx-r):np.int(peakx+r+1),np.int(peaky-r):np.int(peaky+r+1)]
     if verbose:
         print 'Cropped image shape:',cropped.shape
-        print 'value at center:', cropped[r,r]
+        print 'value at center:', cropped[np.int(r),np.int(r)]
         print np.where(cropped == cropped.max())
 #     pl.imshow(cropped, interpolation='nearest', cmap='bone')
 #     pl.show()
@@ -182,11 +182,12 @@ def neighbor_median(ctr, s, a2):
     #print med
 
 
-def get_fits_filter(fitsheader, ):
+def get_fits_filter(fitsheader, verbose=False):
     wavestring = "WAVE"
     weightstring = "WGHT"
     filterlist = []
-    print fitsheader[:]
+    if verbose:
+        print fitsheader[:]
     j =0
     for j in range(len(fitsheader)):
         if wavestring+str(j) in fitsheader:
@@ -194,12 +195,13 @@ def get_fits_filter(fitsheader, ):
             wavl = fitsheader[wavestring+str(j)]  
             print "wave", wavl
             filterlist.append(np.array([wght,wavl]))
-    print filterlist
+	if verbose:
+		print filterlist
     return filterlist
 
 
 # From webbpsf:
-def specFromSpectralType(sptype, return_list=False):
+def specFromSpectralType(sptype, return_list=False, verbose=False):
     """Get Pysynphot Spectrum object from a spectral type string.
 
     """
@@ -281,7 +283,8 @@ def specFromSpectralType(sptype, return_list=False):
 
     #try:
     keys = lookuptable[sptype]
-    print "IT EXISTS THOUGH ({0}):".format(sptype), keys
+    if verbose:
+        print "IT EXISTS THOUGH ({0}):".format(sptype), keys
     return pysynphot.Icat('ck04models',keys[0], keys[1], keys[2])
 
 def combine_transmission(filt, SRC):
@@ -483,7 +486,7 @@ def nb_pistons(multiplier=1.0, debug=False):
         return phi_nb_ * 4.3*um_ # phi_nb in m
 
 
-def get_webbpsf_filter(filtfile, specbin=None, trim=False):
+def get_webbpsf_filter(filtfile, specbin=None, trim=False, verbose=False):
     """
     Returns array of [weight, wavelength_in_meters] empirically tested... 2014 Nov
     specbin: integer, bin spectrum down by this factor
@@ -513,7 +516,8 @@ def get_webbpsf_filter(filtfile, specbin=None, trim=False):
     # rebin as desired - fewer wavelengths for debugginng quickly
     if specbin:
         smallshape = spec.shape[0]//specbin
-        print "bin by",  specbin, "  from ", spec.shape[0], " to",  smallshape
+        if verbose:
+            print "bin by",  specbin, "  from ", spec.shape[0], " to",  smallshape
         spec = spec[:smallshape*specbin, :]  # clip trailing 
         spec = krebin(spec, (smallshape,2))
         #print "          wl/um", spec[:,W]
@@ -523,7 +527,8 @@ def get_webbpsf_filter(filtfile, specbin=None, trim=False):
         #print "specbin - spec.shape", spec.shape
 
     if trim:
-        print "TRIMming"
+        if verbose:
+            print "TRIMming"
         wl = spec[:,W].copy()
         tr = spec[:,T].copy()
         idx = np.where((wl > (1.0 - 0.5*trim[1])*trim[0]) & (wl < (1.0 + 0.5*trim[1])*trim[0]))
@@ -532,23 +537,27 @@ def get_webbpsf_filter(filtfile, specbin=None, trim=False):
         spec = np.zeros((len(idx[0]),2))
         spec[:,1] = wl
         spec[:,0] = tr
-        print "post trim - spec.shape", spec.shape
+        if verbose:
+            print "post trim - spec.shape", spec.shape
 
-    print "post specbin - spec.shape", spec.shape
-    print "%d spectral samples " % len(spec[:,0]) + \
-          "between %.3f and %.3f um" % (spec[0,W]/um_,spec[-1,W]/um_)
+    if verbose:
+        print "post specbin - spec.shape", spec.shape
+        print "%d spectral samples " % len(spec[:,0]) + \
+              "between %.3f and %.3f um" % (spec[0,W]/um_,spec[-1,W]/um_)
  
     return spec
 
-def trim_webbpsf_filter(filt, specbin=None, plot=False):
-    print "================== " + filt + " ==================="
+def trim_webbpsf_filter(filt, specbin=None, plot=False, verbose=False):
+    if verbose:
+        print "================== " + filt + " ==================="
     beta = {"F277W":0.6, "F380M":0.15, "F430M":0.17, "F480M":0.2}
     lamc = {"F277W":2.70e-6, "F380M":3.8e-6, "F430M":4.24e-6, "F480M":4.8e-6}
     filterdirectory = os.getenv('WEBBPSF_PATH')+"/NIRISS/filters/" 
     band = get_webbpsf_filter(filterdirectory+filt+"_throughput.fits", 
                               specbin=specbin, 
                               trim=(lamc[filt], beta[filt]))
-    print "filter", filt, "band.shape", band.shape,  "\n", band
+    if verbose:                              
+        print "filter", filt, "band.shape", band.shape,  "\n", band
     wl = band[:,1]
     tr = band[:,0]
     if plot: plt.plot(wl/um_, np.log10(tr), label=filt)

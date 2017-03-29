@@ -96,14 +96,15 @@ class NRM_Model():
         an NRM_mask_geometry object.
         pixscale should be input in radians.
         """ 
-        # define a handler to write log messages to stdout
-        sh = logging.StreamHandler(stream=sys.stdout)
+        if verbose:
+            # define a handler to write log messages to stdout
+            sh = logging.StreamHandler(stream=sys.stdout)
 
-        # define the format for the log messages, here: "level name: message"
-        formatter = logging.Formatter("[%(levelname)s]: %(message)s")
-        sh.setFormatter(formatter)
-        self.logger = log
-        self.logger.addHandler(sh)
+            # define the format for the log messages, here: "level name: message"
+            formatter = logging.Formatter("[%(levelname)s]: %(message)s")
+            sh.setFormatter(formatter)
+            self.logger = log
+            self.logger.addHandler(sh)
 
         self.holeshape = holeshape
         self.pixel = pixscale
@@ -208,14 +209,14 @@ class NRM_Model():
             over = 1
         #if self.over == None:
         #   self.over=over
-        self.simhdr.update('PIXWGHT', False, "True or false, whether there is "+\
+        self.simhdr['PIXWGHT'] = ( False, "True or false, whether there is "+\
                     "sub-pixel weighting")
         if pixweight is not None:
             over=self.pixweight.shape[0]
             self.simhdr['PIXWGHT'] = True
         else:
             self.simhdr['PIXWGHT'] = True
-        self.simhdr.update('OVER', over, 'oversampling')
+        self.simhdr['OVER'] = ( over, 'oversampling')
 
         if rotate:
             self.rotate=rotate
@@ -223,16 +224,17 @@ class NRM_Model():
             self.simhdr.update('ROTRAD', self.rotate, "rotation in radians")
         else:
             self.rotctrs= self.ctrs
-            self.simhdr.update('ROTRAD', 0, "rotation in radians")
+            self.simhdr['ROTRAD'] = ( 0, "rotation in radians")
         if pixel==None:
             self.pixel_sim = self.pixel
         else:
             self.pixel_sim = pixel
-        self.simhdr.update('PIXSCL', self.pixel_sim, 'Pixel scale in radians')
+        self.simhdr['PIXSCL'] = ( self.pixel_sim, 'Pixel scale in radians')
 
         # The polychromatic case:
         if hasattr(self.bandpass, '__iter__'):
-            self.logger.debug("------Simulating Polychromatic------")
+            if verbose:
+                self.logger.debug("------Simulating Polychromatic------")
             self.psf_over = np.zeros((over*self.fov_sim, 
                             over*self.fov_sim))
             qq=0
@@ -247,17 +249,18 @@ class NRM_Model():
                             self.phi, \
                                centering = centering, \
                             shape=self.holeshape)
-                self.simhdr.update("WAVL{0}".format(qq), l, "wavelength (m)")
-                self.simhdr.update("WGHT{0}".format(qq), w, "weight")
+                self.simhdr["WAVL{0}".format(qq)] = ( l, "wavelength (m)")
+                self.simhdr["WGHT{0}".format(qq)] = ( w, "weight")
                 qq=qq+1
-            self.logger.debug("BINNING UP TO PIXEL SCALE")
+            if verbose:    
+                self.logger.debug("BINNING UP TO PIXEL SCALE")
         # The monochromatic case if bandpass input is a single wavelength
         else:
             self.lam=bandpass
-            self.simhdr.update("WAVL", self.lam,"Wavelength (m)")
+            self.simhdr["WAVL"] = ( self.lam,"Wavelength (m)")
             if verbose:
-                print  "Got one wavelength. Simulating monochromatic ... "
-            self.logger.debug("Calculating Oversampled PSF")
+                print  "Got one wavelength. Simulating monochromatic ... "                
+                self.logger.debug("Calculating Oversampled PSF")
             self.psf_over = analyticnrm2.PSF(self.pixel_sim, self.fov_sim, 
                         over, self.rotctrs, self.d, self.lam, \
                         self.phi, centering = centering, \
@@ -331,9 +334,10 @@ class NRM_Model():
                                   self.d, shape=self.holeshape, \
                               centering=centering,\
                               verbose=verbose)
-            self.logger.debug("centering: {0}".format(centering))
-            self.logger.debug("what primary beam has the model created?"+\
-                        " {0}".format(self.model_beam))
+            if verbose:                  
+                self.logger.debug("centering: {0}".format(centering))
+                self.logger.debug("what primary beam has the model created?"+\
+                            " {0}".format(self.model_beam))
 
             # this routine multiplies the envelope by each fringe "image"
             self.model_over = leastsqnrm.multiplyenv(self.model_beam, self.fringes)
@@ -359,8 +363,8 @@ class NRM_Model():
                 print "So the bandpass should have a shape:",np.shape(bandpass)
                 print "And it should be iterable:", hasattr(bandpass, '__iter__')
                 print "-------Polychromatic bandpass---------"
+                print self.bandpass
             self.bandpass = bandpass
-            print self.bandpass
             
             # The model shape is (fov) x (fov) x (# solution coefficients)
             # the coefficient refers to the terms in the analytic equation
@@ -381,9 +385,10 @@ class NRM_Model():
                                   shape=self.holeshape, \
                                   centering=centering,\
                                   verbose=False)
-                self.logger.debug("centering: {0}".format(centering))
-                self.logger.debug("what primary beam has the model"+\
-                          "created? {0}".format(pb))
+                if verbose:                      
+                    self.logger.debug("centering: {0}".format(centering))
+                    self.logger.debug("what primary beam has the model"+\
+                              "created? {0}".format(pb))
                 self.model_beam += pb
                 self.fringes += ff
 
@@ -639,7 +644,7 @@ class NRM_Model():
                 # -------------------------------
                 if fitswrite:
                     temphdu = fits.PrimaryHDU(data=psf, header=self.simhdr)
-                    temphdu.header.update("pixscale", self.test_pixscale, 
+                    temphdu.header["pixscale"] = ( self.test_pixscale, 
                                 "pixel scale (rad)")
                     temphdu.writeto(self.datapath+self.refdir+\
                         "refpsf_pixscl{0}.fits".format(self.test_pixscale), 
@@ -700,8 +705,7 @@ class NRM_Model():
                 # -------------------------------
                 if fitswrite:
                     temphdu = fits.PrimaryHDU(data=psf, header=self.simhdr)
-                    temphdu.header.update("pixscale", \
-                        self.pixscale_optimal, \
+                    temphdu.header["pixscale"] = (self.pixscale_optimal, \
                         "pixel scale (rad)")
                     temphdu.writeto(self.datapath+self.refdir+\
                         "refpsf_rot{0}_pixel{1}.fits".format(rad, 
@@ -761,8 +765,7 @@ class NRM_Model():
             self.simulate(fov=_npix, over=self.over, bandpass=self.bandpass, verbose=verbose)
 
             hdulist=fits.PrimaryHDU(data=self.psf_over)
-            hdulist.header.update("", "", "Written from auto_find_center method")
-            #hdulist.header.update()
+            hdulist.header[" "] = ( " ", "Written from auto_find_center method")
             hdulist.writeto(self.datapath+modelfitsname, clobber=True)
         else:
             # Looks for this file to read in if it's already been written and overwrite flag not set

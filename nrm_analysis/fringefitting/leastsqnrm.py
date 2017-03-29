@@ -146,10 +146,10 @@ def model_array(ctrs, lam, oversample, pitch, fov, d, centering ='PIXELCENTERED'
     ffmodel.append(ffc.N * np.ones(ffc.size))
     for q,r in enumerate(alist):
         # r[0] and r[1] are holes i and j, x-coord: 0, y-coord: 1
-        ffc.ri = ctrs[r[0]]
-        ffc.rj = ctrs[r[1]]
-        ffs.ri = ctrs[r[0]]
-        ffs.rj = ctrs[r[1]]
+        ffc.ri = ctrs[np.int(r[0])]
+        ffc.rj = ctrs[np.int(r[1])]
+        ffs.ri = ctrs[np.int(r[0])]
+        ffs.rj = ctrs[np.int(r[1])]
 
         # Sept 2015 -- added in transpose to fix coordinate confusion
         ffmodel.append( np.transpose(np.fromfunction(ffc, ffc.size)) )
@@ -221,7 +221,7 @@ def matrix_operations(img, model, flux = None, verbose=False):
 
     
     # JSA test
-    if 0:
+    if 1:
         sys.path.append('/Users/jsahlmann/jwst/code/github/linearfit')
         import linearfit
         import os, pickle
@@ -232,10 +232,10 @@ def matrix_operations(img, model, flux = None, verbose=False):
         noise = np.sqrt(np.abs(flatimg))
         
         # this sets the weights of pixels fulfilling condition to zero
-#         weights = np.where(flatimg==0.0, 0.0, 1.0/(noise**2))
+        weights = np.where(np.abs(flatimg)<=1.0, 0.0, 1.0/(noise**2))
         
         # uniform weight
-        weights = np.ones(len(flatimg))
+#         weights = np.ones(len(flatimg))
         
         #       diagonal covariance matrix of dependent variables
         wy = weights        
