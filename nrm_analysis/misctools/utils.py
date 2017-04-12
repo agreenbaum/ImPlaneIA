@@ -4,6 +4,7 @@ import numpy.fft as fft
 from astropy.io import fits
 import os, sys
 import cPickle as pickle
+from scipy.misc import comb
 
 m_ = 1.0
 mm_ =  m_/1000.0
@@ -147,7 +148,7 @@ def centerit(img, r=60):
 	#print 'peaking on: ',np.ma.masked_invalid(img[lo:hi,lo:hi]).max()
 	print 'peaking on: ',np.ma.masked_invalid(img[ann==1]).max()
 	print 'peak x,y:', peakx,peaky
-	cropped = img[peakx-r:peakx+r+1,peaky-r:peaky+r+1]
+	cropped = img[int(peakx-r):int(peakx+r+1),int(peaky-r):int(peaky+r+1)]
 	print 'Cropped image shape:',cropped.shape
 	print 'value at center:', cropped[r,r]
 	print np.where(cropped == cropped.max())
@@ -275,7 +276,7 @@ def specFromSpectralType(sptype, return_list=False):
 
 	#try:
 	keys = lookuptable[sptype]
-	print "IT EXISTS THOUGH ({0}):".format(sptype), keys
+	print "Spectral type exists in table ({0}):".format(sptype), keys
 	return pysynphot.Icat('ck04models',keys[0], keys[1], keys[2])
 
 def combine_transmission(filt, SRC):
@@ -781,6 +782,48 @@ def corner_plot(pickfile, nbins = 100, save="my_calibrated/triangle_plot.png"):
 	fig = corner.corner(chain, labels = keys, bins=nbins, show_titles=True)
 	plt.savefig("triangle_plot.pdf")
 	plt.show()
+
+def populate_symmamparray(amps, N=7):
+    fringeamparray = np.zeros((N,N))
+    step=0
+    n=N-1
+    for h in range(n):
+        #print "step", step, "step+n", step+n
+        #print "h", h, "h+1", h+1, "and on"
+        #print fringeamparray[h,h+1:].shape, amps[step:step+n].shape
+        fringeamparray[h,h+1:] = amps[step:step+n]
+        step = step+n
+        n=n-1
+    fringeamparray = fringeamparray + fringeamparray.T
+    return fringeamparray
+
+def t3vis(vis, N=7):
+    """ provided visibilities, this put these into triple product"""
+    amparray = populate_symmamparray(vis, N=N)
+    t3vis = np.zeros(int(comb(N,3)))
+    nn=0
+    for kk in range(N-2):
+        for ii in range(N-kk-2):
+            for jj in range(N-kk-ii-2):
+                t3vis[nn+jj] = amparray[kk,ii+kk+1] \
+                * amparray[ii+kk+1,jj+ii+kk+2] \
+                * amparray[jj+ii+kk+2,kk]
+            nn=nn+jj+1
+    return t3vis
+
+def t3err(viserr, N=7):
+    """ provided visibilities, this put these into triple product"""
+    amparray = populate_symmamparray(viserr, N=N)
+    t3viserr = np.zeros(int(comb(N,3)))
+    nn=0
+    for kk in range(N-2):
+        for ii in range(N-kk-2):
+            for jj in range(N-kk-ii-2):
+                t3viserr[nn+jj] = np.sqrt(amparray[kk,ii+kk+1]**2 \
+                + amparray[ii+kk+1,jj+ii+kk+2]**2 \
+                + amparray[jj+ii+kk+2,kk]**2 )
+            nn=nn+jj+1
+    return t3viserr
 
 if __name__ == "__main__":
 
