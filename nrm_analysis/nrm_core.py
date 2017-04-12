@@ -27,14 +27,15 @@ from scipy.misc import comb
 from scipy.stats import sem, mstats
 import cPickle as pickle
 import matplotlib.pyplot as plt
-plt.ion() # Added after JA's suggestion - eventually will make plotting better.
+#plt.ion() # Added after JA's suggestion - eventually will make plotting better.
 
 # Module imports
 from fringefitting.LG_Model import NRM_Model
 import misctools.utils
 from misctools.utils import mas2rad, baselinify, rad2mas
 import misctools.utils as utils
-from modeling.binarymodel import model_cp_uv
+from modeling.binarymodel import model_cp_uv, model_allvis_uv, model_v2_uv, model_t3amp_uv
+from modeling.multimodel import model_bispec_uv
 from multiprocessing import Pool
 
 import oifits
@@ -148,10 +149,10 @@ class FringeFitter:
         # In future can just pass instrument_data to NRM_Model
 
         #plot conditions
-        if self.debug==True or self.auto_scale==True or self.auto_rotate==True:
-            import matplotlib.pyplot as plt
-        if self.debug==True:
-            import poppy.matrixDFT as mft
+        #if self.debug==True or self.auto_scale==True or self.auto_rotate==True:
+        #    import matplotlib.pyplot as plt
+        #if self.debug==True:
+        #    import poppy.matrixDFT as mft
 
     def fit_fringes(self, fns):
         if type(fns) == str:
@@ -201,11 +202,14 @@ class FringeFitter:
                     nrm.bestcenter = self.hold_centering
 
                 # similar if/else routines for auto scaling and rotation
+                if self.auto_scale == True:
+                    nrm.fit_images(self.ctrd, pixguess = self.instrument_data.pscale_rad)
 
-                #print "from nrm_core, centered shape:",self.ctrd.shape[0], self.ctrd.shape[1]
-                nrm.make_model(fov = self.ctrd.shape[0], bandpass=nrm.bandpass, over=self.oversample,
-                               centering=nrm.bestcenter, pixscale=nrm.pixel)
-                nrm.fit_image(self.ctrd, modelin=nrm.model)
+                else:
+                    #print "from nrm_core, centered shape:",self.ctrd.shape[0], self.ctrd.shape[1]
+                    nrm.make_model(fov = self.ctrd.shape[0], bandpass=nrm.bandpass, over=self.oversample,
+                                   centering=nrm.bestcenter, pixscale=nrm.pixel)
+                    nrm.fit_image(self.ctrd, modelin=nrm.model)
                 """
                 Attributes now stored in nrm object:
 
@@ -221,8 +225,10 @@ class FringeFitter:
                 """
 
                 if self.debug==True:
+                    import matplotlib.pyplot as plt
+                    import poppy.matrixDFT as mft
                     dataft = mft.matrix_dft(self.ctrd, 256, 512)
-                    refft = mft.matrix_dft(nrm.refpsf, 256, 512)
+                    refft = mft.matrix_dft(self.refpsf, 256, 512)
                     plt.figure()
                     plt.title("Data")
                     plt.imshow(np.sqrt(abs(dataft)), cmap = "bone")
@@ -464,6 +470,7 @@ class Calibrate:
                 for qq in range(nexps):
                     # nwav files
                     cpfiles = [f for f in os.listdir(paths[ii]+exps[qq]) if "CPs" in f] 
+                    print cpfiles
                     ampfiles = [f for f in os.listdir(paths[ii]+exps[qq]) \
                                 if "amplitudes" in f]
                     phafiles = [f for f in os.listdir(paths[ii]+exps[qq]) if "phase" in f] 
@@ -500,11 +507,11 @@ class Calibrate:
                             self.pha_mean_tar[slc,:], self.pha_err_tar = \
                             self.calib_steps(cps[slc,:,:], amp[slc,:,:], pha[slc,:,:], nexps, expflag=expflag)
                         # measured cp shape: (nwav, nexps, ncp) mean cp shape: (nwav, ncp)
-                        meansub = cps[slc, :, :] - \
-                                  np.tile(self.cp_mean_tar[slc,:], (nexps, 1))
-                        self.cov_mat_tar[slc, :,:] = np.dot(meansub, meansub.transpose()) / (nexps - 1)
+                        ##meansub = cps[slc, :, :] - \
+                        ##          np.tile(self.cp_mean_tar[slc,:], (nexps, 1))
+                        ##self.cov_mat_tar[slc, :,:] = np.dot(meansub, meansub.transpose()) / (nexps - 1)
                         # Uncertainties:
-                        self.sigmasquared_tar[slc,:] = np.diagonal(self.cov_mat_tar[slc, :,:])
+                        ##self.sigmasquared_tar[slc,:] = np.diagonal(self.cov_mat_tar[slc, :,:])
 
                     else:
                         # Fixed clunkiness!
@@ -516,11 +523,11 @@ class Calibrate:
                         print cps[slc, :,:].shape
                         print self.cp_mean_cal[ii-1, slc,:].shape
                         print np.tile(self.cp_mean_cal[ii-1,slc,:],(nexps, 1)).shape
-                        meansub = cps[slc, :, :] - \
-                                  np.tile(self.cp_mean_cal[ii-1, slc,:], (nexps, 1))
-                        self.cov_mat_cal[slc, :,:]  += np.dot(meansub, meansub.transpose()) / (nexps - 1)
+                        ##meansub = cps[slc, :, :] - \
+                        ##          np.tile(self.cp_mean_cal[ii-1, slc,:], (nexps, 1))
+                        ##self.cov_mat_cal[slc, :,:]  += np.dot(meansub, meansub.transpose()) / (nexps - 1)
                         # Uncertainties:
-                        self.sigmasquared_cal[slc,:] = np.diagonal(self.cov_mat_cal[slc, :,:])
+                        ##self.sigmasquared_cal[slc,:] = np.diagonal(self.cov_mat_cal[slc, :,:])
 
             """
             ####################################
@@ -540,20 +547,30 @@ class Calibrate:
             sig^2 = (2 sig_r^2 + (n_c - 1)sig_c*2 ) / (n_c + 1)
             """
             nexp_c = self.sigmasquared_cal.shape[1]
-            self.sigmasquared = (2* self.sigmasquared_tar + \
-                                 (nexp_c - 1)*self.sigmasquared_cal) / (nexp_c + 1)
+            #self.sigmasquared = (2* self.sigmasquared_tar + \
+            #                     (nexp_c - 1)*self.sigmasquared_cal) / (nexp_c + 1)
 
         else:
             for ii in range(self.nobjs):
+
                 cpfiles = [f for f in os.listdir(paths[ii]) if "CPs" in f] 
                 ampfiles = [f for f in os.listdir(paths[ii]) if "amplitudes" in f]
                 phafiles = [f for f in os.listdir(paths[ii]) if "phase" in f]
                 nexps = len(cpfiles)
+
+                if ii == 0:
+                    self.cov_mat_tar = np.zeros((self.naxis2, nexps, nexps))
+                    self.sigmasquared_tar = np.zeros((self.naxis2, nexps))
+                elif ii==1:
+                    self.cov_mat_cal = np.zeros((self.naxis2, nexps, nexps))
+                    self.sigmasquared_cal = np.zeros((self.naxis2, nexps))
+
                 amp = np.zeros((nexps, self.nbl))
                 pha = np.zeros((nexps, self.nbl))
                 cps = np.zeros((nexps, self.ncp))
                 for qq in range(nexps):
                     amp[qq,:] = np.loadtxt(paths[ii]+"/"+ampfiles[qq])
+                    expflag=[]
                     if True in (amp[qq,:]>1):
                         expflag.append(qq)
                     pha[qq,:] = np.loadtxt(paths[ii]+"/"+phafiles[qq])
@@ -566,9 +583,13 @@ class Calibrate:
                 if ii==0:
                     # closure phases and squared visibilities
                     self.cp_mean_tar[0,:], self.cp_err_tar[0,:], \
-                        self.v2_err_tar[0,:], self.v2_err_tar[0,:], \
+                        self.v2_mean_tar[0,:], self.v2_err_tar[0,:], \
                         self.pha_mean_tar[0,:], self.pha_err_tar[0,:] = \
                         self.calib_steps(cps, amp, pha, nexps, expflag=expflag)
+                    # measured cp shape: (nwav, nexps, ncp) mean cp shape: (nwav, ncp)
+                    ##meansub = cps - np.tile(self.cp_mean_tar, (nexps, 1))
+                    ##self.cov_mat_tar[0,:,:] = np.dot(meansub, meansub.transpose()) / (nexps - 1)
+                    ##self.sigmasquared_tar[0,:] = np.diagonal(self.cov_mat_tar[0,:,:])
                 else:
                     # Fixed clunkiness!
                     # closure phases and visibilities
@@ -576,6 +597,15 @@ class Calibrate:
                         self.v2_mean_cal[ii-1,0,:], self.v2_err_cal[ii-1,0,:], \
                         self.pha_mean_cal[ii-1,0,:], self.pha_err_cal[ii-1,0,:] = \
                         self.calib_steps(cps, amp, pha, nexps, expflag=expflag)
+                    # measured cp shape: (nwav, nexps, ncp) mean cp shape: (nwav, ncp)
+                    ##meansub = cps - np.tile(self.cp_mean_cal, (nexps, 1))
+                    # Uncertainties:
+                    ##self.cov_mat_cal[0,:,:]  += np.dot(meansub[0,:], meansub[0,:].transpose()) / (nexps - 1)
+                    ##self.sigmasquared_cal[0,:] = np.diagonal(self.cov_mat_cal[0,:,:])
+
+            ##nexp_c = self.sigmasquared_cal.shape[1]
+            ##self.sigmasquared = (2* self.sigmasquared_tar + \
+            ##                     (nexp_c - 1)*self.sigmasquared_cal) / (nexp_c + 1)
 
         # Combine mean calibrator values and errors
         self.cp_mean_tot = np.zeros(self.cp_mean_cal[0].shape)
@@ -763,7 +793,7 @@ class Calibrate:
         return None
 
 class BinaryAnalyze:
-    def __init__(self, oifitsfn, savedir = "calibrated", extra_error=0):
+    def __init__(self, oifitsfn, savedir = "calibrated", extra_error=0, plot="on"):
         """
         What do I want to do here?
         Want to load an oifits file and look for a binary -- anything else?
@@ -773,6 +803,7 @@ class BinaryAnalyze:
 
         get_data(self)
         self.savedir = savedir
+        self.plot=plot
 
     def coarse_binary_search(self, lims, nstep=20):
         """
@@ -866,10 +897,58 @@ class BinaryAnalyze:
         plt.colorbar(label="Contrast")
         """
         
-        plt.show()
+        if self.plot=="on":
+            plt.show()
         return coarse_params
 
-    def detec_map(self, lims, nstep=50, hyp = 0):
+    def coarse_multi(self, lims, known, nstep=25):
+        """
+        For getting first guess on contrast, separation, and angle 
+        for an additional companion. Iterate until suffient # of 
+        companions is reached. Provide known parameters for whatever
+        number have already been fit.
+
+        lims:   [(c_low, c_hi), (sep_lo, sep_hi), (pa_low, pa_hi)]
+        known: [[c_1, c_2,...], [s_1, s_2, ...], [pa_1, pa_2, ...]]
+
+        contrast is in logspace, so provide powers for the range
+        separation in mas, pa in degrees
+        """
+        #cons = np.linspace(lims[0][0], lims[0][1], num=nstep)
+        nn = np.arange(nstep)
+        r = (lims[0][-1]/lims[0][0])**(1 / float(nstep-1))
+        cons = lims[0][0] * r**(nn)
+        #cons = np.linspace(lims[0][0], lims[0][1], num=nstep)
+        seps = np.linspace(lims[1][0], lims[1][1], num=nstep)
+        angs = np.linspace(lims[2][0], lims[2][1], num=nstep)
+        loglike = np.zeros((nstep, nstep, nstep))
+
+        priors = np.array([(-np.inf, np.inf) for f in range( 3 ) ])
+        constant = {"wavl": self.wavls}
+
+        for i in range(nstep):
+            for j in range(nstep):
+                for k in range(nstep):
+                    #params = {'con':cons[i], 'sep':seps[j], 'pa':angs[k]}
+                    params = known+[cons[i], seps[j], angs[k]] # string them all together
+                    loglike[i,j,k] = cp_multi_model(params, constant, priors, None, self.uvcoords, self.cp, self.cperr)
+        loglike_0 = cp_binary_model([0, 0, 0], constant, priors, None, self.uvcoords, self.cp, self.cperr)
+
+        wheremax = np.where(loglike==loglike.max())
+        print "abs max", wheremax
+        print "loglike at max axis=0",wheremax[0][0], loglike[wheremax[0][0],:,:].shape
+        print "==================="
+        print "Max log likelikehood for contrast:", 
+        print cons[wheremax[0]]
+        print "Max log likelikehood for separation:", 
+        print seps[wheremax[1]], "mas"
+        print "Max log likelikehood for angle:", 
+        print angs[wheremax[2]], "deg"
+        print "==================="
+        coarse_params = cons[wheremax[0]], seps[wheremax[1]], angs[wheremax[2]]
+        return coarse_params
+
+    def detec_map(self, lims, nstep=50, hyp = 0, save=False):
         """
         For getting first guess on contrast, separation, and angle
 
@@ -903,9 +982,11 @@ class BinaryAnalyze:
                     ang = 180*np.arctan2(decs[k], ras[j])/np.pi
                     sep = np.sqrt(ras[j]**2 + decs[k]**2)
                     params = [cons[i], sep, ang]
-                    chi2cube[i,j,k] = cp_binary_model(params, constant, priors, None, self.uvcoords, self.cp, self.cperr, stat="chi2")
+                    #chi2cube[i,j,k] = cp_binary_model(params, constant, priors, None, self.uvcoords, self.cp, self.cperr, stat="chi2")
+                    chi2cube[i,j,k] = allvis_binary_model(params, constant, priors, None, self.uvcoords, self.cp, self.cperr, self.t3amp, self.t3amperr, stat="chi2")
                     #chi2_bin_model[i, j,k] = cp_binary_model([hyp, sep, ang], constant, priors, None, self.uvcoords, self.cp, self.cperr, stat="chi2")
-        chi2_0 = cp_binary_model([0,0,0], constant, priors, None, self.uvcoords, self.cp, self.cperr, stat="chi2")
+        #chi2_0 = cp_binary_model([0,0,0], constant, priors, None, self.uvcoords, self.cp, self.cperr, stat="chi2")
+        chi2_0 = allvis_binary_model([0,0,0], constant, priors, None, self.uvcoords, self.cp, self.cperr, self.t3amp, self.t3amperr, stat="chi2")
 
         # chi^2 detection grid
         #detec_mask = - np.exp(loglike) > (25 - np.exp(loglike_0))
@@ -935,11 +1016,16 @@ class BinaryAnalyze:
         plt.yticks(np.linspace(0, nstep, 5), np.linspace(decs.min(), decs.max(), 4+1))
         plt.colorbar(label="Contrast")
         
-        plt.show()
+        if self.plot=="on":
+            plt.show()
+        if save is not False:
+            plt.savefig(self.savedir+save)
 
-    def chi2map(self, maxsep=300., clims = [0.001, 0.5], nstep=50, threads=4, save=True):
+    def chi2map(self, maxsep=300., clims = [0.001, 0.5], nstep=50, \
+                threads=4, observables="cp",save=True):
         """
         Makes a coarse chi^2 map at the contrast where chi^2 is minimum for each position. 
+        Default cps only, but can choose observables="all" to use visibility info also.
         """
 
         nn = np.arange(nstep)
@@ -964,27 +1050,62 @@ class BinaryAnalyze:
         print np.shape(self.wavls)
 
         t2 = time.time()
-        store_dict = [{"data":self.cp, "error":self.cperr, "uvcoords":uvcoords, \
+
+        # Now split this up by which set of observables we want to test
+        # Either just closure phases, or visibility info also.
+
+        if observables=="cp":
+            store_dict = [{"data":self.cp, "error":self.cperr, "uvcoords":uvcoords, \
                       "params":[self.cons[i],np.sqrt(ras**2+decs**2),180*np.arctan2(decs,ras)/np.pi], \
-                      "wavls":self.wavls} for i in range(nstep)] 
-        if threads>0:
-            pool = Pool(processes=threads)
-            print "Threads:", threads
-            self.chi2grid = np.array(pool.map(chi2_grid_loop, store_dict))
-        else:
-            self.chi2grid = np.zeros((nstep, nstep, nstep))
-            for ii in range(len(self.cons)):
-                self.chi2grid[ii] = chi2_grid_loop(store_dict[ii])
+                      "wavls":self.wavls, "dof":self.cp.shape[0] - 3} for i in range(nstep)] 
+            # Calc null chi^2
+            chi2_null = chi2_grid_loop({"params":[0,0,0],"data":self.cp, \
+                                    "error":self.cperr, "uvcoords":uvcoords,\
+                                     "wavls":self.wavls, "dof": self.cp.shape[0] - 3})
+            if threads>0:
+                pool = Pool(processes=threads)
+                print "Threads:", threads
+                self.chi2grid = np.array(pool.map(chi2_grid_loop, store_dict))
+            else:
+                self.chi2grid = np.zeros((nstep, nstep, nstep))
+                for ii in range(len(self.cons)):
+                    self.chi2grid[ii] = chi2_grid_loop(store_dict[ii])
+
+        elif observables=="all":
+            data = np.concatenate((self.cp, self.t3amp))
+            error = np.concatenate((self.cperr, self.t3amperr))
+            store_dict = [{"data":data, "error":error, "uvcoords":uvcoords, \
+                      "params":[self.cons[i],np.sqrt(ras**2+decs**2),180*np.arctan2(decs,ras)/np.pi], \
+                      "wavls":self.wavls, "dof":data.shape[0] - 3} for i in range(nstep)] 
+            # Calc null chi^2
+            chi2_null = chi2_grid_loop_all({"params":[0,0,0],"data":data, \
+                                    "error":error, "uvcoords":uvcoords,\
+                                     "wavls":self.wavls, "dof": data.shape[0] - 3})
+            if threads>0:
+                pool = Pool(processes=threads)
+                print "Threads:", threads
+                self.chi2grid = np.array(pool.map(chi2_grid_loop_all, store_dict))
+            else:
+                self.chi2grid = np.zeros((nstep, nstep, nstep))
+                for ii in range(len(self.cons)):
+                    self.chi2grid[ii] = chi2_grid_loop_all(store_dict[ii])
+
+
         t3 = time.time()
+        pool.terminate()
         print "took "+str(t3-t2)+"s to compute all chi^2 grid points"
 
         plt.figure()
         plt.plot(nstep/2.0 -0.5,nstep/2.0 - 0.5, marker="*", color='w', markersize=20)
-        plt.imshow(np.min(self.chi2grid, axis=0).transpose(), cmap="cubehelix")
+        #plt.imshow(np.min(self.chi2grid, axis=0).transpose(), cmap="cubehelix")
+        significance = chi2_null - np.min(self.chi2grid, axis=0).transpose()
+        significance[significance<0] = 0
+        plt.imshow(np.sqrt(significance), cmap="cubehelix")
         plt.xlabel("RA (mas)")
         plt.ylabel("DEC (mas)")
         plt.xticks(np.linspace(0, nstep, 5), np.linspace(self.ras.min(), self.ras.max(), 4+1))
         plt.yticks(np.linspace(0, nstep, 5), np.linspace(self.decs.min(), self.decs.max(), 4+1))
+        #plt.colorbar()
 
         chi2min = np.where(self.chi2grid == self.chi2grid.min())
         bestparams = np.array([self.cons[chi2min[0]][0], \
@@ -1000,7 +1121,9 @@ class BinaryAnalyze:
             pickle.dump(savdata, f)
 
         plt.savefig(self.savedir+"chi2map.pdf")
-        plt.show()
+        if self.plot=="on":
+            plt.show()
+        plt.clf()
         return bestparams
 
     def two_hyp_test():
@@ -1008,9 +1131,31 @@ class BinaryAnalyze:
         Is my data consistent with Null Hypothesis?
         """
 
-    def detection_limits(self, ntrials = 1, seplims = [20, 200], conlims = [0.0001, 0.99], anglims = [0,360], nsep = 24, ncon=24, nang=24, threads=4, save=False, scale=1.0):
+    def detection_limits(self, ntrials = 1, seplims = [20, 200],\
+                         conlims = [0.0001, 0.99], anglims = [0,360],\
+                         nsep = 24, ncon=24, nang=24, threads=4,\
+                         observables="cp", save=False, scale=1.0):
         """
         Inspired by pymask code.
+        ntrials: Number of times we draw randomly
+        seplims: Where to search in separation space, default 20-200 mas
+        conlims: Contrast bounds of search def: 1e-4 to 0.99
+        anglims: Sky angle bounds (deg), should leave this 0 to 360 deg
+                 This routine will average over all angles for calculation
+        nsep/ncon/nang: number of each to simulate -- should be a multiple
+                        of the threads set for best performance. If this
+                        takes too much memory, try reducing these #s and
+                        increasing ntrials, since this sets the grid size
+        threads: no threads on your machine for parallel processing
+        observables: default is "cp" for just considering closure phases
+                     can optionally set to "all" to also consider 
+                     visibility amplitudes in t3amp axis. Currently this
+                     option is not working/not fully tested. 
+        save: to save or not to save? Default set to false. If turned on
+              will save as detection_limits .pick and .pdf. Must change
+              filename separately in driver/commands if running multiple.
+        scale: Error scale -- typically set to Nholes/3 to account for
+               # indepent closure phases compared to total.
         """
         pool = Pool(processes = threads)
 
@@ -1032,47 +1177,86 @@ class BinaryAnalyze:
         angs = np.tile(self.angs, (nsep, ncon, self.nwav, 1))
         angs = np.rollaxis(angs, -1, 2)
 
-        # Some random errors to add in per trial
-        # Consider scaling random cperr by wavelength?
-        randnums = np.random.randn(int(ntrials), len(self.cp), int(self.nwav))
-        # randomize* the measurement errors
-        errors = scale*self.cperr[None, ...]*randnums
-        #errors = np.rollaxis(np.tile(self.cperr[None, ...]*randnums, (nsep, ncon, nang,1, 1, 1)),-3,0)
-        print "errors shape:", errors.shape
-
-        #detec_grid = np.zeros((len(seps), len(cons), len(angs)))
         # set up big uvcoordinate grid, keep wavelength axis at the end
         # should be shape (2, 3, ncp, nsep, ncon, nang, nwav)
         uvcoords = np.rollaxis(np.rollaxis(np.rollaxis(np.tile(self.uvcoords, (nsep, ncon, nang, 1, 1, 1, 1)), -2,0), -2, 0), -2, 0)
         print "Computing model cps over", nsep*ncon*nang, "parameters."
-        t1 = time.time()
-        #modelcps = model_cp_uv(uvcoords, cons, seps, angs, 1.0/self.wavls)
-        modelcps = np.rollaxis(model_cp_uv(uvcoords, cons, seps, angs, 1.0/self.wavls), 0, -1)
-        #modelcps = np.rollaxis(pool.map(model_cp_uv(uvcoords, cons, seps, angs, 1.0/self.wavls), 0, -1)
-        t2 = time.time()
-        print "Finished computing big grid, took", t2-t1, "s"
-        print "modelcps shape:", modelcps.shape
 
-        """
-        print "modelcps shape:", modelcps.shape
-        modelcps = np.tile(modelcps, (ntrials, 1, 1, 1, 1, 1))
-        print "modelcps shape:", modelcps.shape
-        simcps = modelcps + errors
-        print "simcps shape:", simcps.shape
-        chi2null = reduced_chi2(simcps, self.cperr, 0)
-        print "chi2null shape:", chi2null.shape, "and chi2null sum:", chi2null.sum()
-        chi2bin = reduced_chi2(simcps, modelcps, self.cperr)
-        print "chi2bin shape:", chi2bin.shape, "and chi2bin sum:", chi2bin.sum()
-        self.detec_grid = ((chi2bin - chi2null)<0.0).sum(axis=(0,-1)) / float(ntrials*len(angs))
-        print "detec_grid shape:", self.detec_grid.shape
-        """
+        # Set up some random errors to add in per trial
+        # Consider scaling random cperr by wavelength?
+        if observables=="cp":
+            randnums = np.random.randn(int(ntrials), len(self.cp), int(self.nwav))
+            # randomize* the measurement errors
+            errors = scale*self.cperr[None, ...]*randnums
+            errors = np.rollaxis(np.tile(self.cperr[None, ...]*randnums,\
+                                 (nsep, ncon, nang,1, 1, 1)),-3,0)
+            print "errors shape:", errors.shape
+            t1 = time.time()
+            modelcps = model_cp_uv(uvcoords, cons, seps, angs, 1.0/self.wavls)
+            modelcps = np.rollaxis(modelcps, 0, -1)
+            t2 = time.time()
+            #modelcps = np.rollaxis(pool.map(model_cp_uv(uvcoords, \
+            #                       cons, seps, angs, 1.0/self.wavls), 0, -1)
+            print "Finished computing big grid, took", t2-t1, "s"
+            print "modelcps shape:", modelcps.shape
 
-        t3 = time.time()
-        print "setting up the dictionary..."
-        store_dict = [{"self":self,"ntrials":ntrials, "model":modelcps, "randerrors":errors[i], "dataerrors":self.cperr} for i in range(len(errors))]
+            """
+            print "modelcps shape:", modelcps.shape
+            modelcps = np.tile(modelcps, (ntrials, 1, 1, 1, 1, 1))
+            print "modelcps shape:", modelcps.shape
+            simcps = modelcps + errors
+            print "simcps shape:", simcps.shape
+            chi2null = reduced_chi2(simcps, self.cperr, 0)
+            print "chi2null shape:", chi2null.shape, "and chi2null sum:",\
+                   chi2null.sum()
+            chi2bin = reduced_chi2(simcps, modelcps, self.cperr)
+            print "chi2bin shape:", chi2bin.shape, "and chi2bin sum:", chi2bin.sum()
+            self.detec_grid = ((chi2bin - chi2null)<0.0).sum(axis=(0,-1))\
+                                / float(ntrials*len(angs))
+            print "detec_grid shape:", self.detec_grid.shape
+            """
+            t3 = time.time()
+            print "setting up the dictionary..."
+            store_dict = [{"self":self,"ntrials":ntrials, "model":modelcps, "randerrors":errors[i], "dataerrors":self.cperr} for i in range(len(errors))]
+
+        elif observables=="all":
+            randnums = np.random.randn(int(ntrials), \
+                                       len(self.cp)+len(self.t3amp),\
+                                       int(self.nwav))
+            # randomize* the measurement errors
+            allerrors = np.concatenate((self.cperr, self.t3amperr))
+            errors = scale*allerrors[None, ...]*randnums
+            print "errors shape:", errors.shape
+
+            #detec_grid = np.zeros((len(seps), len(cons), len(angs)))
+            t1 = time.time()
+            modelcps = np.rollaxis(model_cp_uv(uvcoords, cons, seps,\
+                                   angs, 1.0/self.wavls), 0, -1)
+            modelt3 = np.rollaxis(model_t3amp_uv(uvcoords, cons, seps,\
+                                  angs, 1.0/self.wavls), 0, -1)
+            t2 = time.time()
+            print "Finished computing big grid, took", t2-t1, "s"
+            print "modelcps shape:", modelcps.shape
+            print "modelt3 shape:", modelt3.shape
+            model = np.concatenate((modelcps, modelt3), axis=3)
+            print self.t3amp
+            print "t3 errors"
+            print self.t3amperr
+            print "all"
+            print allerrors
+            print "v2"
+            print self.v2err
+            print "cp errors"
+            #self.cperr
+
+            t3 = time.time()
+            print "setting up the dictionary..."
+            store_dict = [{"self":self,"ntrials":ntrials, "model":model, "randerrors":errors[i], "dataerrors":allerrors} for i in range(len(errors))]
+
         t4 = time.time()
         print "dictionary took", t4-t3, "s to set up"
         big_detec_grid = np.sum(pool.map(detec_calc_loop, store_dict),axis=0) / float(ntrials)
+        pool.terminate()
         t5 = time.time()
         print "Time to finish detec_calc_loop:", t5-t3, "s"
 
@@ -1084,12 +1268,19 @@ class BinaryAnalyze:
         for ii in range(nsep):
             for jj in range(ncon):
                 for kk in range(nang)
-                    bin_model = model_cp_uv(self.uvcoords, seps[ii], cons[jj], angs[kk], 1.0/self.wavls)
+                    bin_model = model_cp_uv(self.uvcoords, seps[ii],\
+                                 cons[jj], angs[kk], 1.0/self.wavls)
                     randomize = bin_model + (errors*randnums)
                     for trial in range(ntrials):
                         # null and binary hyp here are 1-D length ntrials
-                    chi2null[kk,tt] = cp_binary_model([0,0,0], {"wavl":self.wavls}, priors, None, self.uvcoords, self.cp, self.cperr*randnum[:,:,trial], stat="chi2")
-                    chi2_grid = cp_binary_model([seps[ii], cons[jj], angs[kk]], {"wavl":self.wavls}, priors, None, self.uvcoords, self.cp, errors, stat="chi2")
+                    chi2null[kk,tt] = cp_binary_model([0,0,0], \
+                                     {"wavl":self.wavls}, priors, None, \
+                                     self.uvcoords, self.cp, \
+                                     self.cperr*randnum[:,:,trial], stat="chi2")
+                    chi2_grid = cp_binary_model([seps[ii], cons[jj], \
+                                     angs[kk]], {"wavl":self.wavls}, \
+                                     priors, None, self.uvcoords, self.cp,\
+                                     errors, stat="chi2")
                 diff = chi2_grid - chi2null
                 # How many detects for each separation & contrast
                 # Normalize by # of points
@@ -1101,8 +1292,10 @@ class BinaryAnalyze:
         colors = ['k', 'k', 'k', 'k']
         plt.figure()
         SEP, CON = np.meshgrid(self.seps, self.cons)
-        contours = plt.contour(SEP, CON, self.detec_grid, clevels, colors=colors, linewidth=2, \
-                               extent=[seplims[0], seplims[1], conlims[0], conlims[1]])
+        contours = plt.contour(SEP, CON, self.detec_grid, clevels,\
+                               colors=colors, linewidth=2, \
+                               extent=[seplims[0], seplims[1], \
+                                       conlims[0], conlims[1]])
         plt.yscale('log')
         plt.clabel(contours)
         plt.contourf(SEP, CON, self.detec_grid, clevels, cmap=plt.cm.bone)
@@ -1112,24 +1305,28 @@ class BinaryAnalyze:
         plt.title("Detection Limits")
 
         # pickle the data
-        savdata = {"clevels": clevels, "separations": self.seps, "angles":self.angs, \
-                   "contrasts":self.cons, "detections":self.detec_grid}
+        savdata = {"clevels": clevels, "separations": self.seps, \
+                   "angles":self.angs, "contrasts":self.cons, \
+                   "detections":self.detec_grid}
         if save:
             f = open(self.savedir+os.path.sep+"detection_limits.pick", "w")
             pickle.dump(savdata, f)
             f.close()
             plt.savefig(self.savedir+os.path.sep+"detection_limits.pdf")
-        plt.draw()
+        if self.plot=="on":
+            plt.draw()
 
     def grid_spectrum(self, sep, pa, ncon=100, conlims=[1.0e-3, 0.999], plot=True):
-        """ If the position is known (sep, pa), look for best contrast at each wavelength."""
+        """ If the position is known (sep, pa), look for best 
+            contrast at each wavelength."""
         nn = np.arange(ncon)
         r = (conlims[-1]/conlims[0])**(1 / float(ncon-1))
         self.cons = conlims[0] * r**(nn)
         cons = np.tile(self.cons, (self.nwav, 1))
         cons = np.rollaxis(cons, -1, 0)
         print "cons shape", cons.shape
-        uvcoords = np.rollaxis(np.rollaxis(np.rollaxis(np.tile(self.uvcoords, (ncon, 1, 1, 1, 1)), -2,0), -2, 0), -2, 0)
+        uvcoords = np.rollaxis(np.rollaxis(np.rollaxis(np.tile(self.uvcoords,\
+                               (ncon, 1, 1, 1, 1)), -2,0), -2, 0), -2, 0)
         print "uvcoords shape", uvcoords.shape
         print "Computing model cps over", ncon, "parameters."
         t1 = time.time()
@@ -1168,7 +1365,8 @@ class BinaryAnalyze:
 
     def correlation_plot(self, start=[0.16, 64, 219], bnds=50):
         """
-        A nice visualization to see how the data compares to model solutions. Plot is adjustable.
+        A nice visualization to see how the data compares 
+        to model solutions. Plot is adjustable.
 
         separation in mas, pa in degrees
         """
@@ -1176,14 +1374,15 @@ class BinaryAnalyze:
         fig, ax = plt.subplots()
         plt.subplots_adjust(left=0.25, bottom=0.25)
         plt.title("Model vs. Data")
-        plt.xlim(-50, 50)
-        plt.ylim(-50, 50)
+        plt.xlim(-bnds, bnds)
+        plt.ylim(-bnds, bnds)
 
         priors = np.array([(-np.inf, np.inf) for f in range( len(start) ) ])
         #constant = {'wavl':self.wavls}
 
         # Data and model both have shape ncp, nwav
-        modelcps = model_cp_uv(self.uvcoords, start[0], start[1], start[2], 1.0/self.wavls)
+        modelcps = model_cp_uv(self.uvcoords, start[0], start[1],\
+                               start[2], 1.0/self.wavls)
         #print "model shape:"
         #print modelcps.shape
         #print type(modelcps)
@@ -1216,7 +1415,8 @@ class BinaryAnalyze:
             sep = ssep.val
             print "separation:", sep
             newparams = [cratio, sep, theta]
-            modelcps = model_cp_uv(self.uvcoords, cratio, sep, theta, 1.0/self.wavls)
+            modelcps = model_cp_uv(self.uvcoords, cratio, \
+                                   sep, theta, 1.0/self.wavls)
             l.set_ydata(modelcps)
             fig.canvas.draw_idle()
         sang.on_changed(update)
@@ -1240,7 +1440,9 @@ class BinaryAnalyze:
 
         plt.show()
 
-    def run_emcee(self, params, constant={}, nwalkers = 250, niter = 1000, spectrum_model=None, priors=None, threads=4, scale=1.0, show=True):
+    def run_emcee(self, params, constant={}, nwalkers = 250, \
+                  niter = 1000, spectrum_model=None, priors=None, \
+                  threads=4, scale=1.0, observables="cp", show=True):
         """
         A lot of options in this method, read carefully.
 
@@ -1278,7 +1480,28 @@ class BinaryAnalyze:
 
         t0 = time.time()
         #print "nwalkers", nwalkers, "args", self.constant, self.priors, self.spectrum_model, self.uvcoords, self.cp, self.cperr
-        self.sampler = emcee.EnsembleSampler(nwalkers, self.ndim, cp_binary_model, threads=threads, args=[self.constant, self.priors, self.spectrum_model, self.uvcoords, self.cp, scale*self.cperr])
+        if observables == "cp":
+            self.sampler = emcee.EnsembleSampler(nwalkers, self.ndim, cp_binary_model, threads=threads, args=[self.constant, self.priors, self.spectrum_model, self.uvcoords, self.cp, scale*self.cperr])
+        elif observables == "all":
+            self.sampler = emcee.EnsembleSampler(nwalkers, self.ndim, \
+                            allvis_binary_model, threads=threads, \
+                            args=[self.constant, self.priors, self.spectrum_model, self.uvcoords, \
+                            self.cp, scale*self.cperr, self.t3amp, scale*self.t3amperr])
+        elif observables == "v2":
+            self.sampler = emcee.EnsembleSampler(nwalkers, self.ndim, v2_binary_model, threads=threads, args=[self.constant, self.priors, self.spectrum_model, self.uvcoords_vis, self.v2, scale*self.v2err])
+        elif observables == "multiple_all":
+            self.sampler = emcee.EnsembleSampler(nwalkers, self.ndim, \
+                            bispec_multi_model, threads=threads, \
+                            args=[self.constant, self.priors, self.spectrum_model, self.uvcoords, \
+                            self.cp, scale*self.cperr, self.t3amp, scale*self.t3amperr])
+        elif observables == "multiple_cp":
+            self.sampler = emcee.EnsembleSampler(nwalkers, self.ndim, \
+                            cp_multi_model, threads=threads, \
+                            args=[self.constant, self.priors, self.spectrum_model, self.uvcoords, \
+                            self.cp, scale*self.cperr])
+        else:
+            print "invalid choice of observable:", observables,
+            print "options are 'cp', 'v2', and 'all'"
 
         pos, prob, state = self.sampler.run_mcmc(p0, 100)
         self.sampler.reset()
@@ -1301,9 +1524,9 @@ class BinaryAnalyze:
             self.mcmc_results[key] = self.chain[:,ii]
             mean = np.mean(self.mcmc_results[key])
             err = np.std(self.mcmc_results[key])
-            if key=="sep":
+            if "sep" in key:
                 print key, ":", mean, "+/-", err, "mas"
-            elif key=="pa":
+            elif "pa" in key:
                 print key, ":", mean, "+/-", err, "deg"
             else:
                 print key, ":", mean, "+/-", err
@@ -1322,11 +1545,17 @@ class BinaryAnalyze:
         # 3. contrast_min, slope -- 2 parameters (position is given as constant)
         # 4. nwav different contrasts - nwav parameters (position is given as constant)
         if self.spectrum_model==None:
-            guess = np.zeros(len(self.params))
-            guess[0] = self.params['con']
-            guess[1] = self.params['sep']
-            guess[2] = self.params['pa']
-            self.keys = ['con', 'sep', 'pa']
+            ncomp = np.size(self.params[self.params.keys()[0]])
+            guess = np.zeros(len(self.params)*ncomp)
+            guess[0::3] = self.params['con']
+            guess[1::3] = self.params['sep']
+            guess[2::3] = self.params['pa']
+            if len(guess) == 3:
+                self.keys = ['con', 'sep', 'pa']
+            else:
+                self.keys = []
+                self.keys = sum([self.keys+['con_{0}'.format(f), 'sep_{0}'.format(f),'pa_{0}'.format(f)] \
+                             for f in range(ncomp)], [])
         elif self.spectrum_model=="slope":
             guess = np.zeros(len(self.params))
             guess[0] = self.params['con']
@@ -1335,17 +1564,20 @@ class BinaryAnalyze:
             guess[3] = self.params["pa"]
             self.keys = ['con', 'slope','sep', 'pa']
         elif self.spectrum_model == "free":
-            guess = self.params["con"] # here con is given as an array size nwav
+            guess = np.array([self.params["con"]]) # here con is given as an array size nwav
             self.keys = ['wl_{0:02d}'.format(f) for f in range(len(guess))]
         else:
             print "invalid spectrum_model set"
+        print "keys", self.keys
+        print "params", guess
         return guess
     def corner_plot(self, fn):
         import corner
         plt.figure(1)
         fig = corner.corner(self.chain, labels = self.keys, bins = 200, show_titles=True)
         plt.savefig(self.savedir+fn)
-        plt.show()
+        if self.plot=="on":
+            plt.show()
         return None
         
     def plot_chain_convergence(self):
@@ -1420,6 +1652,177 @@ def cp_binary_model(params, constant, priors, spectrum_model, uvcoords, cp, cper
     elif stat == "chi2":
         return chi2stat
 
+def v2_binary_model(params, constant, priors, spectrum_model, uvcoords, v2, v2err, stat="loglike"):
+    # really want to be able to give this guy some general oi_data and have bm() sort it out.
+    # Need to figure out how to add in the priors
+
+    ##################################################
+    # HOW DO I TUNE THIS DEPENDING ON MY OBSERVATIONS? - need a keyword or something, need help.
+    # data = self.cp, self.cperr#, self.v2, self.v2err
+    ##################################################
+
+    # priors, i.e. bounds here
+    # constant
+    # uvcoords
+    # cp
+    # cperr
+
+    for i in range(len(params)):
+        if (params[i] < priors[i][0] or params[i] > priors[i][1]):  
+            return -np.inf
+
+    if spectrum_model == None:
+
+        # Model from params
+        #model_cp = model_cp_uv(self.uvcoords, params['con'], params['sep'], \
+        #                   params['pa'], 1.0/self.constant['wavl'])
+        model_v2 = model_v2_uv(uvcoords, params[0], params[1], \
+                            params[2], 1.0/constant['wavl'])
+    elif spectrum_model == 'slope':
+        # params needs 'con_start' starting contrast and 'slope,' sep & pa constant?
+        wav_step = constant['wavl'][1] - constant['wavl'][0]
+        # contrast model is con_start + slope*delta_lambda
+        contrast = params[0] + params[1]*wav_step
+        # Model from params
+        model_v2 = model_v2_uv(uvcoords, contrast, params[2], \
+                            params[3], 1.0/constant['wavl'])
+    elif spectrum_model == 'free' :
+        # Model from params - params is contrast array nwav long, sep & pa constant
+        model_v2 = model_v2_uv(uvcoords, params, constant['sep'], \
+                            constant['pa'], 1.0/constant['wavl'])
+    else:
+        sys.exit("Invalid spectrum model")
+
+    chi2stat = reduced_chi2(v2, v2err, model_v2, 34.0)
+    ll = logl(v2, v2err, model_v2)
+    if stat == "loglike":
+        return ll
+    elif stat == "chi2":
+        return chi2stat
+
+def allvis_binary_model(params, constant, priors, spectrum_model, uvcoords, \
+                        cp, cperr, vis, viserr, stat="loglike", dof = 1):
+    """
+    For now, writing a new function to do this with both cps and bisectrum visibilities
+    """
+    for i in range(len(params)):
+        if (params[i] < priors[i][0] or params[i] > priors[i][1]):  
+            return -np.inf
+
+    if spectrum_model == None:
+
+        # Model from params
+        model_cp = model_cp_uv(uvcoords, params[0], params[1], \
+                           params[2], 1.0/constant['wavl'])
+        model_vis = model_t3amp_uv(uvcoords, params[0], params[1], \
+                           params[2], 1.0/constant['wavl'])
+        #model_cp, model_vis = model_allvis_uv(uvcoords, uvcoords_vis, params[0], params[1], \
+        #                    params[2], 1.0/constant['wavl'])
+
+        model = np.zeros((model_cp.shape[0] + model_vis.shape[0], model_cp.shape[1]))
+        model[:model_cp.shape[0],...] = model_cp
+        model[model_cp.shape[0]:,...] = model_vis
+    else:
+        sys.exit("Invalid spectrum model")
+
+    allvisobs = np.zeros((cp.shape[0]+vis.shape[0], cp.shape[1]))
+    allvisobserr = np.zeros((cp.shape[0]+vis.shape[0], cp.shape[1]))
+    allvisobs[:cp.shape[0], ...] = cp
+    allvisobs[cp.shape[0]:, ...] = vis
+    allvisobserr[:cp.shape[0], ...] = cperr
+    allvisobserr[cp.shape[0]:, ...] = viserr
+
+    if stat == "loglike":
+        ll = logl(allvisobs, allvisobserr, model)
+        return ll
+    elif stat == "chi2":
+        chi2stat = reduced_chi2(allvisobs, allvisobserr, model, dof)
+        return chi2stat
+
+def cp_multi_model(params, constant, priors, spectrum_model, uvcoords, \
+                        cp, cperr, stat="loglike", dof = 1):
+    """
+    For now, writing a new function to do this with both cps and bisectrum visibilities
+    """
+    for i in range(len(params)):
+        if (params[i] < priors[i%3][0] or params[i] > priors[i%3][1]):  
+            return -np.inf
+    # chop up the params by type input: [c1, s1, p1, c2, s2, p2, ...]
+    nsource = len(params) / 3
+    cons = params[0::3]
+    seps = params[1::3]
+    pas = params[2::3]
+    if spectrum_model == None:
+
+        # Model from params
+        model_cp, model_vis = model_bispec_uv(uvcoords, cons, seps, \
+                           pas, 1.0/constant['wavl'])
+        #model_cp = np.zeros(cp.shape)
+        #for q in range(nsource):
+        #    model_cp += model_cp_uv(uvcoords, cons[q], seps[q], pas[q], 1.0/constant['wavl'])
+
+        #model = np.zeros((model_cp.shape[0] + model_vis.shape[0], model_cp.shape[1]))
+        #model[:model_cp.shape[0],...] = model_cp
+        #model[model_cp.shape[0]:,...] = model_vis
+    else:
+        sys.exit("Invalid spectrum model")
+
+    """
+    allvisobs = np.zeros((cp.shape[0]+vis.shape[0], cp.shape[1]))
+    allvisobserr = np.zeros((cp.shape[0]+vis.shape[0], cp.shape[1]))
+    allvisobs[:cp.shape[0], ...] = cp
+    allvisobs[cp.shape[0]:, ...] = vis
+    allvisobserr[:cp.shape[0], ...] = cperr
+    allvisobserr[cp.shape[0]:, ...] = viserr
+    """
+
+    if stat == "loglike":
+        ll = logl(cp, cperr, model_cp)
+        return ll
+    elif stat == "chi2":
+        chi2stat = reduced_chi2(cp, cperr, model_cp, dof)
+        return chi2stat
+
+def bispec_multi_model(params, constant, priors, spectrum_model, uvcoords, \
+                        cp, cperr, vis, viserr, stat="loglike", dof = 1):
+    """
+    For now, writing a new function to do this with both cps and bisectrum visibilities
+    """
+    for i in range(len(params)):
+        if (params[i] < priors[i%3][0] or params[i] > priors[i%3][1]):  
+            return -np.inf
+
+    # chop up the params by type input: [c1, s1, p1, c2, s2, p2, ...]
+    nsource = len(params) / 3
+    cons = params[0::3]
+    seps = params[1::3]
+    pas = params[2::3]
+    if spectrum_model == None:
+
+        # Model from params
+        model_cp, model_vis = model_bispec_uv(uvcoords, cons, seps, \
+                           pas, 1.0/constant['wavl'])
+
+        model = np.zeros((model_cp.shape[0] + model_vis.shape[0], model_cp.shape[1]))
+        model[:model_cp.shape[0],...] = model_cp
+        model[model_cp.shape[0]:,...] = model_vis
+    else:
+        sys.exit("Invalid spectrum model")
+
+    allvisobs = np.zeros((cp.shape[0]+vis.shape[0], cp.shape[1]))
+    allvisobserr = np.zeros((cp.shape[0]+vis.shape[0], cp.shape[1]))
+    allvisobs[:cp.shape[0], ...] = cp
+    allvisobs[cp.shape[0]:, ...] = vis
+    allvisobserr[:cp.shape[0], ...] = cperr
+    allvisobserr[cp.shape[0]:, ...] = viserr
+
+    if stat == "loglike":
+        ll = logl(allvisobs, allvisobserr, model)
+        return ll
+    elif stat == "chi2":
+        chi2stat = reduced_chi2(allvisobs, allvisoberr, model, dof)
+        return chi2stat
+
 def get_data(self):
     # Move this function out, pass values to the object
     try:
@@ -1434,10 +1837,13 @@ def get_data(self):
     self.nwav = len(self.wavls)
     #self.ucoord = np.zeros((3, self.ncp))
     self.uvcoords = np.zeros((2, 3, self.ncp))#, self.nwav))
+    self.uvcoords_vis = np.zeros((2, self.nbl))
 
     # Now collect fringe observables and coordinates
     self.cp = np.zeros((self.ncp, self.nwav))
     self.cperr = np.zeros((self.ncp, self.nwav))
+    self.t3amp = np.zeros((self.ncp, self.nwav))
+    self.t3amperr = np.zeros((self.ncp, self.nwav))
     self.v2 = np.zeros((self.nbl, self.nwav))
     self.v2err = np.zeros((self.nbl, self.nwav))
     self.pha = np.zeros((self.nbl, self.nwav))
@@ -1456,10 +1862,13 @@ def get_data(self):
         #           -(self.oifdata.t3[ii].v1coord+self.oifdata.t3[ii].v2coord)
         self.cp[ii, :] = self.oifdata.t3[ii].t3phi
         self.cperr[ii, :] = np.sqrt(self.oifdata.t3[ii].t3phierr**2 + self.extra_error**2)
+        self.t3amp[ii, :] = self.oifdata.t3[ii].t3amp
+        self.t3amperr[ii, :] = np.sqrt(self.oifdata.t3[ii].t3amperr**2 + self.extra_error**2)
         self.uvcoords[0,:,ii] = self.oifdata.t3[ii].u1coord, self.oifdata.t3[ii].u2coord,\
                     -(self.oifdata.t3[ii].u1coord+self.oifdata.t3[ii].u2coord)
         self.uvcoords[1, :,ii] = self.oifdata.t3[ii].v1coord, self.oifdata.t3[ii].v2coord,\
                     -(self.oifdata.t3[ii].v1coord+self.oifdata.t3[ii].v2coord)
+        #self.t3vis[:,ii] = self.oifdata.vis2[]
     #print self.cp
     for jj in range(self.nbl):
         #self.v2[:,jj] = self.oifdata.vis2[jj].vis2data
@@ -1469,21 +1878,26 @@ def get_data(self):
         try:
             #self.pha[:,jj] = self.oifdata.vis[jj].visphi
             #self.phaerr[:,jj] = self.oifdata.vis[jj].visphierr
-            self.pha[jj, :] = self.oifdata.vis[jj].visphi
-            self.phaerr[jj, :] = self.oifdata.vis[jj].visphierr
+            self.pha[jj, :] = self.oifdata.vis[jj].vispha
+            self.phaerr[jj, :] = self.oifdata.vis[jj].visphaerr
+            self.cv = np.sqrt(self.v2)*np.exp(-1j*self.pha)
         except:
             pass
+        self.uvcoords_vis[0,jj] = self.oifdata.vis2[jj].ucoord
+        self.uvcoords_vis[1,jj] = self.oifdata.vis2[jj].vcoord
     # hack right now to take care of 0 values, set to some limit, 0.001 right now
-    floor = 0.001
+    floor = 0.00001
     self.cperr[self.cperr<floor] = self.cperr[self.cperr!=0.0].mean()
     self.phaerr[self.phaerr<floor] = self.phaerr[self.phaerr!=0.0].mean()
     self.v2err[self.v2err<floor] = self.v2err[self.v2err!=0.0].mean()
     
     # replicate the uv coordinates over the wavelength axis
     self.uvcoords = np.tile(self.uvcoords, (self.nwav, 1, 1, 1))
+    self.uvcoords_vis = np.tile(self.uvcoords_vis, (self.nwav, 1, 1))
     # Now uvcoords is shape (nwav, 2, 3, ncps)
     # So we move nwav axis to the end:
     self.uvcoords = np.rollaxis(self.uvcoords, 0, 4)
+    self.uvcoords_vis = np.rollaxis(self.uvcoords_vis, 0, 3)
     #for q in range(self.nwav-1):
     #   self.uvcoords[:,:,:,f] = self.uvcoords[:,:,:,0]
 
@@ -1536,14 +1950,17 @@ def assemble_cov_mat(self):
 def chi2_grid_loop(args):
     # Model from data, err, uvcoords, params, wavls
     p0, p1, p2 = args['params']
-    #print "In Loop:"
-    #print np.shape(p0)
-    #print np.shape(p1)
-    #print np.shape(p2)
-    #print np.shape(args['wavls'])
-    #print np.shape(args['uvcoords'])
     modelcps = np.rollaxis(model_cp_uv(args['uvcoords'], p0, p1, p2, 1/args['wavls']), 0, -1)
-    chi2 = np.sum( (modelcps - args['data'])**2 / args['error']**2, axis = (-1,-2))
+    chi2 = np.sum( (modelcps - args['data'])**2 / args['error']**2, axis = (-1,-2))/ args["dof"]
+    return chi2
+
+def chi2_grid_loop_all(args):
+    # Model from data, err, uvcoords, params, wavls
+    p0, p1, p2 = args['params']
+    modelcps = np.rollaxis(model_cp_uv(args['uvcoords'], p0, p1, p2, 1/args['wavls']), 0, -1)
+    modelt3 = np.rollaxis(model_t3amp_uv(args['uvcoords'], p0, p1, p2, 1/args['wavls']), 0, -1)
+    model = np.concatenate((modelcps, modelt3), axis=2)
+    chi2 = np.sum( (model - args['data'])**2 / args['error']**2, axis = (-1,-2))/ args["dof"]
     return chi2
 
 class DiskAnalyze:
