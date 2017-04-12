@@ -1134,7 +1134,7 @@ class BinaryAnalyze:
     def detection_limits(self, ntrials = 1, seplims = [20, 200],\
                          conlims = [0.0001, 0.99], anglims = [0,360],\
                          nsep = 24, ncon=24, nang=24, threads=4,\
-                         observables="cp", save=False, scale=1.0):
+                         observables="cp", save="", scale=1.0):
         """
         Inspired by pymask code.
         ntrials: Number of times we draw randomly
@@ -1179,7 +1179,8 @@ class BinaryAnalyze:
 
         # set up big uvcoordinate grid, keep wavelength axis at the end
         # should be shape (2, 3, ncp, nsep, ncon, nang, nwav)
-        uvcoords = np.rollaxis(np.rollaxis(np.rollaxis(np.tile(self.uvcoords, (nsep, ncon, nang, 1, 1, 1, 1)), -2,0), -2, 0), -2, 0)
+        uvcoords = np.rollaxis(np.rollaxis(np.rollaxis(np.tile(self.uvcoords, \
+                               (nsep, ncon, nang, 1, 1, 1, 1)), -2,0), -2, 0), -2, 0)
         print "Computing model cps over", nsep*ncon*nang, "parameters."
 
         # Set up some random errors to add in per trial
@@ -1217,7 +1218,8 @@ class BinaryAnalyze:
             """
             t3 = time.time()
             print "setting up the dictionary..."
-            store_dict = [{"self":self,"ntrials":ntrials, "model":modelcps, "randerrors":errors[i], "dataerrors":self.cperr} for i in range(len(errors))]
+            store_dict = [{"self":self,"ntrials":ntrials, "model":modelcps, \
+                           "randerrors":errors[i], "dataerrors":self.cperr} for i in range(len(errors))]
 
         elif observables=="all":
             randnums = np.random.randn(int(ntrials), \
@@ -1251,7 +1253,8 @@ class BinaryAnalyze:
 
             t3 = time.time()
             print "setting up the dictionary..."
-            store_dict = [{"self":self,"ntrials":ntrials, "model":model, "randerrors":errors[i], "dataerrors":allerrors} for i in range(len(errors))]
+            store_dict = [{"self":self,"ntrials":ntrials, "model":model, "randerrors":errors[i],\
+                           "dataerrors":allerrors} for i in range(len(errors))]
 
         t4 = time.time()
         print "dictionary took", t4-t3, "s to set up"
@@ -1286,33 +1289,39 @@ class BinaryAnalyze:
                 # Normalize by # of points
                 detec_grid[ii,jj] = (diff <0.0).sum() / float(ntrials*len(angs))
         """
-
-        # contour plot
+        # pickle the data
         clevels = [0.5, 0.9, 0.99, 0.999]
+        self.savdata = {"clevels": clevels, "separations": self.seps, \
+                   "angles":self.angs, "contrasts":self.cons, \
+                   "detections":self.detec_grid}
+        f = open(self.savedir+os.path.sep+save+"detection_limits.pick", "w")
+        pickle.dump(self.savdata, f)
+        f.close()
+        return self.savdata
+
+    def plot_deteclims(self, savdata, save = "", plot="off"):
+        # contour plot
+        clevels = savdata["clevels"]
+        seps = savdata["separations"]
+        cons = savdata["contrasts"]
+        angs = savdata["angles"]
+        detec_grid = savdata["detections"]
         colors = ['k', 'k', 'k', 'k']
         plt.figure()
-        SEP, CON = np.meshgrid(self.seps, self.cons)
-        contours = plt.contour(SEP, CON, self.detec_grid, clevels,\
+        SEP, CON = np.meshgrid(seps, cons)
+        contours = plt.contour(SEP, CON, detec_grid, clevels,\
                                colors=colors, linewidth=2, \
-                               extent=[seplims[0], seplims[1], \
-                                       conlims[0], conlims[1]])
+                               extent=[seps.min(), seps.max(), \
+                                       cons.min(), cons.max()])
         plt.yscale('log')
         plt.clabel(contours)
-        plt.contourf(SEP, CON, self.detec_grid, clevels, cmap=plt.cm.bone)
+        plt.contourf(SEP, CON, detec_grid, clevels, cmap=plt.cm.bone)
         plt.colorbar()
         plt.xlabel("Separation (mas)")
         plt.ylabel("Contrast Ratio")
         plt.title("Detection Limits")
 
-        # pickle the data
-        savdata = {"clevels": clevels, "separations": self.seps, \
-                   "angles":self.angs, "contrasts":self.cons, \
-                   "detections":self.detec_grid}
-        if save:
-            f = open(self.savedir+os.path.sep+"detection_limits.pick", "w")
-            pickle.dump(savdata, f)
-            f.close()
-            plt.savefig(self.savedir+os.path.sep+"detection_limits.pdf")
+        plt.savefig(self.savedir+os.path.sep+save+"detection_limits.pdf")
         if self.plot=="on":
             plt.draw()
 
