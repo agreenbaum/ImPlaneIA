@@ -144,10 +144,10 @@ def model_array(ctrs, lam, oversample, pitch, fov, d, centering ='PIXELCENTERED'
 	ffmodel.append(ffc.N * np.ones(ffc.size))
 	for q,r in enumerate(alist):
 		# r[0] and r[1] are holes i and j, x-coord: 0, y-coord: 1
-		ffc.ri = ctrs[r[0]]
-		ffc.rj = ctrs[r[1]]
-		ffs.ri = ctrs[r[0]]
-		ffs.rj = ctrs[r[1]]
+		ffc.ri = ctrs[int(r[0])]
+		ffc.rj = ctrs[int(r[1])]
+		ffs.ri = ctrs[int(r[0])]
+		ffs.rj = ctrs[int(r[1])]
 
 		# Sept 2015 -- added in transpose to fix coordinate confusion
 		ffmodel.append( np.transpose(np.fromfunction(ffc, ffc.size)) )

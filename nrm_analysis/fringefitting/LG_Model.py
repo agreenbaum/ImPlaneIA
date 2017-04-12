@@ -193,9 +193,9 @@ class NRM_Model():
 			self.fov_sim = fov
 
 		if hasattr(centering, '__iter__'):
-			self.simhdr.update('XCTR', centering[0],\
+			self.simhdr['XCTR'] = (centering[0],\
 					'x center position on oversampled pixel')
-			self.simhdr.update('YCTR', centering[1],\
+			self.simhdr['YCTR'] = (centering[1],\
 					'y center position on oversampled pixel')
 		self.bandpass = bandpass
 		if over is not None:
@@ -204,27 +204,26 @@ class NRM_Model():
 			over = 1
 		#if self.over == None:
 		#	self.over=over
-		self.simhdr.update('PIXWGHT', False, "True or false, whether there is "+\
-					"sub-pixel weighting")
+		self.simhdr['PIXWGHT']= (False, "True or false, whether there is sub-pixel weighting")
 		if pixweight is not None:
 			over=self.pixweight.shape[0]
 			self.simhdr['PIXWGHT'] = True
 		else:
 			self.simhdr['PIXWGHT'] = True
-		self.simhdr.update('OVER', over, 'oversampling')
+		self.simhdr['OVER'] = (over, 'oversampling')
 
 		if rotate:
 			self.rotate=rotate
 			self.rotctrs = analyticnrm2.rotatevectors(self.ctrs, self.rotate)
-			self.simhdr.update('ROTRAD', self.rotate, "rotation in radians")
+			self.simhdr['ROTRAD'] = (self.rotate, "rotation in radians")
 		else:
 			self.rotctrs= self.ctrs
-			self.simhdr.update('ROTRAD', 0, "rotation in radians")
+			self.simhdr['ROTRAD'] = (0, "rotation in radians")
 		if pixel==None:
 			self.pixel_sim = self.pixel
 		else:
 			self.pixel_sim = pixel
-		self.simhdr.update('PIXSCL', self.pixel_sim, 'Pixel scale in radians')
+		self.simhdr['PIXSCL'] = (self.pixel_sim, 'Pixel scale in radians')
 
 		# The polychromatic case:
 		if hasattr(self.bandpass, '__iter__'):
@@ -242,14 +241,14 @@ class NRM_Model():
 							self.phi, \
 						       centering = centering, \
 							shape=self.holeshape)
-				self.simhdr.update("WAVL{0}".format(qq), l, "wavelength (m)")
-				self.simhdr.update("WGHT{0}".format(qq), w, "weight")
+				self.simhdr["WAVL{0}".format(qq)] = (l, "wavelength (m)")
+				self.simhdr["WGHT{0}".format(qq)] = (w, "weight")
 				qq=qq+1
 			self.logger.debug("BINNING UP TO PIXEL SCALE")
 		# The monochromatic case if bandpass input is a single wavelength
 		else:
 			self.lam=bandpass
-			self.simhdr.update("WAVL", self.lam,"Wavelength (m)")
+			self.simhdr["WAVL"] = (self.lam,"Wavelength (m)")
 			print  "Got one wavelength. Simulating monochromatic ... "
 			self.logger.debug("Calculating Oversampled PSF")
 			self.psf_over = analyticnrm2.PSF(self.pixel_sim, self.fov_sim, 
@@ -628,7 +627,7 @@ class NRM_Model():
 				# -------------------------------
 				if fitswrite:
 					temphdu = fits.PrimaryHDU(data=psf, header=self.simhdr)
-					temphdu.header.update("pixscale", self.test_pixscale, 
+					temphdu.header["pixscale"] = (self.test_pixscale, 
 								"pixel scale (rad)")
 					temphdu.writeto(self.datapath+self.refdir+\
 						"refpsf_pixscl{0}.fits".format(self.test_pixscale), 
@@ -689,8 +688,7 @@ class NRM_Model():
 				# -------------------------------
 				if fitswrite:
 					temphdu = fits.PrimaryHDU(data=psf, header=self.simhdr)
-					temphdu.header.update("pixscale", \
-						self.pixscale_optimal, \
+					temphdu.header["pixscale"] = (self.pixscale_optimal, \
 						"pixel scale (rad)")
 					temphdu.writeto(self.datapath+self.refdir+\
 						"refpsf_rot{0}_pixel{1}.fits".format(rad, 
@@ -750,7 +748,7 @@ class NRM_Model():
 			self.simulate(fov=_npix, over=self.over, bandpass=self.bandpass)
 
 			hdulist=fits.PrimaryHDU(data=self.psf_over)
-			hdulist.header.update("", "", "Written from auto_find_center method")
+			hdulist.header[""] = ("", "Written from auto_find_center method")
 			#hdulist.header.update()
 			hdulist.writeto(self.datapath+modelfitsname, clobber=True)
 		else:
