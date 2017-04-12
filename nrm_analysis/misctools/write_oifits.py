@@ -14,7 +14,7 @@ import datetime
 from scipy.misc import comb
 from mask_definitions import NRM_mask_definitions
 import sys,os
-from nrm_analysis.misctools.utils import flip, rotatevectors
+from nrm_analysis.misctools.utils import flip, rotatevectors, t3vis, t3err
 
 def count_bls(ctrs):
     N = len(ctrs)
@@ -35,7 +35,7 @@ def count_bls(ctrs):
 
 def count_cps(ctrs):
     N = len(ctrs)
-    ncps = comb(N,3)
+    ncps = int(comb(N,3))
     cp_label = np.zeros((ncps, 3))
     u1 = np.zeros(ncps)
     v1 = np.zeros(ncps)
@@ -71,20 +71,20 @@ def populate_symmamparray(blamp, N=7):
     return fringeamparray
 
 def get_t3ampdata(v2s, v2errs, N = 10):
-    v2array = populate_symmamparray(v2s, N=N)
-    v2errarray = populate_symmamparray(v2errs, N=N)
+    varray = populate_symmamparray(np.sqrt(v2s), N=N)
+    verrarray = populate_symmamparray(np.sqrt(v2errs), N=N)
     t3amps = np.zeros(int(comb(N,3)))
     t3amperr = np.zeros(int(comb(N,3)))
     nn=0
     for kk in range(N-2):
         for ii in range(N-kk-2):
             for jj in range(N-kk-ii-2):
-                t3amps[nn+jj] = v2array[kk, ii+kk+1] *\
-                       v2array[ii+kk+1, jj+ii+kk+2] *\
-                       v2array[jj+ii+kk+2, kk]
-                t3amperr[nn+jj] = np.sqrt(v2errarray[kk,ii+kk+1]**2 +\
-                       v2errarray[ii+kk+1, jj+ii+kk+2]**2 +\
-                       v2errarray[jj+ii+kk+2, kk]**2 )
+                t3amps[nn+jj] = varray[kk, ii+kk+1] *\
+                       varray[ii+kk+1, jj+ii+kk+2] *\
+                       varray[jj+ii+kk+2, kk]
+                t3amperr[nn+jj] = np.sqrt(verrarray[kk,ii+kk+1]**2 +\
+                       verrarray[ii+kk+1, jj+ii+kk+2]**2 +\
+                       verrarray[jj+ii+kk+2, kk]**2 )
             nn = nn+jj+1
     return t3amps, t3amperr
 
@@ -116,8 +116,8 @@ class OIfits():
             self.datapath = ''
 
         self.N = len(nrmobj.ctrs)   
-        self.nbl = self.N*(self.N-1)/2
-        self.ncps = comb(self.N,3)
+        self.nbl = int(self.N*(self.N-1)/2)
+        self.ncps = int(comb(self.N,3))
         # Parse through kwdict to see what user decided to specify
         try:
             self.ra = kwdict['RA']
@@ -247,6 +247,9 @@ class OIfits():
             else:
                 for qq,wl in enumerate(self.wls):
                     self.t3phi[qq,:], self.t3phierr[qq,:] = read_in(self.datapath, wl=qq,kw='cp')
+            for elem in range(self.t3amp.shape[0]):
+                self.t3amp[elem,:] = t3vis(np.sqrt(self.v2[elem,:]), N=self.N)
+                self.t3amperr[elem,:] = t3err(self.v2_err[elem, :], N=self.N)
         # or user can give the arrays as kwargs
         else:
             #self.wls = kwargs["wls"] # satisfied by wavextension
@@ -273,13 +276,18 @@ class OIfits():
 
 
         # T3 AMP data from V2 arrays
-        self.t3amp = self.t3phi.copy() #np.ones((self.nwav, self.ncps))
-        self.t3amperr = self.t3phierr.copy() #np.ones((self.nwav, self.ncps))
+        self.t3amp = 0*self.t3phi.copy()
+        self.t3amperr = 0*self.t3phierr.copy()
+        print self.t3amp.shape
+        for elem in range(self.t3amp.shape[0]):
+            self.t3amp[elem,:] = t3vis(np.sqrt(self.v2[elem,:]), N=self.N)#self.t3phi.copy() #np.ones((self.nwav, self.ncps))
+            self.t3amperr[elem,:] = t3err(self.v2_err[elem, :], N=self.N)#self.t3phierr.copy() #np.ones((self.nwav, self.ncps))
         #for qq,wl in enumerate(self.wls):
         #   self.t3amp[qq,:], self.t3amperr[qq,:] = get_t3ampdata(np.sqrt(self.v2[qq,:]),\
         #                                   self.v2_err[qq,:], N=self.N)
 
         #print np.nan in np.isnan(self.v2)
+        #print "break?"
         for qq in range(self.nbl):
             vis2data = oifits.OI_VIS2(self.timeobs,self.int_time, self.v2[:,qq],\
                 self.v2_err[:,qq], self.v2flag[:,qq], self.ucoord[qq],\
@@ -295,8 +303,10 @@ class OIfits():
 
         #print 'oivis2 table set'
         self.oivis2 = np.array(self.oivis2)
-        self.oivis = np.array(self.oivis)
-        #print self.oivis2
+        #self.oivis = np.array(self.oivis)
+        "vis understood by oifits obj:"
+        #print self.oivis
+        print self.oivis2
 
             #print read_in(self.datapath, wl,kw='cp')
             # needs to be in degrees
@@ -319,7 +329,7 @@ class OIfits():
         self.oit3=np.array(self.oit3)
         print "cps understood by oifits obj:"
         print self.oit3
-
+        print self.oit3[2].t3amp, self.oit3[2].t3phi
 
     def wavextension(self, wls, eff_band, clip=None):#mode, fitsfile, clip=None):
         # The OI_WAVELENGTH table -- stores wavelength info
@@ -378,11 +388,16 @@ class OIfits():
         self.oif.target=self.oitarget
         self.oif.wavelength=self.wavs
         self.oif.vis2=self.oivis2
+        #self.oif.vis = self.oivis
         self.oif.t3=self.oit3
         # Add in vis array
         self.oif.vis=np.array([])
 
         self.oif.save(self.datapath+save_name)
+        # Check
+        f = oifits.open(self.datapath+save_name)
+        print "0th t3phi:", f.t3[0].t3phi
+        print "0th t3amp:", f.t3[0].t3amp
         return self.datapath+save_name
 
 if __name__ == "__main__":
