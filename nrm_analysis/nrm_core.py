@@ -1188,12 +1188,17 @@ class BinaryAnalyze:
         if observables=="cp":
             randnums = np.random.randn(int(ntrials), len(self.cp), int(self.nwav))
             # randomize* the measurement errors
+            # errors shape here is [ntrials, ncps, nwavs]
             errors = scale*self.cperr[None, ...]*randnums
-            errors = np.rollaxis(np.tile(self.cperr[None, ...]*randnums,\
-                                 (nsep, ncon, nang,1, 1, 1)),-3,0)
+            # errors shape here becomes [ntrials, nsep, ncon, nang, ncp, nwav]?
+            # ...which is way too many for multiwav data...
+            #errors = np.rollaxis(np.tile(self.cperr[None, ...]*randnums,\
+            #                     (nsep, ncon, nang,1, 1, 1)),-3,0)
             print "errors shape:", errors.shape
             t1 = time.time()
+            #modelcps is shape [ncp, nsep, ncon, nang, nwav]
             modelcps = model_cp_uv(uvcoords, cons, seps, angs, 1.0/self.wavls)
+            # now becomes [nsep, ncon, nang, ncp, nwav]
             modelcps = np.rollaxis(modelcps, 0, -1)
             t2 = time.time()
             #modelcps = np.rollaxis(pool.map(model_cp_uv(uvcoords, \
