@@ -1868,8 +1868,11 @@ def get_data(self):
         self.oifdata = oifits.open(self.oifitsfn)
     except:
         print "Unable to read oifits file"
-    self.avparang = self.oifdata.avparang
-    self.parang_range = self.oifdata.parang_range
+    try:
+        self.avparang = self.oifdata.avparang
+        self.parang_range = self.oifdata.parang_range
+    except:
+        print "oifits has no parang info, moving on..."
     self.telescope = self.oifdata.wavelength.keys()[0]
     self.ncp = len(self.oifdata.t3)
     self.nbl = len(self.oifdata.vis2)
