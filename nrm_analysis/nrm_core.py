@@ -1066,7 +1066,7 @@ class BinaryAnalyze:
                       "params":[self.cons[i],np.sqrt(ras**2+decs**2),180*np.arctan2(decs,ras)/np.pi], \
                       "wavls":self.wavls, "dof":self.cp.shape[0] - 3} for i in range(nstep)] 
             # Calc null chi^2
-            chi2_null = chi2_grid_loop({"params":[0,0,0],"data":self.cp, \
+            self.chi2_null = chi2_grid_loop({"params":[0,0,0],"data":self.cp, \
                                     "error":self.cperr, "uvcoords":uvcoords,\
                                      "wavls":self.wavls, "dof": self.cp.shape[0] - 3})
             if threads>0:
