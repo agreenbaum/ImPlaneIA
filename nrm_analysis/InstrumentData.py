@@ -31,7 +31,8 @@ class GPI:
 
         ARGUMENTS:
 
-        reffile - reference fits file gpi-pipeline reduced containing useful header info
+        reffile - one or a list of reference fits files 
+                  gpi-pipeline reduced containing useful header info
         
         """
 
@@ -48,23 +49,29 @@ class GPI:
         self.holeshape="circ"
 
         # Get info from reference file 
-        reffits = fits.open(reffile)
-        self.hdr0 = reffits[0].header
-        self.hdr1 = reffits[1].header
-        self.refdata = reffits[1].data
-        reffits.close()
+        self.hdr0 = []
+        self.hdr1 = []
+        self.refdata = []
+        if type(reffile)==str:
+            reffile = [reffile,]
+        for fn in reffile:
+            reffits = fits.open(fn)
+            self.hdr0.append(reffits[0].header)
+            self.hdr1.append(reffits[1].header)
+            self.refdata.append(reffits[1].data)
+            reffits.close()
         # instrument settings
-        self.mode = self.hdr0["DISPERSR"]
-        self.obsmode = self.hdr0["OBSMODE"]
+        self.mode = self.hdr0[0]["DISPERSR"]
+        self.obsmode = self.hdr0[0]["OBSMODE"]
         self.band = self.obsmode[-1] # K1 is two letters
         self.ref_imgs_dir = "refimgs_"+self.band+"/"
 
         # wavelength info: spect mode or pol more
         if "PRISM" in self.mode:
             # GPI's spectral mode
-            self.nwav = self.hdr1["NAXIS3"]
-            self.wls = np.linspace(self.hdr1["CRVAL3"], \
-                  self.hdr1["CRVAL3"]+self.hdr1['CD3_3']*self.nwav, self.nwav)*um
+            self.nwav = self.hdr1[0]["NAXIS3"]
+            self.wls = np.linspace(self.hdr1[0]["CRVAL3"], \
+                  self.hdr1[0]["CRVAL3"]+self.hdr1[0]['CD3_3']*self.nwav, self.nwav)*um
             self.eff_band = um*np.ones(self.nwav)*(self.wls[-1] - self.wls[0])/self.nwav
         elif "WOLLASTON" in self.mode:
             # GPI's pol mode. Will define this for the DIFFERENTIAL VISIBILITIES
@@ -86,17 +93,23 @@ class GPI:
 
         # Observation info
         self.telname= "GEMINI"
-        self.ra, self.dec = self.hdr0["RA"], self.hdr0["DEC"]
-        self.date = self.hdr0["DATE"]
+        self.ra, self.dec = self.hdr0[0]["RA"], self.hdr0[0]["DEC"]
+        self.date = self.hdr0[0]["DATE"]
         self.month = self.date[-5:-3]
         self.day = self.date[-2:]
         self.year = self.date[:4]
-        self.parang = self.hdr0["PAR_ANG"]
+        #self.parang = self.hdr0["PAR_ANG"]
         # AVPARANG added Aug 2 2016
-        self.parang = self.hdr1["AVPARANG"]
-        self.pa = self.hdr0["PA"]
-        self.objname = self.hdr0["OBJECT"]
-        self.itime = self.hdr1["ITIME"]
+        self.parangs = []
+        self.itime = []
+        for ii in range(len(reffile)):
+            self.parangs.append(self.hdr1[ii]["AVPARANG"])
+            self.itime.append(self.hdr1[ii]["ITIME"])
+        self.avparang = np.mean(self.parangs)
+        self.parang_range = abs(self.parangs[-1] - self.parangs[0])
+        self.totalinttime = np.sum(self.itime)
+        self.pa = self.hdr0[0]["PA"]
+        self.objname = self.hdr0[0]["OBJECT"]
 
         # Look for additional keyword arguments ?
     def read_data(self, fn):

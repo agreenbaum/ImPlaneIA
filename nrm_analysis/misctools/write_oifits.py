@@ -153,6 +153,10 @@ class OIfits():
         except:
             self.parang = 0.0
         try:
+            self.parang_range = kwdict['PARANGRANGE']
+        except:
+            self.parang_range = 0.0
+        try:
             self.maskrotdeg = kwdict['maskrotdeg']
         except:
             print "no mask rotation"
@@ -392,6 +396,9 @@ class OIfits():
         self.oif.t3=self.oit3
         # Add in vis array
         self.oif.vis=np.array([])
+        # some extra keywords we'd like to hold onto
+        self.oif.avparang = self.parang
+        self.oif.parang_range = self.parang_range
 
         self.oif.save(self.datapath+save_name)
         # Check
