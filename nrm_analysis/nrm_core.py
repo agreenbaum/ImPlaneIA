@@ -1123,15 +1123,15 @@ class BinaryAnalyze:
             savestr = self.savedir+os.path.sep+self.oifitsfn.replace(".oifits", "")+"_chi2map.pick"
             f = open(savestr, "w")
             pickle.dump(savdata, f)
-        else
+        else:
             pass
 
         if self.plot=="on":
-            self.save_chi2map(savestr.replace(".pick", ".pdf")
+            self.save_chi2map(savestr.replace(".pick", ".pdf"))
 
         return bestparams
 
-    def save_chi2map(self, savestr="chi2map.pdf", show=False)
+    def save_chi2map(self, savestr="chi2map.pdf", show=False):
         
         plt.figure()
         plt.plot(nstep/2.0 -0.5,nstep/2.0 - 0.5, marker="*", color='w', markersize=20)
