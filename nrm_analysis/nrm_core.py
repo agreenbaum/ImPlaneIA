@@ -114,6 +114,10 @@ class FringeFitter:
             self.interactive = kwargs['interactive']
         else:
             self.interactive = True
+        if "save_txt_only" in kwargs:
+            self.save_txt_only = kwargs["save_txt_only"]
+        else:
+            self.save_txt_only = False
         #######################################################################
 
 
@@ -241,10 +245,18 @@ class FringeFitter:
 
     def save_output(self, slc, nrm):
         # cropped & centered PSF
-        fits.PrimaryHDU(data=self.ctrd, header=self.scihdr).writeto(self.savedir+\
-                self.sub_dir_str+"/centered_"+str(slc)+".fits", clobber=True)
+        if save_txt_only==False:
+            fits.PrimaryHDU(data=self.ctrd, header=self.scihdr).writeto(self.savedir+\
+                    self.sub_dir_str+"/centered_"+str(slc)+".fits", clobber=True)
 
-        model, modelhdu = nrm.plot_model(fits_true=1)
+            model, modelhdu = nrm.plot_model(fits_true=1)
+            # save to fits files
+            fits.PrimaryHDU(data=nrm.residual).writeto(self.savedir+\
+                        self.sub_dir_str+"/residual{0:02d}.fits".format(slc), clobber=True)
+            modelhdu.writeto(self.savedir+\
+                        self.sub_dir_str+"/modelsolution{0:02d}.fits".format(slc), clobber=True)
+        else:
+            print "NOT SAVING ANY FITS FILES. IF YOU WANT THESE, SET save_txt_only=False"
 
         # default save to text files
         np.savetxt(self.savedir+self.sub_dir_str+"/solutions_{0:02d}.txt".format(slc), nrm.soln)
@@ -257,12 +269,6 @@ class FringeFitter:
         if self.verbose_save:
             np.savetxt(self.savedir+self.sub_dir_str+"/condition_{0:02d}.txt".format(slc), nrm.cond)
             np.savetxt(self.savedir+self.sub_dir_str+"/flux_{0:02d}.txt".format(slc), nrm.flux)
-
-        # save to fits files
-        fits.PrimaryHDU(data=nrm.residual).writeto(self.savedir+\
-                    self.sub_dir_str+"/residual{0:02d}.fits".format(slc), clobber=True)
-        modelhdu.writeto(self.savedir+\
-                    self.sub_dir_str+"/modelsolution{0:02d}.fits".format(slc), clobber=True)
 
     def save_auto_figs(self, slc, nrm):
         # pixel scales
@@ -752,7 +758,8 @@ class Calibrate:
                 'object':self.instrument_data.objname,
                 'RA':self.instrument_data.ra, 
                 'DEC':self.instrument_data.dec, \
-                'PARANG':self.instrument_data.parang, 
+                'PARANG':self.instrument_data.avparang, 
+                'PARANGRANGE':self.instrument_data.parang_range,
                 'PA':self.instrument_data.pa, 
                 'phaseceil':self.phaseceil}
 
@@ -1078,7 +1085,7 @@ class BinaryAnalyze:
                       "params":[self.cons[i],np.sqrt(ras**2+decs**2),180*np.arctan2(decs,ras)/np.pi], \
                       "wavls":self.wavls, "dof":data.shape[0] - 3} for i in range(nstep)] 
             # Calc null chi^2
-            chi2_null = chi2_grid_loop_all({"params":[0,0,0],"data":data, \
+            self.chi2_null = chi2_grid_loop_all({"params":[0,0,0],"data":data, \
                                     "error":error, "uvcoords":uvcoords,\
                                      "wavls":self.wavls, "dof": data.shape[0] - 3})
             if threads>0:
@@ -1095,18 +1102,6 @@ class BinaryAnalyze:
         pool.terminate()
         print "took "+str(t3-t2)+"s to compute all chi^2 grid points"
 
-        plt.figure()
-        plt.plot(nstep/2.0 -0.5,nstep/2.0 - 0.5, marker="*", color='w', markersize=20)
-        #plt.imshow(np.min(self.chi2grid, axis=0).transpose(), cmap="cubehelix")
-        significance = chi2_null - np.min(self.chi2grid, axis=0).transpose()
-        significance[significance<0] = 0
-        plt.imshow(np.sqrt(significance), cmap="cubehelix")
-        plt.xlabel("RA (mas)")
-        plt.ylabel("DEC (mas)")
-        plt.xticks(np.linspace(0, nstep, 5), np.linspace(self.ras.min(), self.ras.max(), 4+1))
-        plt.yticks(np.linspace(0, nstep, 5), np.linspace(self.decs.min(), self.decs.max(), 4+1))
-        #plt.colorbar()
-
         chi2min = np.where(self.chi2grid == self.chi2grid.min())
         bestparams = np.array([self.cons[chi2min[0]][0], \
                                np.sqrt(self.ras[chi2min[1]]**2 + self.decs[chi2min[2]]**2)[0], \
@@ -1115,16 +1110,46 @@ class BinaryAnalyze:
         print "Best Separation:", np.sqrt(self.ras[chi2min[1]]**2 + self.decs[chi2min[2]]**2)
         print "Best PA:", np.arctan2(self.decs[chi2min[2]], self.ras[chi2min[1]])*180/np.pi
 
-        savdata = {"chi2grid":self.chi2grid, "ra":self.ras, "dec":self.decs, "con": self.cons}
-        if save:
-            f = open(self.savedir+os.path.sep+"chi2map.pick", "w")
-            pickle.dump(savdata, f)
+        self.significance = self.chi2_null - np.min(self.chi2grid, axis=0).transpose()
+        self.significance[significance<0] = 0
 
-        plt.savefig(self.savedir+"chi2map.pdf")
+        savdata = {"chi2grid":self.chi2grid, "ra":self.ras, "dec":self.decs, "con": self.cons,\
+                   "significance":self.significance}
+        if type(save)==str:
+            savestr = self.savedir+os.path.sep+save+"_chi2map.pick"
+            f = open(savestr, "w")
+            pickle.dump(savdata, f)
+        elif save==True:
+            savestr = self.savedir+os.path.sep+self.oifitsfn.replace(".oifits", "")+"_chi2map.pick"
+            f = open(savestr, "w")
+            pickle.dump(savdata, f)
+        else
+            pass
+
         if self.plot=="on":
+            self.save_chi2map(savestr.replace(".pick", ".pdf")
+
+        return bestparams
+
+    def save_chi2map(self, savestr="chi2map.pdf", show=False)
+        
+        plt.figure()
+        plt.plot(nstep/2.0 -0.5,nstep/2.0 - 0.5, marker="*", color='w', markersize=20)
+        #plt.imshow(np.min(self.chi2grid, axis=0).transpose(), cmap="cubehelix")
+        significance = self.chi2_null - np.min(self.chi2grid, axis=0).transpose()
+        significance[significance<0] = 0
+        plt.imshow(np.sqrt(self.significance), cmap="cubehelix")
+        plt.xlabel("RA (mas)")
+        plt.ylabel("DEC (mas)")
+        plt.xticks(np.linspace(0, nstep, 5), np.linspace(self.ras.min(), self.ras.max(), 4+1))
+        plt.yticks(np.linspace(0, nstep, 5), np.linspace(self.decs.min(), self.decs.max(), 4+1))
+        #plt.colorbar()
+
+        plt.savefig(self.savedir+savestr)
+        if show==True:
             plt.show()
         plt.clf()
-        return bestparams
+        return None
 
     def two_hyp_test():
         """
@@ -1843,6 +1868,8 @@ def get_data(self):
         self.oifdata = oifits.open(self.oifitsfn)
     except:
         print "Unable to read oifits file"
+    self.avparang = self.oifdata.avparang
+    self.parang_range = self.oifdata.parang_range
     self.telescope = self.oifdata.wavelength.keys()[0]
     self.ncp = len(self.oifdata.t3)
     self.nbl = len(self.oifdata.vis2)
