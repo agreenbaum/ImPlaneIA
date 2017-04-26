@@ -245,7 +245,7 @@ class FringeFitter:
 
     def save_output(self, slc, nrm):
         # cropped & centered PSF
-        if save_txt_only==False:
+        if self.save_txt_only==False:
             fits.PrimaryHDU(data=self.ctrd, header=self.scihdr).writeto(self.savedir+\
                     self.sub_dir_str+"/centered_"+str(slc)+".fits", clobber=True)
 
@@ -1111,7 +1111,7 @@ class BinaryAnalyze:
         print "Best PA:", np.arctan2(self.decs[chi2min[2]], self.ras[chi2min[1]])*180/np.pi
 
         self.significance = self.chi2_null - np.min(self.chi2grid, axis=0).transpose()
-        self.significance[significance<0] = 0
+        self.significance[self.significance<0] = 0
 
         savdata = {"chi2grid":self.chi2grid, "ra":self.ras, "dec":self.decs, "con": self.cons,\
                    "significance":self.significance}
