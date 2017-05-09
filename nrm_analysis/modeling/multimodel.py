@@ -31,7 +31,7 @@ def vis(baseline, ratio, separation, angle):
 
         alpha = mas2rad(separation[ii])*np.cos(np.pi*angle[ii]/180.0)
         delta = mas2rad(separation[ii])*np.sin(np.pi*angle[ii]/180.0)
-        visnum += ratio*(np.exp((-1j*2*np.pi*(alpha*u + delta*v))) )
+        visnum += ratio[ii]*(np.exp((-1j*2*np.pi*(alpha*u + delta*v))) )
     visibility = visnum / (1+ ratio.sum())
 
     phase = np.angle(visibility)
