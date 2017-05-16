@@ -94,7 +94,10 @@ class GPI:
         # Observation info
         self.telname= "GEMINI"
         self.ra, self.dec = self.hdr0[0]["RA"], self.hdr0[0]["DEC"]
-        self.date = self.hdr0[0]["DATE"]
+        try:
+            self.date = self.hdr0[0]["DATE"]
+        except:
+            self.date = self.hdr0[0]["DATE-OBS"]
         self.month = self.date[-5:-3]
         self.day = self.date[-2:]
         self.year = self.date[:4]
@@ -108,15 +111,21 @@ class GPI:
         self.avparang = np.mean(self.parangs)
         self.parang_range = abs(self.parangs[-1] - self.parangs[0])
         self.totalinttime = np.sum(self.itime)
-        self.pa = self.hdr0[0]["PA"]
-        self.objname = self.hdr0[0]["OBJECT"]
+        try:
+            self.pa = self.hdr0[0]["PA"]
+        except:
+            self.pa = 0.0
+        try:
+            self.objname = self.hdr0[0]["OBJECT"]
+        except:
+            self.objname = "Unknown"
 
         # Look for additional keyword arguments ?
     def read_data(self, fn):
 
         fitsfile = fits.open(fn)
-        sci=fitsfile['SCI'].data
-        hdr=fitsfile['SCI'].header
+        sci=fitsfile[1].data
+        hdr=fitsfile[1].header
         fitsfile.close()
         #fitshdr = fitsfile[0].header
         self.sub_dir_str = fn[-21:-10]

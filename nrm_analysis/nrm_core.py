@@ -467,9 +467,11 @@ class Calibrate:
                 if ii == 0:
                     self.cov_mat_tar = np.zeros((self.naxis2, nexps, nexps))
                     self.sigmasquared_tar = np.zeros((self.naxis2, nexps))
-                elif ii==1:
                     self.cov_mat_cal = np.zeros((self.naxis2, nexps, nexps))
                     self.sigmasquared_cal = np.zeros((self.naxis2, nexps))
+                #elif ii==1:
+                #    self.cov_mat_cal = np.zeros((self.naxis2, nexps, nexps))
+                #    self.sigmasquared_cal = np.zeros((self.naxis2, nexps))
                 else:
                     pass
 
@@ -748,6 +750,10 @@ class Calibrate:
             # default is no clipping - maybe could set instrument-dependent clip in future
             self.clip_wls = None
 
+        if not hasattr(self.instrument_data, "parang_range"):
+            self.instrument_data.parang_range = 0.0
+        if not hasattr(self.instrument_data, "avparang"):
+            self.instrument_data.avparang = 0.0
         self.obskeywords = {
                 'path':self.savedir+"/",
                 'year':self.instrument_data.year, 
@@ -1131,19 +1137,27 @@ class BinaryAnalyze:
 
         return bestparams
 
-    def save_chi2map(self, savestr="chi2map.pdf", show=False):
+    def plot_chi2map(self, savdata, savestr="chi2map.pdf", show=False):
+        #unpack everything
+        ras = savdata['ra']
+        decs = savdata['dec']
+        chi2grid = savdata['chi2grid']
+        cons = savdata['con']
+        significance = savdata['significance']
+        nstep = len(ras)
         
         plt.figure()
         plt.plot(nstep/2.0 -0.5,nstep/2.0 - 0.5, marker="*", color='w', markersize=20)
         #plt.imshow(np.min(self.chi2grid, axis=0).transpose(), cmap="cubehelix")
-        significance = self.chi2_null - np.min(self.chi2grid, axis=0).transpose()
-        significance[significance<0] = 0
-        plt.imshow(np.sqrt(self.significance), cmap="cubehelix")
+        #significance = self.chi2_null - np.min(self.chi2grid, axis=0).transpose()
+        #significance[significance<0] = 0
+        
+        plt.imshow(np.sqrt(significance), cmap="cubehelix", interpolation="nearest")
         plt.xlabel("RA (mas)")
         plt.ylabel("DEC (mas)")
-        plt.xticks(np.linspace(0, nstep, 5), np.linspace(self.ras.min(), self.ras.max(), 4+1))
-        plt.yticks(np.linspace(0, nstep, 5), np.linspace(self.decs.min(), self.decs.max(), 4+1))
-        #plt.colorbar()
+        plt.xticks(np.linspace(0, nstep, 5), np.linspace(ras.min(), ras.max(), 4+1))
+        plt.yticks(np.linspace(0, nstep, 5), np.linspace(decs.min(), decs.max(), 4+1))
+        plt.colorbar()
 
         plt.savefig(self.savedir+savestr)
         if show==True:
@@ -1382,7 +1396,9 @@ class BinaryAnalyze:
         t4 = time.time()
         self.con_spectrum = np.zeros((self.nwav, len(self.cons)))
         for ll in range(self.nwav):
-            chi2 = np.sum((model_cps[:,:,ll] - datacps[:,:,ll])**2 / (dataerror[:,:,ll]**2), axis=-1)
+            #dof = self.nwav*self.ncp - 1
+            fac = 1.0#(1/float(dof))
+            chi2 = fac*np.sum((model_cps[:,:,ll] - datacps[:,:,ll])**2 / (dataerror[:,:,ll]**2), axis=-1)
             minimum = chi2.min()
             #print "chi2:", chi2.shape
             self.con_spectrum[ll, :] = chi2#loglike
