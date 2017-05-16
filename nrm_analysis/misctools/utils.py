@@ -138,7 +138,11 @@ def rebin(a, shape): # Klaus P's fastrebin from web
     return a.reshape(sh).sum(-1).sum(1)
 """
 
-def centerit(img, r=img.shape[0]/2):
+def centerit(img, r='default'):
+    if r == 'default':
+        r = img.shape[0]-1 //2
+    else:
+        pass
 	print 'Before cropping:', img.shape
 	lo = 140-40
 	hi = 140+40
