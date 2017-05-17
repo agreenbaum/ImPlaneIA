@@ -292,8 +292,8 @@ class FringeFitter:
         modelhdu.writeto(self.savedir+\
                     self.sub_dir_str+"/modelsolution_{0:02d}.fits".format(slc), clobber=True)
         
-        if 1:            
-            # JSA save linearfit results
+        if nrm.linfit_result is not None:          
+            # save linearfit results to pickle file
             myPickleFile = os.path.join(self.savedir+self.sub_dir_str,"linearfit_result_{0:02d}.pkl".format(slc))
             pickle.dump( (nrm.linfit_result), open( myPickleFile , "wb" ) ) 
             if verbose:

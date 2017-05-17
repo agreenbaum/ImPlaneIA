@@ -218,13 +218,12 @@ def matrix_operations(img, model, flux = None, verbose=False):
         print "flat image dimensions ", np.shape(flatimg)
         print "transpose * image data dimensions", np.shape(data_vector)
         print "flat img * transpose dimensions", np.shape(inverse)
-
     
-    # JSA test
-    if 1:
-        sys.path.append('/Users/jsahlmann/jwst/code/github/linearfit')
-        import linearfit
+    
+    try:
+        import linearfit                    
         import os, pickle
+        
         # dependent variables
         M = np.mat(flatimg);
                 
@@ -235,7 +234,7 @@ def matrix_operations(img, model, flux = None, verbose=False):
         weights = np.where(np.abs(flatimg)<=1.0, 0.0, 1.0/(noise**2))
         
         # uniform weight
-#         weights = np.ones(len(flatimg))
+        #         weights = np.ones(len(flatimg))
         
         #       diagonal covariance matrix of dependent variables
         wy = weights        
@@ -255,7 +254,11 @@ def matrix_operations(img, model, flux = None, verbose=False):
 
         linfit_result = result
             
-    return x, res, cond , linfit_result
+        return x, res, cond , linfit_result
+
+    except ImportError:
+
+        return x, res, cond , None
 
 def weighted_operations(img, model, weights, verbose=False):
     # least squares matrix operations to solve A x = b, where A is the model, b is the data (image), and x is the coefficient vector we are solving for. In 2-D data x = inv(At.A).(At.b) 
