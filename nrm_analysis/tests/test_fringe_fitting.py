@@ -37,8 +37,8 @@ class FringeFittingTestCase(unittest.TestCase):
     def setUp(self):
     
         # setup parameters for simulation
-        verbose = 0
-        overwrite = 0
+        verbose = 1
+        overwrite = 1
 
         monochromatic_wavelength_m = 4.3e-6 
         mask = 'MASK_NRM'
