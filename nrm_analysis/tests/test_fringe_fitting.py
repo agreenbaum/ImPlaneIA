@@ -12,7 +12,19 @@ import sys
 sys.path.insert(0, os.path.join(os.path.dirname(__file__),'../'))
 sys.path.insert(0, os.path.join(os.path.dirname(__file__),'../../'))
 
+
+# print(sys.path)
+
+try:
+    import oifits
+    print('oifits successfully imported')
+except ImportError:
+    print('Module oifits not found. Please include it in your path')    
+    sys.exit()
+
+
 from nrm_analysis import nrm_core, InstrumentData
+
 
 
 arcsec2rad = u.arcsec.to(u.rad)
