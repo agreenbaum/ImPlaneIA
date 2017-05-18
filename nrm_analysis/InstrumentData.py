@@ -34,6 +34,11 @@ class GPI:
         reffile - one or a list of reference fits files 
                   gpi-pipeline reduced containing useful header info
         
+        optionally: 'gpifilterpath'
+                - Point to a directory which contains GPI filter files
+                  code will read in the relevant file and pick out a 
+                  sample of wavelengths and transmissions that span the
+                  list, to be used later to generate the model.
         """
 
         # only one NRM on GPI:
@@ -76,19 +81,52 @@ class GPI:
         elif "WOLLASTON" in self.mode:
             # GPI's pol mode. Will define this for the DIFFERENTIAL VISIBILITIES
             # diff vis: two channels 0/45 and 22/67
+
             self.nwav = 2
+
+            # Define the bands in case we use a tophat filter
             band_ctrs = {"Y":(1.14-0.95)*um/2., "J":(1.35-1.12)*um/2., \
                          "H":(1.80-1.50)*um/2., "1":(2.19-1.9)*um/2., \
                          "2":(2.4-2.13)*um/2.0}
             band_wdth = {"Y":(1.14-0.95)*um, "J":(1.35-1.12)*um, "H":(1.80-1.50)*um, \
                          "1":(2.19-1.9)*um, "2":(2.4-2.13)*um}
+            wghts = np.ones(15)
+            wavls = np.linspace(band_ctrs[self.band]-band_wdth[self.band]/2.0, \
+                                band_ctrs[self.band]+band_wdth[self.band]/2.0, num=15)
+
+            if 'gpifilterpath' in kwargs:
+                if self.band=="Y":
+                    filterfile = kwargs["gpifilterpath"]+"GPI-filter-Y.fits"
+                if self.band=="J":
+                    filterfile = kwargs["gpifilterpath"]+"GPI-filter-J.fits"
+                if self.band=="H":
+                    filterfile = kwargs["gpifilterpath"]+"GPI-filter-H.fits"
+                if self.band=="1":
+                    filterfile = kwargs["gpifilterpath"]+"GPI-filter-K1.fits"
+                if self.band=="2":
+                    filterfile = kwargs["gpifilterpath"]+"GPI-filter-K2.fits"
+                # Read in gpi filter file
+                fitsfilter = fits.open(filterfile)[1].data
+                wavls = []
+                wghts = []
+                # Sample the filter file so the filter is only 50 elements long
+                skip = len(fitsfilter[0][0]) / 50
+                for ii in range(len(fitsfilter[0][0])/skip):
+                    if fitsfilter[0][1][skip*ii]>0.7:
+                        wavls.append(fitsfilter[0][0][skip*ii]*1.0e-6)
+                        wghts.append(fitsfilter[0][1][skip*ii])
+
             lam_c = band_ctrs[self.band]
             lam_w = band_wdth[self.band]
-            self.wls = np.array([lam_c, lam_c])
+
+            transmission = np.array([[wghts[f], wavls[f]] for f in range(len(wghts))])
+            self.wls = [transmission, transmission]
             self.eff_band = np.array([lam_w, lam_w])
         else:
             sys.exit("Check your reference file header. "+\
                     "Keywork DISPERSR='{0}' not understood".format(self.mode))
+
+        # For OIFits structure
         self.wavextension = (self.wls, self.eff_band)
 
         # Observation info
