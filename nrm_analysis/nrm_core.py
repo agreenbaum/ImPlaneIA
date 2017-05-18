@@ -101,7 +101,7 @@ class FringeFitter:
         if "npix" in kwargs:
             self.npix = kwargs["npix"]
         else:
-            self.npix = 121
+            self.npix = 'default'
         if "debug" in kwargs:
             self.debug=kwargs["debug"]
         else:
@@ -145,8 +145,13 @@ class FringeFitter:
             pass
         #######################################################################
 
-        np.savetxt(self.savedir+"/coordinates.txt", self.instrument_data.mask.ctrs)
-        np.savetxt(self.savedir+"/wavelengths.txt", self.instrument_data.wavextension[0])
+        #--------------------------------------------------------------------------
+        #05/18 2017: commented these lines out because this should all be 
+        #            saved in the InstrumentData object (and it crashes for polz data
+        #            which is polychrom & has a 3rd axis.
+        #np.savetxt(self.savedir+"/coordinates.txt", self.instrument_data.mask.ctrs)
+        #np.savetxt(self.savedir+"/wavelengths.txt", self.instrument_data.wls[0])
+        #--------------------------------------------------------------------------
 
         #nrm = NRM_Model(mask = self.instrument_data.mask, pixscale = self.instrument_data.pscale_rad, over = self.oversample, holeshape=self.instrument_data.holeshape)
         #print nrm.holeshape
@@ -189,7 +194,9 @@ class FringeFitter:
                 nrm.bandpass = self.instrument_data.wls[slc]
                 #hdr['WAVL'] = wls[slc]
 
-                self.ctrd = utils.centerit(self.scidata[slc, :,:], r = self.npix//2)
+                if self.npix == 'default':
+                    self.npix = self.scidata[slc,:,:].shape[0]
+                self.ctrd = utils.centerit(self.scidata[slc, :,:], r = (self.npix -1)//2)
                 refslice = self.ctrd.copy()
                 if True in np.isnan(refslice):
                     refslice=utils.deNaN(5, self.ctrd)
