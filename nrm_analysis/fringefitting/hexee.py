@@ -3,7 +3,7 @@ import numpy as np
 from astropy.io import fits
 import os
 #import matplotlib.pyplot as pl
-DEBUG = True
+DEBUG = False
 """ Python implementation: anand@stsci.edu 6 Mar 2013
     Algorithm: eelliott@stsci.edu -  Applied Optics, Vol 44, No. 8 10 March 2005  Sabatke et al.
     Erin Elliott's analytical hexagon-aperture PSF, page 1361 equation 5

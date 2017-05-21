@@ -27,7 +27,8 @@ import analyticnrm2
 import subpix
 
 _default_log = logging.getLogger('NRM_Model')
-_default_log.setLevel(logging.INFO)
+#_default_log.setLevel(logging.INFO)
+_default_log.setLevel(logging.ERROR)
 
 """
 
@@ -67,9 +68,9 @@ Algorithm documented in
 Developed with NASA APRA (AS, AZG), NSF GRFP (AZG), NASA Sagan (LP), and French taxpayer (SL)  support
 
 """
-phi_nb = np.array( [0.028838669455909766, -0.061516214504502634, 0.12390958557781348, \
-            -0.020389361461019516, 0.016557347248600723, -0.03960017912525625, \
-            -0.04779984719154552] ) # phi in waves
+phi_nb = np.array( [0.028838669455909766, -0.061516214504502634, \
+     0.12390958557781348, -0.020389361461019516, 0.016557347248600723, \
+    -0.03960017912525625, -0.04779984719154552] ) # phi in waves
 # define phi at the center of F430M band:
 phi_nb = phi_nb *4.3e-6 # phi_nb in m
 m = 1.0
@@ -79,10 +80,6 @@ um = 1.0e-6 * m
 def mas2rad(mas):
     rad = mas*(10**(-3)) / (3600*180/np.pi)
     return rad
-
-def load():
-    """Loads NRM_Model data"""
-    return None
 
 class NRM_Model():
 
@@ -482,8 +479,9 @@ class NRM_Model():
             self.soln, self.residual = leastsqnrm.weighted_operations(image, \
                         self.fittingmodel, weights=self.weighted)
         else:
-            self.soln, self.residual, self.cond = leastsqnrm.matrix_operations(image, \
-                                    self.fittingmodel)
+            self.soln, self.residual, self.cond,self.linfit_result = \
+                leastsqnrm.matrix_operations(image, self.fittingmodel, \
+                                             verbose=False)
         print "NRM_Model Raw Soln:", self.soln
         self.rawDC = self.soln[-1]
         self.flux = self.soln[0]
