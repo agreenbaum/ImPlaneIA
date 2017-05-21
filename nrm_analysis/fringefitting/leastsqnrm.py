@@ -186,8 +186,11 @@ def matrix_operations(img, model, flux = None, verbose=False):
 	flatmodel_nan = model.reshape(np.shape(model)[0] * np.shape(model)[1], np.shape(model)[2])
 	#flatmodel = model.reshape(np.shape(model)[0] * np.shape(model)[1], np.shape(model)[2])
 	flatmodel = np.zeros((len(flatimg), np.shape(model)[2]))
-	print "flat model dimensions ", np.shape(flatmodel)
-	print "flat image dimensions ", np.shape(flatimg)
+
+    if verbose:
+        print "flat model dimensions ", np.shape(flatmodel)
+        print "flat image dimensions ", np.shape(flatimg)
+
 	for fringe in range(np.shape(model)[2]):
 		flatmodel[:,fringe] = np.delete(flatmodel_nan[:,fringe], nanlist)
 	# At (A transpose)
@@ -215,8 +218,41 @@ def matrix_operations(img, model, flux = None, verbose=False):
 		print "transpose * image data dimensions", np.shape(data_vector)
 		print "flat img * transpose dimensions", np.shape(inverse)
 
+    try: 
+        import linearfit
+        import os, pickle
+
+        # dependent variables
+        M = np.mat(flatimg)
+
+        # photon noise
+        noise = np.sqrt(np.abs(flatimg))
+
+        # this sets the weights of pixels fulfilling condition to zero
+        weights = np.where(np.abs(flatimg)<=1.0, 0.0, 1.0/(noise**2))    
+
+        # uniform weight
+        wy = weights
+        S = np.mat(np.diag(wy));
+        # matrix of independent variables
+        C = np.mat(flatmodeltranspose)
+
+        # initialize object
+        result = linearfit.LinearFit(M,S,C)
+
+        # do the fit
+        result.fit()
+
+        # delete inverse_covariance_matrix to reduce size of pickled file
+        result.inverse_covariance_matrix = []
+
+        linfit_result = result
+    except:
+        linfit_result = None
+        if verbose:
+            print "linearfit module not imported, no covariances saved."
 	
-	return x, res, cond
+	return x, res, cond, linfit_result
 
 def weighted_operations(img, model, weights, verbose=False):
 	# least squares matrix operations to solve A x = b, where A is the model, b is the data (image), and x is the coefficient vector we are solving for. In 2-D data x = inv(At.A).(At.b) 
