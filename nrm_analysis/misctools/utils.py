@@ -726,7 +726,7 @@ def baselinify(ctrs):
 def count_cps(ctrs):
     from scipy.misc import comb
     N = len(ctrs)
-    ncps = comb(N,3)
+    ncps = int(comb(N,3))
     cp_label = np.zeros((ncps, 3))
     u1 = np.zeros(ncps)
     v1 = np.zeros(ncps)
