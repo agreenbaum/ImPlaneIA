@@ -148,7 +148,7 @@ class FringeFitter:
         #--------------------------------------------------------------------------
         #05/18 2017: commented these lines out because this should all be 
         #            saved in the InstrumentData object (and it crashes for polz data
-        #            which is polychrom & has a 3rd axis.
+        #            which is polychrom & has a 3rd axis).
         #np.savetxt(self.savedir+"/coordinates.txt", self.instrument_data.mask.ctrs)
         #np.savetxt(self.savedir+"/wavelengths.txt", self.instrument_data.wls[0])
         #--------------------------------------------------------------------------
@@ -163,10 +163,27 @@ class FringeFitter:
         #if self.debug==True:
         #    import poppy.matrixDFT as mft
 
-    def fit_fringes(self, fns):
+    ###
+    # May 2017 J Sahlmann updates: parallelized fringe-fitting!
+    ###
+
+    def fit_fringes(self, fns, threads = 0):
         if type(fns) == str:
             fns = [fns, ]
 
+        # Can get fringes for images in parallel
+        store_dict = [{"object":self, "file":self.datadir+"/"+fn,"id":jj} \
+                        for jj,fn in enumerate(fns)]
+
+        t2 = time.time()
+        for jj, fn in enumerate(fns):
+            fit_fringes_parallel({"object":self, "file": self.datadir+"/"+fn,\
+                                  "id":jj}, threads)
+        t3 = time.time()
+        print "Parallel with {0} threads took {1}s to fit all fringes".format(\
+               threads, t3-t2)
+
+        '''
         for fn in fns:
             self.scidata, self.scihdr = self.instrument_data.read_data(self.datadir+"/"+fn)
 
@@ -249,33 +266,46 @@ class FringeFitter:
                     plt.show()
                 
                 self.save_output(slc, nrm)
+        '''
+
 
     def save_output(self, slc, nrm):
         # cropped & centered PSF
         if self.save_txt_only==False:
-            fits.PrimaryHDU(data=self.ctrd, header=self.scihdr).writeto(self.savedir+\
-                    self.sub_dir_str+"/centered_"+str(slc)+".fits", clobber=True)
+            fits.PrimaryHDU(data=self.ctrd, \
+                    header=self.scihdr).writeto(self.savedir+\
+                    self.sub_dir_str+"/centered_{0}.fits".format(slc), \
+                    overwrite=True)
 
             model, modelhdu = nrm.plot_model(fits_true=1)
             # save to fits files
             fits.PrimaryHDU(data=nrm.residual).writeto(self.savedir+\
-                        self.sub_dir_str+"/residual{0:02d}.fits".format(slc), clobber=True)
+                        self.sub_dir_str+"/residual_{0:02d}.fits".format(slc), \
+                        overwrite=True)
             modelhdu.writeto(self.savedir+\
-                        self.sub_dir_str+"/modelsolution{0:02d}.fits".format(slc), clobber=True)
+                        self.sub_dir_str+"/modelsolution_{0:02d}.fits".format(slc),\
+                        overwrite=True)
         else:
-            print "NOT SAVING ANY FITS FILES. IF YOU WANT THESE, SET save_txt_only=False"
+            print "NOT SAVING ANY FITS FILES. SET save_txt_only=False TO SAVE."
 
         # default save to text files
-        np.savetxt(self.savedir+self.sub_dir_str+"/solutions_{0:02d}.txt".format(slc), nrm.soln)
-        np.savetxt(self.savedir+self.sub_dir_str+"/phases_{0:02d}.txt".format(slc), nrm.fringephase)
-        np.savetxt(self.savedir+self.sub_dir_str+"/amplitudes_{0:02d}.txt".format(slc), nrm.fringeamp)
-        np.savetxt(self.savedir+self.sub_dir_str+"/CPs_{0:02d}.txt".format(slc), nrm.redundant_cps)
-        np.savetxt(self.savedir+self.sub_dir_str+"/CAs_{0:02d}.txt".format(slc), nrm.redundant_cas)
+        np.savetxt(self.savedir+self.sub_dir_str+\
+                   "/solutions_{0:02d}.txt".format(slc), nrm.soln)
+        np.savetxt(self.savedir+self.sub_dir_str+\
+                   "/phases_{0:02d}.txt".format(slc), nrm.fringephase)
+        np.savetxt(self.savedir+self.sub_dir_str+\
+                   "/amplitudes_{0:02d}.txt".format(slc), nrm.fringeamp)
+        np.savetxt(self.savedir+self.sub_dir_str+\
+                   "/CPs_{0:02d}.txt".format(slc), nrm.redundant_cps)
+        np.savetxt(self.savedir+self.sub_dir_str+\
+                   "/CAs_{0:02d}.txt".format(slc), nrm.redundant_cas)
 
         # optional save outputs
         if self.verbose_save:
-            np.savetxt(self.savedir+self.sub_dir_str+"/condition_{0:02d}.txt".format(slc), nrm.cond)
-            np.savetxt(self.savedir+self.sub_dir_str+"/flux_{0:02d}.txt".format(slc), nrm.flux)
+            np.savetxt(self.savedir+self.sub_dir_str+\
+                       "/condition_{0:02d}.txt".format(slc), nrm.cond)
+            np.savetxt(self.savedir+self.sub_dir_str+\
+                       "/flux_{0:02d}.txt".format(slc), nrm.flux)
 
     def save_auto_figs(self, slc, nrm):
         # pixel scales
@@ -286,7 +316,8 @@ class FringeFitter:
                         nrm.pixscl_corr[-1], linestyles='--', color='r')
             plt.text(rad2mas(nrm.pixscales[1]), nrm.pixscl_corr[1], 
                      "best fit at {0}".format(rad2mas(nrm.pixscale_optimal)))
-            plt.savefig(self.savedir+self.sub_dir_str+"/pixscalecorrelation_{0:02d}.png".format(slc))
+            plt.savefig(self.savedir+self.sub_dir_str+\
+                        "/pixscalecorrelation_{0:02d}.png".format(slc))
         
         # rotation
         if self.auto_rotate==True:
@@ -296,9 +327,107 @@ class FringeFitter:
                         nrm.corrs[-1], linestyles='--', color='r')
             plt.text(nrm.rots[1], nrm.corrs[1], 
                      "best fit at {0}".format(nrm.rot_measured))
-            plt.savefig(self.savedir+self.sub_dir_str+"/rotationcorrelation_{0:02d}.png".format(slc))
+            plt.savefig(self.savedir+self.sub_dir_str+\
+                        "/rotationcorrelation_{0:02d}.png".format(slc))
+
+def fit_fringes_parallel(args, threads):
+    self = args['object']
+    filename = args['file']
+    id_tag = args['id']
+    self.scidata, self.scihdr = self.instrument_data.read_data(filename)
+
+    self.sub_dir_str = self.instrument_data.sub_dir_str
+    try:
+        os.mkdir(self.savedir+self.sub_dir_str)
+    except:
+        pass
+
+    store_dict = [{"object":self, "slc":slc} for slc in \
+                  range(self.instrument_data.nwav)]
+
+    if threads>0:
+        pool = Pool(processes=threads)
+        print "Running fit_fringes in parallel with {0} threads".format(threads)
+        pool.map(fit_fringes_single_integration, store_dict)
+
+    else:
+        for slc in range(self.instrument_data.nwav):
+            try:
+                os.mkdir(self.refimgs+'{0:02d}'.format(slc)+'/')
+            except:
+                    pass
+            fit_fringes_single_integration({"object":self, "slc":slc})
+
+def fit_fringes_single_integration(args):
+    self = args["object"]
+    slc = args["slc"]
+    id_tag = args["slc"]
+
+    nrm = NRM_Model(mask=self.instrument_data.mask, \
+                    pixscale=self.instrument_data.pscale_rad,\
+                    holeshape=self.instrument_data.holeshape,\
+                    over = self.oversample)
+
+    nrm.refdir=self.refimgs+'{0:02d}'.format(slc)+'/'
+    nrm.bandpass = self.instrument_data.wls[slc]
+
+    if self.npix == 'default':
+        self.npix = self.scidata[slc,:,:].shape[0]
+    self.ctrd = utils.centerit(self.scidata[slc, :,:], r = (self.npix -1)//2)
+
+    refslice = self.ctrd.copy()
+    if True in np.isnan(refslice):
+        refslice=utils.deNaN(5, self.ctrd)
+        if True in np.isnan(refslice):
+            refslice = utils.deNaN(20,refslice)
 
 
+    nrm.reference = self.ctrd
+    if self.hold_centering == False:
+        # this fn should be more descriptive
+        nrm.auto_find_center("ctrmodel.fits")
+        nrm.bestcenter = 0.5-nrm.over*nrm.xpos, 0.5-nrm.over*nrm.ypos
+    else:
+        nrm.bestcenter = self.hold_centering
+
+    # similar if/else routines for auto scaling and rotation
+    if self.auto_scale == True:
+        nrm.fit_images(self.ctrd, pixguess = self.instrument_data.pscale_rad)
+
+    else:
+        nrm.make_model(fov = self.ctrd.shape[0], bandpass=nrm.bandpass, \
+                       over=self.oversample,centering=nrm.bestcenter, \
+                       pixscale=nrm.pixel)
+        nrm.fit_image(self.ctrd, modelin=nrm.model)
+    """
+    Attributes now stored in nrm object:
+
+    -----------------------------------------------------------------------------
+    soln            --- resulting sin/cos coefficients from least squares fitting
+    fringephase     --- baseline phases in radians
+    fringeamp       --- baseline amplitudes (flux normalized)
+    redundant_cps   --- closure phases in radians
+    redundant_cas   --- closure amplitudes
+    residual        --- fit residuals [data - model solution]
+    cond            --- matrix condition for inversion
+    -----------------------------------------------------------------------------
+    """
+
+    if self.debug==True:
+        import matplotlib.pyplot as plt
+        import poppy.matrixDFT as mft
+        dataft = mft.matrix_dft(self.ctrd, 256, 512)
+        refft = mft.matrix_dft(self.refpsf, 256, 512)
+        plt.figure()
+        plt.title("Data")
+        plt.imshow(np.sqrt(abs(dataft)), cmap = "bone")
+        plt.figure()
+        plt.title("Reference")
+        plt.imshow(np.sqrt(abs(refft)), cmap="bone")
+        plt.show()
+    
+    self.save_output(slc, nrm)
+    return None
 
 class Calibrate:
     """
