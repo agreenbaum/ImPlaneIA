@@ -244,11 +244,12 @@ class VISIR:
         self.sub_dir_str = '/' + fn.split('/')[-1].replace('.fits', '')
         self.nexp = scidata.shape[0]
         # rewrite wavextension to be same length as nexp
-        self.wavextension = (self.lam_c*np.ones(self.nexp), self.lam_w*np.ones(self.nexp))
+        self.wavextension = (self.lam_c*np.ones(self.nexp), \
+                             self.lam_w*np.ones(self.nexp))
         return scidata, hdr
 
 class NIRISS:
-    def __init__(self, filt, objname="obj", src="A0V", **kwargs):
+    def __init__(self, filt, objname="obj", src="A0V", out_dir='', **kwargs):
         """
         Initialize NIRISS class
 
@@ -289,7 +290,7 @@ class NIRISS:
         #self.mode = self.hdr0["DISPERSR"]
         #self.obsmode = self.hdr0["OBSMODE"]
         #self.band = self.obsmode[-1] # K1 is two letters
-        self.ref_imgs_dir = "refimgs_"+self.filt+"/"
+        self.ref_imgs_dir = os.path.join(out_dir,"refimgs_"+self.filt+"/")
 
         # Wavelength info for NIRISS bands F277W, F380M, F430M, or F480M
         try:
