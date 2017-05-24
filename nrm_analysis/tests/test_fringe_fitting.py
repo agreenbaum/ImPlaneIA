@@ -6,20 +6,16 @@ from astropy.io import fits
 from astropy.table import Table
 from astropy import units as u
 
-
-
 import sys
-sys.path.insert(0, os.path.join(os.path.dirname(__file__),'../'))
-sys.path.insert(0, os.path.join(os.path.dirname(__file__),'../../'))
-
-
-# print(sys.path)
 
 try:
     import oifits
     print('oifits successfully imported')
 except ImportError:
-    print('Module oifits not found. Please include it in your path')    
+    print('Module oifits not found. Please include it in your path')
+    print('You can for instance run the shell command')    
+    print('wget http://astro.ins.urfu.ru/pages/~pboley/oifits/oifits.py --directory-prefix %s' % os.path.dirname(__file__))
+    print('and try again')
     sys.exit()
 
 
