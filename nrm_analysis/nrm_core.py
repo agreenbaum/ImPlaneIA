@@ -306,6 +306,15 @@ class FringeFitter:
                        "/condition_{0:02d}.txt".format(slc), nrm.cond)
             np.savetxt(self.savedir+self.sub_dir_str+\
                        "/flux_{0:02d}.txt".format(slc), nrm.flux)
+                       
+        if nrm.linfit_result is not None:          
+            # save linearfit results to pickle file
+            myPickleFile = os.path.join(self.savedir+self.sub_dir_str,"linearfit_result_{0:02d}.pkl".format(slc))
+            pickle.dump( (nrm.linfit_result), open( myPickleFile , "wb" ) ) 
+            if verbose:
+                print("Wrote pickled file  %s" % myPickleFile)
+                       
+                       
 
     def save_auto_figs(self, slc, nrm):
         # pixel scales
