@@ -12,7 +12,19 @@ import sys
 sys.path.insert(0, os.path.join(os.path.dirname(__file__),'../'))
 sys.path.insert(0, os.path.join(os.path.dirname(__file__),'../../'))
 
+
+# print(sys.path)
+
+try:
+    import oifits
+    print('oifits successfully imported')
+except ImportError:
+    print('Module oifits not found. Please include it in your path')    
+    sys.exit()
+
+
 from nrm_analysis import nrm_core, InstrumentData
+
 
 
 arcsec2rad = u.arcsec.to(u.rad)
@@ -25,8 +37,8 @@ class FringeFittingTestCase(unittest.TestCase):
     def setUp(self):
     
         # setup parameters for simulation
-        verbose = 0
-        overwrite = 0
+        verbose = 1
+        overwrite = 1
 
         monochromatic_wavelength_m = 4.3e-6 
         mask = 'MASK_NRM'

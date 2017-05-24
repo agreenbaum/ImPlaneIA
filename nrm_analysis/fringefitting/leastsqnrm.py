@@ -253,6 +253,7 @@ def matrix_operations(img, model, flux = None, verbose=False):
             print "linearfit module not imported, no covariances saved."
     
     return x, res, cond, linfit_result
+    
 
 def weighted_operations(img, model, weights, verbose=False):
     # least squares matrix operations to solve A x = b, where A is the model, b is the data (image), and x is the coefficient vector we are solving for. In 2-D data x = inv(At.A).(At.b) 
