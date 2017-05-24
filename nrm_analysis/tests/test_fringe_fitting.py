@@ -7,6 +7,9 @@ from astropy.table import Table
 from astropy import units as u
 
 import sys
+sys.path.insert(0, os.path.join(os.path.dirname(__file__),'../'))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__),'../../'))
+
 
 try:
     import oifits
