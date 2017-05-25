@@ -9,6 +9,7 @@ import analyticnrm2 as analytic
 import nrm_analysis.misctools.utils as utils # April 2016, trying to get imports right
 import hexee
 from scipy.misc import comb
+import os, pickle
 
 m = 1.0
 mm = 1.0e-3 * m
@@ -219,8 +220,7 @@ def matrix_operations(img, model, flux = None, verbose=False):
         print "flat img * transpose dimensions", np.shape(inverse)
 
     try: 
-        import linearfit
-        import os, pickle
+        from linearfit import linearfit
 
         # dependent variables
         M = np.mat(flatimg)
@@ -235,7 +235,7 @@ def matrix_operations(img, model, flux = None, verbose=False):
         wy = weights
         S = np.mat(np.diag(wy));
         # matrix of independent variables
-        C = np.mat(flatmodeltranspose)
+        C = np.mat(flatmodeltransp)
 
         # initialize object
         result = linearfit.LinearFit(M,S,C)
@@ -247,10 +247,12 @@ def matrix_operations(img, model, flux = None, verbose=False):
         result.inverse_covariance_matrix = []
 
         linfit_result = result
-    except:
+        print "Returned linearfit result"
+
+    except ImportError:
         linfit_result = None
-        if verbose:
-            print "linearfit module not imported, no covariances saved."
+#         if verbose:
+        print "linearfit module not imported, no covariances saved."
     
     return x, res, cond, linfit_result
     

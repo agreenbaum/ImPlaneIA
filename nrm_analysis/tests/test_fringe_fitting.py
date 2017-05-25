@@ -21,6 +21,12 @@ except ImportError:
     print('and try again')
     sys.exit()
 
+try: 
+    import linearfit
+except ImportError:
+    print('linearfit module not imported, no covariances will be saved.')
+    print(sys.path)
+    1/0
 
 from nrm_analysis import nrm_core, InstrumentData
 
@@ -117,7 +123,7 @@ class FringeFittingTestCase(unittest.TestCase):
                       npix=n_image, interactive=False, flip=flip)
         print('FringeFitter oversampling: %d' % ff.oversample)
     
-        threads = 1
+        threads = 0
         ff.fit_fringes([file_name],threads=threads)
 
         CP_file = sorted(glob.glob(os.path.join(data_dir,'%s/%s*.txt' % (file_name.split('.')[0],'CPs_') )));
