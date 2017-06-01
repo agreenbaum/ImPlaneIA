@@ -478,7 +478,7 @@ def redundant_cps(deltaps, N = 7):
     if type(deltaps[0]).__module__ != 'uncertainties.core':
         cps = np.zeros(int(comb(N,3)))
     else:
-        cps = unumpy.uarray( (np.zeros(np.int(comb(N,3))),np.zeros(np.int(comb(N,3))) ))    
+        cps = unumpy.uarray( np.zeros(np.int(comb(N,3))),np.zeros(np.int(comb(N,3))) )    
     nn=0
     for kk in range(N-2):
         for ii in range(N-kk-2):
@@ -523,7 +523,7 @@ def return_CAs(amps, N=7):
     if type(amps[0]).__module__ != 'uncertainties.core':
         CAs = np.zeros(int(comb(N,4)))
     else:
-        CAs = unumpy.uarray( (np.zeros(np.int(comb(N,4))),np.zeros(np.int(comb(N,4))) ))
+        CAs = unumpy.uarray( np.zeros(np.int(comb(N,4))),np.zeros(np.int(comb(N,4))) )
         
     for ii in range(N-3):
         for jj in range(N-ii-3):
