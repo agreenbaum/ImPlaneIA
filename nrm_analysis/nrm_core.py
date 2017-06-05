@@ -1531,6 +1531,13 @@ class BinaryAnalyze:
 
         t4 = time.time()
         self.con_spectrum = np.zeros((self.nwav, len(self.cons)))
+        """
+        if use_covar == True:
+        for nn in range(ncon):
+            model_cps_con = np.rollaxis(model_cps[nn,:,:], 0,-1)
+            data_con = np.rollaxis(data_con[nn,:,:], 0,-1)
+            chi2 = np.sum(np.dot((model_cps_con - data_con).transpose(),np.dot(inv_covar, (model_cps_con - data_con))))
+        """
         for ll in range(self.nwav):
             #dof = self.nwav*self.ncp - 1
             fac = 1.0#(1/float(dof))
@@ -1755,7 +1762,7 @@ class BinaryAnalyze:
             guess[3] = self.params["pa"]
             self.keys = ['con', 'slope','sep', 'pa']
         elif self.spectrum_model == "free":
-            guess = np.array([self.params["con"]]) # here con is given as an array size nwav
+            guess = np.array([self.params["con"]])[0] # here con is given as an array size nwav
             self.keys = ['wl_{0:02d}'.format(f) for f in range(len(guess))]
         else:
             print "invalid spectrum_model set"
@@ -1765,7 +1772,7 @@ class BinaryAnalyze:
     def corner_plot(self, fn):
         import corner
         plt.figure(1)
-        fig = corner.corner(self.chain, labels = self.keys, bins = 200, show_titles=True)
+        fig = corner.corner(self.chain, labels = self.keys, bins = 50, show_titles=True)
         plt.savefig(self.savedir+fn)
         if self.plot=="on":
             plt.show()
@@ -1811,6 +1818,8 @@ def cp_binary_model(params, constant, priors, spectrum_model, uvcoords, cp, cper
     # cperr
 
     for i in range(len(params)):
+        #print "HERE:",len(params)
+        #print "HERE:",params[i]
         if (params[i] < priors[i][0] or params[i] > priors[i][1]):  
             return -np.inf
 
@@ -1825,7 +1834,10 @@ def cp_binary_model(params, constant, priors, spectrum_model, uvcoords, cp, cper
         # params needs 'con_start' starting contrast and 'slope,' sep & pa constant?
         wav_step = constant['wavl'][1] - constant['wavl'][0]
         # contrast model is con_start + slope*delta_lambda
-        contrast = params[0] + params[1]*wav_step
+        #contrast = params[0] + params[1]*wav_step
+        band_diff = constant['wavl'][-1] - constant['wavl'][0]
+        contrast = np.linspace(params[0], params[0]+(params[1]*band_diff), \
+                               num = len(constant['wavl']))
         # Model from params
         model_cp = model_cp_uv(uvcoords, contrast, params[2], \
                             params[3], 1.0/constant['wavl'])
