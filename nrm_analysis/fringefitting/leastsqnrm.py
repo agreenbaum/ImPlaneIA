@@ -9,6 +9,8 @@ import analyticnrm2 as analytic
 import nrm_analysis.misctools.utils as utils # April 2016, trying to get imports right
 import hexee
 from scipy.misc import comb
+import os, pickle
+from uncertainties import unumpy
 
 m = 1.0
 mm = 1.0e-3 * m
@@ -219,8 +221,7 @@ def matrix_operations(img, model, flux = None, verbose=False):
         print "flat img * transpose dimensions", np.shape(inverse)
 
     try: 
-        import linearfit
-        import os, pickle
+        from linearfit import linearfit
 
         # dependent variables
         M = np.mat(flatimg)
@@ -235,7 +236,7 @@ def matrix_operations(img, model, flux = None, verbose=False):
         wy = weights
         S = np.mat(np.diag(wy));
         # matrix of independent variables
-        C = np.mat(flatmodeltranspose)
+        C = np.mat(flatmodeltransp)
 
         # initialize object
         result = linearfit.LinearFit(M,S,C)
@@ -247,10 +248,12 @@ def matrix_operations(img, model, flux = None, verbose=False):
         result.inverse_covariance_matrix = []
 
         linfit_result = result
-    except:
+        print "Returned linearfit result"
+
+    except ImportError:
         linfit_result = None
-        if verbose:
-            print "linearfit module not imported, no covariances saved."
+#         if verbose:
+        print "linearfit module not imported, no covariances saved."
     
     return x, res, cond, linfit_result
     
@@ -347,19 +350,33 @@ def tan2visibilities(coeffs, verbose=False):
     (A*sin(dphi))^2 + (A*cos(dphi)^2) = A^2 = a'^2 + b'^2
 
     Edit 10/2014: pistons now returned in units of radians!!
+    Edit 05/2017: J. Sahlmann added support of uncertainty propagation
     """
-    # coefficients of sine terms mulitiplied by 2*pi
-    delta = np.zeros((len(coeffs) -1)/2)
-    amp = np.zeros((len(coeffs) -1)/2)
-    for q in range((len(coeffs) - 1)/2):
-        delta[q] = (np.arctan2(coeffs[2*q+2], coeffs[2*q+1])) 
-        amp[q] = np.sqrt(coeffs[2*q+2]**2 + coeffs[2*q+1]**2)
-    if verbose:
-        print "shape coeffs", np.shape(coeffs)
-        print "shape delta", np.shape(delta)
+    if type(coeffs[0]).__module__ != 'uncertainties.core':
+        # if uncertainties not present, proceed as usual
+        
+        # coefficients of sine terms mulitiplied by 2*pi
+        delta = np.zeros((len(coeffs) -1)/2)
+        amp = np.zeros((len(coeffs) -1)/2)
+        for q in range((len(coeffs) - 1)/2):
+            delta[q] = (np.arctan2(coeffs[2*q+2], coeffs[2*q+1])) 
+            amp[q] = np.sqrt(coeffs[2*q+2]**2 + coeffs[2*q+1]**2)
+        if verbose:
+            print "shape coeffs", np.shape(coeffs)
+            print "shape delta", np.shape(delta)
 
-    # returns fringe amplitude & phase
-    return amp, delta
+        # returns fringe amplitude & phase
+        return amp, delta
+    
+    else:
+        #         propagate uncertainties
+        qrange = np.arange((len(coeffs) - 1)/2)
+        fringephase = unumpy.arctan2(coeffs[2*qrange+2], coeffs[2*qrange+1])
+        fringeamp = unumpy.sqrt(coeffs[2*qrange+2]**2 + coeffs[2*qrange+1]**2)
+        return fringeamp, fringephase
+
+            
+        
 
 def cos2deltapistons(coeffs, verbose=False):
     # coefficients of cosine terms (multiplied by 2*pi)
@@ -388,7 +405,10 @@ def fixeddeltapistons(coeffs, verbose=False):
     return delta    
 
 def populate_antisymmphasearray(deltaps, N=7):
-    fringephasearray = np.zeros((N,N))
+    if type(deltaps[0]).__module__ != 'uncertainties.core':
+        fringephasearray = np.zeros((N,N))
+    else:
+        fringephasearray = unumpy.uarray(np.zeros((N,N)),np.zeros((N,N)))    
     step=0
     n=N-1
     for h in range(n):
@@ -406,8 +426,14 @@ def populate_antisymmphasearray(deltaps, N=7):
     fringephasearray = fringephasearray - fringephasearray.T
     return fringephasearray
 
+
 def populate_symmamparray(amps, N=7):
-    fringeamparray = np.zeros((N,N))
+
+    if type(amps[0]).__module__ != 'uncertainties.core':
+        fringeamparray = np.zeros((N,N))
+    else:
+        fringeamparray = unumpy.uarray(np.zeros((N,N)),np.zeros((N,N)))
+        
     step=0
     n=N-1
     for h in range(n):
@@ -417,9 +443,42 @@ def populate_symmamparray(amps, N=7):
     fringeamparray = fringeamparray + fringeamparray.T
     return fringeamparray
 
+
+
+
+def phases_and_amplitudes(solution_coefficients, N=7):
+
+    #     number of solution coefficients
+    Nsoln = len(solution_coefficients)    
+    
+    # normalise by intensity
+    soln = np.array([solution_coefficients[i]/solution_coefficients[0] for i in range(Nsoln)])
+
+    # compute fringe quantitites
+    fringeamp, fringephase = tan2visibilities( soln )    
+    
+#     import pdb
+#     pdb.set_trace()
+
+    # compute closure phases
+    if type(solution_coefficients[0]).__module__ != 'uncertainties.core':
+        redundant_closure_phases = redundant_cps(np.array(fringephase), N=N)
+    else:
+        redundant_closure_phases, fringephasearray = redundant_cps(np.array(fringephase), N=N)
+    
+    # compute closure amplitudes
+    redundant_closure_amplitudes = return_CAs(np.array(fringephase), N=N)
+
+    return fringephase, fringeamp, redundant_closure_phases, redundant_closure_amplitudes
+    
+
+
 def redundant_cps(deltaps, N = 7):
     fringephasearray = populate_antisymmphasearray(deltaps, N=N)
-    cps = np.zeros(int(comb(N,3)))
+    if type(deltaps[0]).__module__ != 'uncertainties.core':
+        cps = np.zeros(int(comb(N,3)))
+    else:
+        cps = unumpy.uarray( np.zeros(np.int(comb(N,3))),np.zeros(np.int(comb(N,3))) )    
     nn=0
     for kk in range(N-2):
         for ii in range(N-kk-2):
@@ -428,8 +487,11 @@ def redundant_cps(deltaps, N = 7):
                        + fringephasearray[ii+kk+1, jj+ii+kk+2] \
                        + fringephasearray[jj+ii+kk+2, kk]
             nn = nn+jj+1
-    return cps
-
+    if type(deltaps[0]).__module__ != 'uncertainties.core':
+        return cps
+    else:
+        return cps, fringephasearray
+        
 def closurephase(deltap, N=7):
     # N is number of holes in the mask
     # 7 and 10 holes available (JWST & GPI)
@@ -455,9 +517,14 @@ def closurephase(deltap, N=7):
     return cps
 
 def return_CAs(amps, N=7):
-    fringeamparray = populate_symmamparray(amps, N=N)
+    fringeamparray = populate_symmamparray(amps, N=N)            
     nn=0
-    CAs = np.zeros(int(comb(N,4)))
+    
+    if type(amps[0]).__module__ != 'uncertainties.core':
+        CAs = np.zeros(int(comb(N,4)))
+    else:
+        CAs = unumpy.uarray( np.zeros(np.int(comb(N,4))),np.zeros(np.int(comb(N,4))) )
+        
     for ii in range(N-3):
         for jj in range(N-ii-3):
             for kk in range(N-jj-ii-3):
@@ -467,6 +534,9 @@ def return_CAs(amps, N=7):
             / (fringeamparray[ii,kk+ii+jj+2]*fringeamparray[jj+ii+1,ll+ii+jj+kk+3])
                 nn=nn+ll+1
     return CAs
+    
+
+    
     
 def rebin(a = None, rc=(2,2), verbose=None):
 
