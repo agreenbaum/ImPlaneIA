@@ -65,7 +65,7 @@ class FringeFittingTestCase(unittest.TestCase):
         self.monochromatic_wavelength_m = monochromatic_wavelength_m
         
         # directory containing the test data
-        data_dir = os.path.join(os.path.dirname(__file__),'test_data')
+        data_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)),'test_data')
         if not os.path.exists(data_dir):
             os.makedirs(data_dir)
 
@@ -105,9 +105,7 @@ class FringeFittingTestCase(unittest.TestCase):
         file_list = glob.glob(os.path.join(data_dir,'*%s*.fits' % 'without_oversampling' ));
             
         self.simulated_image = file_list[0]
-        self.psf_image_without_oversampling = psf_image_without_oversampling
-        
-        
+        self.psf_image_without_oversampling = psf_image_without_oversampling        
                 
     def test_fringe_fitting(self,verbose = 0):
         '''
@@ -158,6 +156,7 @@ class FringeFittingTestCase(unittest.TestCase):
 
         data_dir = os.path.dirname( self.simulated_image )
         save_dir = os.path.join(data_dir,'%s' % (self.simulated_image.split('.')[0]))
+        
         ffr = utility_classes.FringeFitterResult(save_dir) 
         ffr.print_results()
         pklfile = os.path.join(save_dir,'linearfit_result_00.pkl')
