@@ -97,14 +97,15 @@ def visphase(baseline, ratio, separation, angle):
     From David L.'s NRM code V(u,v) = {1 + r exp[-i2pi(alpha.u + delta.v)]}/(1+r)
     2011 Sparse Aperture Masking at the VLT
 
-    r: flux ratio between sources
+    r: flux ratio: secondary / primary
     alpha, delta: RA, DEC (radians)
-    u, v: orthogonal spatial frequency vectors
+    u, v: orthogonal spatial frequency vectors (scaled by wavelength)
 
     Returns: the resulting phase given a baseline, flux ratio, separation, and angle.
     To do: figure out the scaling & coordinates for the baseline.
     """
-    alpha = separation*np.cos(angle)
+    angle+= 90*np.pi/180.
+    alpha = -separation*np.cos(angle)
     delta = separation*np.sin(angle)
     u = baseline[0]
     v = baseline[1]
