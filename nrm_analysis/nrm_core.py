@@ -1712,7 +1712,7 @@ class BinaryAnalyze:
             print "invalid choice of observable:", observables,
             print "options are 'cp', 'v2', and 'all'"
 
-        pos, prob, state = self.sampler.run_mcmc(p0, 100)
+        pos, prob, state = self.sampler.run_mcmc(p0, 500)
         self.sampler.reset()
         t2 = time.time()
         print "burn in complete, took ", t2-t0, "s"
@@ -2155,7 +2155,10 @@ def logl(data, err, model):
     #   #ll += -0.5*np.log(2*np.pi)*data[2*ii].size + np.sum(-np.log(data[2*ii+1]**2)
     #return -0.5*np.log(2*np.pi) - np.sum(np.log(err)) - np.sum((model - data)**2/(2*data**2))
     #return -0.5*np.log(2*np.pi)*data.size + np.sum(-np.log(err**2) - 0.5*((model - data)/err)**2)
-    return np.sum(-np.log(err**2) - 0.5*((model - data)/err)**2)
+    chi2 = np.sum(((data-model)/err)**2)
+    loglike = -chi2/2
+    #return np.sum(-np.log(err**2) - 0.5*((model - data)/err)**2)
+    return loglike
 
 def reduced_chi2(data, err, model, dof=1.0):
     return (1/float(dof))*np.sum(((model - data)**2/(err**2)), axis=(-1,-2))
