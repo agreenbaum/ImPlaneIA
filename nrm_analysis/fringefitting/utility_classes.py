@@ -6,9 +6,10 @@ import numpy as np
 import pylab as pl
 from astropy.table import Table, Column
 from astropy.table import hstack as tablehstack
-# from astropy.io import fits
+from astropy.io import fits
 # from scipy.misc import comb
 from uncertainties import unumpy
+import aplpy
 
 class NrmIntegrationResult(object):
     def __init__(self, solutions , closure_quantities , baseline_quantities ):
@@ -148,6 +149,55 @@ class NrmIntegrationResult(object):
             gc.save(figure_name,dpi=300)
 
 
+
+def make_standard_image(file, image_title='', save_plot=0, plot_dir=None, name_seed=None, stretch='linear', x_axis_label=None, y_axis_label=None):
+    '''
+
+    :param file:
+    :return:
+    '''
+
+    if name_seed is None:
+        name_seed = os.path.basename(file).split('.')[0]
+
+    fig = pl.figure(figsize=(7, 7), facecolor='w', edgecolor='k'); pl.clf();
+    data = fits.getdata(file)
+    header = fits.getheader(file)
+    gc = aplpy.FITSFigure(data, figure=fig, north=False)
+    vmin = np.min(data)
+    vmax = np.max(data)
+    vmid = vmin - 1
+    vmin = None
+    gc.show_grayscale(invert=True, aspect=1, stretch=stretch, vmin=vmin, vmid=vmid,
+                      vmax=vmax)
+    pl.title(image_title)
+    gc.add_colorbar()
+    textsize = 12
+    mycol = 'k'
+    if 0:
+        gc.add_label(0.05, 0.91, '%s\n%s\n%s' % (header['INSTRUME'], header['FILTER'], header['PUPIL']), size=textsize,
+                     relative=True, horizontalalignment='left', color=mycol)  # header['STARMAG']
+    if 1:
+        gc.add_label(0.05, 0.91, '%s %3.3f' % ('RMS', np.std(data)), size=textsize, relative=True,
+                     horizontalalignment='left', color=mycol)
+
+    if x_axis_label is None:
+        x_axis_label = 'PIXEL (AXIS1)'
+    if y_axis_label is None:
+        y_axis_label = 'PIXEL (AXIS2)'
+
+    gc.axis_labels.set_xtext(x_axis_label)
+    gc.axis_labels.set_ytext(y_axis_label)
+
+
+    fig.tight_layout(h_pad=0.0)
+    # pl.show()
+
+    figure_name = os.path.join(plot_dir, '%s_%s.pdf' % (name_seed, 'standard_image'))
+    if save_plot == 1:
+        gc.save(figure_name, dpi=300)
+
+    return figure_name
 
 
 

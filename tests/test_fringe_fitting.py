@@ -55,7 +55,9 @@ class FringeFittingTestCase(unittest.TestCase):
         if not os.path.exists(data_dir):
             os.makedirs(data_dir)
 
+        # self.data_dir = data_dir
         out_dir = data_dir
+
 
         name_seed = 'PSF_NIRISS_%s_%s'%(mask,filter)
 
@@ -126,6 +128,21 @@ class FringeFittingTestCase(unittest.TestCase):
 
         #         perform the actual test
         self.assertTrue(np.mean(np.array(CP['closure_phase'])) < 1e-15, 'Simulated closure phases of point source are non-zero')
+
+
+    def test_standard_image(self):
+        from nrm_analysis.fringefitting.utility_classes import FringeFitterResult, make_standard_image
+
+        # directory that contains the files written by fit_fringes
+        file_image_dir = self.simulated_image.split('.')[0]
+
+        # result object
+        result = FringeFitterResult(file_image_dir)
+
+
+        figure_name = make_standard_image(result.centered_file[0], save_plot=1, plot_dir=file_image_dir)
+
+        self.assertTrue(os.path.isfile(figure_name), 'Standard image PDF was not produced')
 
 if __name__ == '__main__':
     unittest.main()
