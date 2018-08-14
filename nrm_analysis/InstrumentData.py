@@ -23,6 +23,16 @@ from misctools import utils
 
 um = 1.0e-6
 
+# utility routines for InstrumentData classes
+
+def show_cvsupport_threshold(instr):
+    print("cvsupport_threshold is: ", instr.cvsupport_threshold)
+    print(instr.cvsupport_threshold)
+def set_cvsupport_threshold(instr, k, v):
+    instr.cvsupport_threshold[k] = v
+    print("New cvsupport_threshold is: ", instr.cvsupport_threshold)
+
+
 class GPI:
 
     def __init__(self, reffile, **kwargs):
@@ -49,7 +59,7 @@ class GPI:
         self.mask.ctrs = np.array(self.mask.ctrs)
         # Hard code -1.5 deg rotation in data (April 2016)
         # (can be moved to NRM_mask_definitions later)
-        self.mask.ctrs = utils.rotatevectors(self.mask.ctrs, -1.5*np.pi/180.)
+        self.mask.ctrs = utils.rotatevectors(self.mask.ctrs, -1.3*np.pi/180.)
         # Add in hole/baseline properties ?
         self.holeshape="circ"
 
@@ -71,13 +81,29 @@ class GPI:
         self.band = self.obsmode[-1] # K1 is two letters
         self.ref_imgs_dir = "refimgs_"+self.band+"/"
 
-        # wavelength info: spect mode or pol more
+        # finding centroid from phase slope only considered cv_phase data when cv_abs data exceeds this.  
+        # absolute value of cv data normalized to unity maximum for the threshold application.
+        self.cvsupport_threshold = {"Y":0.02, "J":0.02, "H":0.02, "1":0.02, "2":0.02} # Gurus: tweak with use...
+        self.threshold = self.cvsupport_threshold[self.band]
+
+        # Special mode for collapsed data
+        if self.hdr1[0]["NAXIS3"]==1:
+            # This is just a way handle data that is manually collapsed.
+            # Not a standard data format for GPI.
+            print "No NAXIS3 keyword. This is probably collapsed data."
+            print "Going to fake some stuff now"
+            self.mode = "WOLLASTON_FAKEOUT"
+            
+        # wavelength info: spect mode or pol mode
         if "PRISM" in self.mode:
             # GPI's spectral mode
             self.nwav = self.hdr1[0]["NAXIS3"]
             self.wls = np.linspace(self.hdr1[0]["CRVAL3"], \
-                  self.hdr1[0]["CRVAL3"]+self.hdr1[0]['CD3_3']*self.nwav, self.nwav)*um
-            self.eff_band = um*np.ones(self.nwav)*(self.wls[-1] - self.wls[0])/self.nwav
+                                   self.hdr1[0]["CRVAL3"]+\
+                                   self.hdr1[0]['CD3_3']*self.nwav,\
+                                   self.nwav)*um
+            self.eff_band = um*np.ones(self.nwav)*(self.wls[-1] - \
+                                       self.wls[0])/self.nwav
         elif "WOLLASTON" in self.mode:
             # GPI's pol mode. Will define this for the DIFFERENTIAL VISIBILITIES
             # diff vis: two channels 0/45 and 22/67
@@ -85,9 +111,9 @@ class GPI:
             self.nwav = 2
 
             # Define the bands in case we use a tophat filter
-            band_ctrs = {"Y":(1.14-0.95)*um/2., "J":(1.35-1.12)*um/2., \
-                         "H":(1.80-1.50)*um/2., "1":(2.19-1.9)*um/2., \
-                         "2":(2.4-2.13)*um/2.0}
+            band_ctrs = {"Y":(1.14+0.95)*um/2., "J":(1.35+1.12)*um/2., \
+                         "H":(1.80+1.50)*um/2., "1":(2.19+1.9)*um/2., \
+                         "2":(2.4+2.13)*um/2.0}
             band_wdth = {"Y":(1.14-0.95)*um, "J":(1.35-1.12)*um, "H":(1.80-1.50)*um, \
                          "1":(2.19-1.9)*um, "2":(2.4-2.13)*um}
             wghts = np.ones(15)
@@ -95,16 +121,27 @@ class GPI:
                                 band_ctrs[self.band]+band_wdth[self.band]/2.0, num=15)
 
             if 'gpifilterpath' in kwargs:
+                print "Using GPI filter file ",
                 if self.band=="Y":
                     filterfile = kwargs["gpifilterpath"]+"GPI-filter-Y.fits"
+                    print kwargs["gpifilterpath"]+"GPI-filter-Y.fits"
+                    cutoff=0.7
                 if self.band=="J":
                     filterfile = kwargs["gpifilterpath"]+"GPI-filter-J.fits"
+                    print kwargs["gpifilterpath"]+"GPI-filter-J.fits"
+                    cutoff=0.7
                 if self.band=="H":
                     filterfile = kwargs["gpifilterpath"]+"GPI-filter-H.fits"
+                    print kwargs["gpifilterpath"]+"GPI-filter-H.fits"
+                    cutoff=0.7
                 if self.band=="1":
                     filterfile = kwargs["gpifilterpath"]+"GPI-filter-K1.fits"
+                    print kwargs["gpifilterpath"]+"GPI-filter-K1.fits"
+                    cutoff=0.94
                 if self.band=="2":
                     filterfile = kwargs["gpifilterpath"]+"GPI-filter-K2.fits"
+                    print kwargs["gpifilterpath"]+"GPI-filter-K2.fits"
+                    cutoff=0.94
                 # Read in gpi filter file
                 fitsfilter = fits.open(filterfile)[1].data
                 wavls = []
@@ -112,7 +149,7 @@ class GPI:
                 # Sample the filter file so the filter is only 50 elements long
                 skip = len(fitsfilter[0][0]) / 50
                 for ii in range(len(fitsfilter[0][0])/skip):
-                    if fitsfilter[0][1][skip*ii]>0.7:
+                    if fitsfilter[0][1][skip*ii]>cutoff:
                         wavls.append(fitsfilter[0][0][skip*ii]*1.0e-6)
                         wghts.append(fitsfilter[0][1][skip*ii])
 
@@ -120,14 +157,23 @@ class GPI:
             lam_w = band_wdth[self.band]
 
             transmission = np.array([[wghts[f], wavls[f]] for f in range(len(wghts))])
-            self.wls = [transmission, transmission]
-            self.eff_band = np.array([lam_w, lam_w])
+            if "FAKEOUT" in self.mode:
+                self.nwav=1
+                self.wls = [transmission, ]
+                self.eff_band = np.array([lam_w, ])
+            else:
+                self.wls = [transmission, transmission]
+                self.eff_band = np.array([lam_w, lam_w])
         else:
             sys.exit("Check your reference file header. "+\
                     "Keywork DISPERSR='{0}' not understood".format(self.mode))
 
         # For OIFits structure
         self.wavextension = (self.wls, self.eff_band)
+        if "FAKEOUT" in self.mode:
+            #lam_c = np.sum(np.array(wghts)*np.array(wavls))/np.sum(wghts)
+            #lam_w = 
+            self.wavextension = ([lam_c,], [lam_w,])  
 
         # Observation info
         self.telname= "GEMINI"
@@ -143,10 +189,17 @@ class GPI:
         # AVPARANG added Aug 2 2016
         self.parangs = []
         self.itime = []
+        self.crpa = []
         for ii in range(len(reffile)):
             self.parangs.append(self.hdr1[ii]["AVPARANG"])
             self.itime.append(self.hdr1[ii]["ITIME"])
+            if "CRPA" in self.hdr0[ii]:
+                self.crpa.append(self.hdr0[ii]["CRPA"])
         self.avparang = np.mean(self.parangs)
+        if len(self.crpa)>0:
+            self.avcassang = np.mean(self.crpa)
+        else:
+            self.avcassang = 0.0
         self.parang_range = abs(self.parangs[-1] - self.parangs[0])
         self.totalinttime = np.sum(self.itime)
         try:
@@ -200,6 +253,10 @@ class VISIR:
             self.wls = [self.filt, ]
         self.wavextension = (self.lam_c, self.lam_w)
         self.nwav=1
+
+        # finding centroid from phase slope only considered cv_phase data when cv_abs data exceeds this.  
+        # absolute value of cv data normalized to unity maximum for the threshold application.
+        self.cvsupport_threshold = {"threshold":0.02} # Gurus: tweak with use...
 
         self.ref_imgs_dir = "refimgs/"
 
@@ -281,6 +338,12 @@ class NIRISS:
         # (can be moved to NRM_mask_definitions later)
         # Add in hole/baseline properties ?
         self.holeshape="hex"
+
+        # finding centroid from phase slope only considered cv_phase data when cv_abs data exceeds this.  
+        # absolute value of cv data normalized to unity maximum for the threshold application.
+        self.cvsupport_threshold = {"F277W":0.02, "F380M": 0.02, "F430M": 0.02, "F480M": 0.02} # Gurus: tweak with use...
+        show_cvsupport_threshold(self)
+        self.threshold = self.cvsupport_threshold[filt]
 
         ## Get info from reference file 
         #reffits = fits.open(reffile)
