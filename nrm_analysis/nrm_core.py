@@ -417,7 +417,7 @@ class Calibrate:
 
     Flexible for 2 different kinds of data:
     - individual measurements per exposure
-    - an additional axis (e.g., wavelength or polz)
+    - an additional axis (e.g., wavelength)
 
     What happens in __init__:
     - Get statistics on each set of exposures
@@ -429,9 +429,12 @@ class Calibrate:
     * save_to_txt
     * save_to_oifits
 
+    If you know what you are doing with sub-directory structurem 
+    set interactive=False when initializing this object!
+
     """
 
-    def __init__(self, paths, instrument_data, savedir="calibrated", sub_dir_tag=None, **kwargs):
+    def __init__(self, paths, instrument_data, savedir=None, sub_dir_tag=None, **kwargs):
         """
         Initilize the class
 
@@ -449,8 +452,8 @@ class Calibrate:
                     assumed to be the target, the remaining paths belong to any 
                     and all calibrators
 
-        savedir     - default is folder called "calibrated" in the working 
-                    directory
+        savedir     - default is in the working directory; can give path from
+                      CWD or absolute path.
 
         sub_dir_tag - Does this dataset have an additional axis?
                     (e.g. wavelength or polz)
@@ -483,11 +486,15 @@ class Calibrate:
         else:
             self.vflag=0.0
     
+        #if no savedir specified, default is current working directory
+        if self.savedir ==None:
+            self.savedir = os.getcwd()
+        else:
+            self.savedir = savedir
         try:
             os.listdir(savedir)
         except:
             os.mkdir(savedir)
-        self.savedir = savedir
 
         # number of calibrators being used:
         self.ncals = len(paths) - 1 # number of calibrators, if zero, set to 1
@@ -635,11 +642,6 @@ class Calibrate:
                             self.pha_mean_tar[slc,:], self.pha_err_tar = \
                             self.calib_steps(cps[slc,:,:], amp[slc,:,:], pha[slc,:,:], nexps, expflag=expflag)
                         # measured cp shape: (nwav, nexps, ncp) mean cp shape: (nwav, ncp)
-                        ##meansub = cps[slc, :, :] - \
-                        ##          np.tile(self.cp_mean_tar[slc,:], (nexps, 1))
-                        ##self.cov_mat_tar[slc, :,:] = np.dot(meansub, meansub.transpose()) / (nexps - 1)
-                        # Uncertainties:
-                        ##self.sigmasquared_tar[slc,:] = np.diagonal(self.cov_mat_tar[slc, :,:])
 
                     else:
                         # Fixed clunkiness!
@@ -651,16 +653,12 @@ class Calibrate:
                         #print cps[slc, :,:].shape
                         #print self.cp_mean_cal[ii-1, slc,:].shape
                         #print np.tile(self.cp_mean_cal[ii-1,slc,:],(nexps, 1)).shape
-                        ##meansub = cps[slc, :, :] - \
-                        ##          np.tile(self.cp_mean_cal[ii-1, slc,:], (nexps, 1))
-                        ##self.cov_mat_cal[slc, :,:]  += np.dot(meansub, meansub.transpose()) / (nexps - 1)
-                        # Uncertainties:
-                        ##self.sigmasquared_cal[slc,:] = np.diagonal(self.cov_mat_cal[slc, :,:])
+
 
             """
-            ####################################
-            # calculate closure phase cov matrix
-            ####################################
+            ################################################
+            # Notes on calculating closure phase cov matrix?
+            ################################################
             # zero mean and stack wavelength+exposures
             if ii ==0:
                 flatcps = (cps-self.cp_mean_tar[:,None,:]).reshape(nexps*self.naxis2, self.ncp)
@@ -668,15 +666,12 @@ class Calibrate:
             else:
                 flatcps = (cps-self.cp_mean_cal[ii-1, :,None,:]).reshape(nexps*self.naxis2, self.ncp)
                 self.cov_mat_cal += np.cov(flatcps)
-            UPDATE: Oct 18 2016 -- trying to implement description from Kraus et al. 2008
+            UPDATE: Oct 18 2016 -- description from Kraus et al. 2008
             C_r = sum_i (phi_frame - phi_mean)^T (phi_frame - phi_mean) / (n - 1)
             Q: how do we get a "calibrated" covariance matrix?
             add to phase uncertainties:
             sig^2 = (2 sig_r^2 + (n_c - 1)sig_c*2 ) / (n_c + 1)
             """
-            #nexp_c = self.sigmasquared_cal.shape[1]
-            #self.sigmasquared = (2* self.sigmasquared_tar + \
-            #                     (nexp_c - 1)*self.sigmasquared_cal) / (nexp_c + 1)
 
         else:
             for ii in range(self.nobjs):
@@ -685,13 +680,6 @@ class Calibrate:
                 ampfiles = [f for f in os.listdir(paths[ii]) if "amplitudes" in f]
                 phafiles = [f for f in os.listdir(paths[ii]) if "phase" in f]
                 nexps = len(cpfiles)
-
-                #if ii == 0:
-                #    self.cov_mat_tar = np.zeros((self.naxis2, nexps, nexps))
-                #    self.sigmasquared_tar = np.zeros((self.naxis2, nexps))
-                #elif ii==1:
-                #    self.cov_mat_cal = np.zeros((self.naxis2, nexps, nexps))
-                #    self.sigmasquared_cal = np.zeros((self.naxis2, nexps))
 
                 amp = np.zeros((nexps, self.nbl))
                 pha = np.zeros((nexps, self.nbl))
@@ -727,8 +715,6 @@ class Calibrate:
                         self.pha_mean_tar[0,:], self.pha_err_tar[0,:] = \
                         self.calib_steps(cps, amp, pha, nexps, expflag=expflag)
                     # measured cp shape: (nwav, nexps, ncp) mean cp shape: (nwav, ncp)
-                    ##meansub = cps - np.tile(self.cp_mean_tar, (nexps, 1))
-                    ##self.cov_mat_tar[0,:,:] = np.dot(meansub, meansub.transpose()) / (nexps - 1)
                     ##self.sigmasquared_tar[0,:] = np.diagonal(self.cov_mat_tar[0,:,:])
                 else:
                     # Fixed clunkiness!
@@ -738,14 +724,6 @@ class Calibrate:
                         self.pha_mean_cal[ii-1,0,:], self.pha_err_cal[ii-1,0,:] = \
                         self.calib_steps(cps, amp, pha, nexps, expflag=expflag)
                     # measured cp shape: (nwav, nexps, ncp) mean cp shape: (nwav, ncp)
-                    ##meansub = cps - np.tile(self.cp_mean_cal, (nexps, 1))
-                    # Uncertainties:
-                    ##self.cov_mat_cal[0,:,:]  += np.dot(meansub[0,:], meansub[0,:].transpose()) / (nexps - 1)
-                    ##self.sigmasquared_cal[0,:] = np.diagonal(self.cov_mat_cal[0,:,:])
-
-            ##nexp_c = self.sigmasquared_cal.shape[1]
-            ##self.sigmasquared = (2* self.sigmasquared_tar + \
-            ##                     (nexp_c - 1)*self.sigmasquared_cal) / (nexp_c + 1)
 
         # Combine mean calibrator values and errors
         self.cp_mean_tot = np.zeros(self.cp_mean_cal[0].shape)
