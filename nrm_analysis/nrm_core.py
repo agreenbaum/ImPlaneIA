@@ -925,16 +925,32 @@ class Calibrate:
         return None
 
 class BinaryAnalyze:
-    def __init__(self, oifitsfn, savedir = "calibrated", extra_error=0, plot="on"):
+    def __init__(self, oifitsfn, savedir = None, extra_error=0, plot="on"):
         """
-        What do I want to do here?
-        Want to load an oifits file and look for a binary -- anything else?
+        BinaryAnalyze loads in an oifits file, also contains various methods
+        for searching for a secondary point source:
+
+        coarse_binary_search ***out of date*** - loop through a coars grid to
+                             find min chi^2, feeds finer search
+        detec_map *** phasing out *** - create crude "detection sensitivity" map
+        chi2map              - updated coarse grid search, parallelized, 
+                               much faster
+        detection_limits     - Needs to be checked, but MC approach to estimating
+                               detection limits.
+        grid_spectrum        - holding position constant, computes contrast over 
+                               set of wavelengths that minimize chi^2 (coarse 
+                               spectrum extraction)
+        run_emcee            - runs MCMC fit for a BINARY. 
+        + various plotting routines to show the results.
         """
         self.oifitsfn = oifitsfn
         self.extra_error = extra_error
 
         get_data(self)
-        self.savedir = savedir
+        if self.savedir==None:
+            self.savedir=os.getcwd()
+        else:
+            self.savedir = savedir
         self.plot=plot
 
     def coarse_binary_search(self, lims, nstep=20):
@@ -1015,7 +1031,7 @@ class BinaryAnalyze:
         con_index = np.ma.masked_array(loglike, mask=detec_mask).argmax(axis=2)
         detec_array = cons[con_index]
         print detec_array.shape
-        self.loglike = loglike
+        self.loglike = loglike`
         self.loglike_0 = loglike_0
         plt.figure()
         plt.title("1-sigma detection?")
@@ -1155,7 +1171,7 @@ class BinaryAnalyze:
             plt.savefig(self.savedir+save)
 
     def chi2map(self, maxsep=300., clims = [0.001, 0.5], nstep=50, \
-                threads=4, observables="cp",save=True):
+                threads=4, observables="cp"):
         """
         Makes a coarse chi^2 map at the contrast where chi^2 is minimum for each position. 
         Default cps only, but can choose observables="all" to use visibility info also.
@@ -1239,25 +1255,18 @@ class BinaryAnalyze:
         self.significance = self.chi2_null - np.min(self.chi2grid, axis=0).transpose()
         self.significance[self.significance<0] = 0
 
-        savdata = {"chi2grid":self.chi2grid, "ra":self.ras, "dec":self.decs, "con": self.cons,\
+        self.chi2map_savdata = {"chi2grid":self.chi2grid, "ra":self.ras, "dec":self.decs, "con": self.cons,\
                    "significance":self.significance}
-        if type(save)==str:
-            savestr = self.savedir+os.path.sep+save+"_chi2map.pick"
-            f = open(savestr, "w")
-            pickle.dump(savdata, f)
-        elif save==True:
-            savestr = self.savedir+os.path.sep+self.oifitsfn.replace(".oifits", "")+"_chi2map.pick"
-            f = open(savestr, "w")
-            pickle.dump(savdata, f)
-        else:
-            savestr = self.savedir+os.path.sep+self.oifitsfn.replace(".oifits", "")+"_chi2map.pick"
-
-        if self.plot=="on":
-            self.plot_chi2map(savdata, savestr.replace(".pick", ".pdf"))
-
         return bestparams
 
-    def plot_chi2map(self, savdata, savestr="chi2map.pdf", show=False):
+    def save_chi2map(self, absolute_path_filename_save):
+        savestr = self.savedir+os.path.sep+save+"_chi2map.pick"
+        #savestr = self.savedir+os.path.sep+self.oifitsfn.replace(".oifits", "")+"_chi2map.pick"
+        f = open(savestr, "w")
+        pickle.dump(savdata, f)
+        return bestparams
+
+    def plot_chi2map(self, savdata, savestr=False, show=False):
         #unpack everything
         ras = savdata['ra']
         decs = savdata['dec']
@@ -1280,7 +1289,8 @@ class BinaryAnalyze:
         plt.colorbar()
         plt.gca().invert_yaxis()
 
-        plt.savefig(savestr)
+        if savestr is not False:
+            plt.savefig(savestr)
         if show==True:
             plt.show()
         plt.clf()
@@ -1294,7 +1304,7 @@ class BinaryAnalyze:
     def detection_limits(self, ntrials = 1, seplims = [20, 200],\
                          conlims = [0.0001, 0.99], anglims = [0,360],\
                          nsep = 24, ncon=24, nang=24, threads=4,\
-                         observables="cp", save="", scale=1.0):
+                         observables="cp", scale=1.0):
         """
         Inspired by pymask code.
         ntrials: Number of times we draw randomly
@@ -1479,15 +1489,17 @@ class BinaryAnalyze:
         """
         # pickle the data
         clevels = [0.5, 0.9, 0.99, 0.999]
-        self.savdata = {"clevels": clevels, "separations": self.seps, \
+        self.savdata_deteclims = {"clevels": clevels, "separations": self.seps, \
                    "angles":self.angs, "contrasts":self.cons, \
                    "detections":self.detec_grid}
-        f = open(self.savedir+os.path.sep+save+"detection_limits.pick", "w")
-        pickle.dump(self.savdata, f)
-        f.close()
         return self.savdata
 
-    def plot_deteclims(self, savdata, save = "", plot="off"):
+    def save_deteclims(self, savestr):
+        f = open(savestr, "w")
+        pickle.dump(self.savdata, f)
+        f.close()
+
+    def plot_deteclims(self, savdata, savestr =False, plot="off"):
         # contour plot
         clevels = savdata["clevels"]
         seps = savdata["separations"]
@@ -1509,9 +1521,9 @@ class BinaryAnalyze:
         plt.ylabel("Contrast Ratio")
         plt.title("Detection Limits")
 
-        plt.savefig(self.savedir+os.path.sep+save+"detection_limits.pdf")
-        if self.plot=="on":
-            plt.draw()
+        if savestr is not False:
+            plt.savefig(savestr)
+        return None
 
     def grid_spectrum(self, sep, pa, ncon=100, conlims=[1.0e-3, 0.999], plot=True):
         """ If the position is known (sep, pa), look for best 
@@ -1648,7 +1660,7 @@ class BinaryAnalyze:
 
     def run_emcee(self, params, constant={}, nwalkers = 250, \
                   niter = 1000, burnin=500, spectrum_model=None, priors=None, \
-                  threads=4, scale=1.0, observables="cp", show=True):
+                  threads=4, scale=1.0, observables="cp"):
         """
         A lot of options in this method, read carefully.
 
@@ -1777,6 +1789,7 @@ class BinaryAnalyze:
         print "keys", self.keys
         print "params", guess
         return guess
+
     def corner_plot(self, fn):
         import corner
         plt.figure(1)
@@ -1803,14 +1816,6 @@ class BinaryAnalyze:
         plt.show()
         plt.clf()
         return self.chain_convergence
-
-def diffphase_binary_model(self):
-    # Figure out how to do diff phase here in Calibrate first?
-    # Look for, e.g., emission features.
-    return None
-
-def plot_diffphase_uv(self):
-    return None
 
 def cp_binary_model(params, constant, priors, spectrum_model, uvcoords, cp, cperr, stat="loglike"):
     # really want to be able to give this guy some general oi_data and have bm() sort it out.
@@ -2223,9 +2228,9 @@ class DiskAnalyze:
 
     def diffvis_model(self, params, priors):
         """
-        polz data - look for differential visibilities and fit something from a radiative transfer code
-                    > Hyperion? Does it have polz info
-                    > mcfost? - Has polz info.
+        Calibrate polz data and calculate differential visibilities - 
+        Later: Forward model something from a radiative transfer code. 
+               This is more work...
         """
 
         # priors, here we're doing a general search, so it's a good idea to have some priors
