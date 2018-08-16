@@ -193,6 +193,16 @@ def model_cv_uv(uvs, ratio, separation, pa, inv_wavl):
     model_v2 = model_visamp**2
     return model_v2
 
+def model_pha_uv(uvs, ratio, separation, pa, inv_wavl):
+    # uvs are size 2, nwavl
+    uvs = inv_wavl*uvs
+    #model_visphi = visphase(uvs, ratio, separation, pa)
+    #model_visamp = visamp(uvs[:,0, ...], ratio, mas2rad(separation), np.pi*pa/180.)*\
+    #              visamp(uvs[:,0, ...], ratio, mas2rad(separation), np.pi*pa/180.)*\
+    #              visamp(uvs[:,0, ...], ratio, mas2rad(separation), np.pi*pa/180.)
+    model_vispha = visphase(uvs, ratio, mas2rad(separation), np.pi*pa/180.)
+    return model_vispha
+
 def model_cp_uv(tri_uv, ratio, separation, pa, inv_wavl):
     """
     Takes 3 cp uv coords, or a set of them and returns model cps based on

@@ -29,10 +29,14 @@ def vis(baseline, ratio, separation, angle):
     ratio = np.array(ratio)
     for ii in range(len(ratio)):
 
-        alpha = mas2rad(separation[ii])*np.cos(np.pi*angle[ii]/180.0)
-        delta = mas2rad(separation[ii])*np.sin(np.pi*angle[ii]/180.0)
+        alpha = separation[ii]*np.cos(angle[ii])
+        delta = separation[ii]*np.sin(angle[ii])
         visnum += ratio[ii]*(np.exp((-1j*2*np.pi*(alpha*u + delta*v))) )
     visibility = visnum / (1+ ratio.sum())
+    #    visibility += (1 + ratio[ii]*(np.exp((-1j*2*np.pi*(alpha*u + delta*v))) ) )\
+    #                   / (1+ ratio[ii])
+
+    #visibility = visnum / (1+ ratio.sum())
 
     phase = np.angle(visibility)
     amplitude = np.absolute(visibility)
@@ -49,14 +53,14 @@ def model_bispec_uv(tri_uv, ratio, separation, pa, inv_wavl):
     contrast, separation, pa all should be len(inv_wavl) or scalar
     """
     #ratio = np.array(ratio)
-    #separation = np.array(separation)
-    #pa = np.array(pa)
+    separation = np.array(separation)
+    pa = np.array(pa)
     uvs = inv_wavl*tri_uv
-    model_cps = vis(uvs[:,0, ...], ratio, separation, pa)[0] + \
-                vis(uvs[:,1, ...], ratio, separation, pa)[0] + \
-                vis(uvs[:,2, ...], ratio, separation, pa)[0]
-    model_t3amp = vis(uvs[:,0, ...], ratio, separation, pa)[1] * \
-                vis(uvs[:,1, ...], ratio, separation, pa)[1] * \
-                vis(uvs[:,2, ...], ratio, separation, pa)[1]
+    model_cps = vis(uvs[:,0, ...], ratio, mas2rad(separation), np.pi*pa/180.0)[1] + \
+                vis(uvs[:,1, ...], ratio, mas2rad(separation), np.pi*pa/180.0)[1] + \
+                vis(uvs[:,2, ...], ratio, mas2rad(separation), np.pi*pa/180.0)[1]
+    model_t3amp = vis(uvs[:,0, ...], ratio, mas2rad(separation), np.pi*pa/180.0)[0] * \
+                vis(uvs[:,1, ...], ratio, mas2rad(separation), np.pi*pa/180.0)[0] * \
+                vis(uvs[:,2, ...], ratio, mas2rad(separation), np.pi*pa/180.0)[0]
     # Return in deg to match oifits standard
     return model_t3amp, 180.*model_cps/np.pi
