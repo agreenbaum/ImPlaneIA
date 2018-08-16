@@ -115,7 +115,7 @@ class NRM_Model():
                         [ 2.2863100 ,  1.3200001],
                         [ 1.1431500 ,  1.9800000]    ] )
             #self.ctrs = analyticnrm2.flip(self.ctrs)
-            print "CTRS FLIPPED IN INIT"
+            #print "CTRS FLIPPED IN INIT"
             #self.lam = 4.3*um
             self.d = 0.80
             self.D = 6.5
