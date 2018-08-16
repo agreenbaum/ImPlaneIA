@@ -171,6 +171,10 @@ class OIfits():
             self.flip = kwdict['flip']
         except:
             self.flip=False
+        try:
+            self.covariance = kwdict["covariance"]
+        except:
+            self.covariance = None
 
         self.oitarget = np.array([self.target])
 
@@ -262,8 +266,8 @@ class OIfits():
                 self.v2_err = kwargs["v2err"][self.clip[0]: self.clip[1]]
                 # Add in vis observables
                 self.t3phi = kwargs["cps"][self.clip[0]: self.clip[1]]
-                print "cps given to oifits writer:"
-                print self.t3phi
+                #print "cps given to oifits writer:"
+                #print self.t3phi
                 self.t3phierr = kwargs["cperr"][self.clip[0]: self.clip[1]]
                 self.vispha = kwargs["pha"][self.clip[0]: self.clip[1]]
                 self.visphaerr = kwargs["phaerr"][self.clip[0]: self.clip[1]]
@@ -272,8 +276,8 @@ class OIfits():
                 self.v2_err = kwargs["v2err"]
                 # Add in vis observables
                 self.t3phi = kwargs["cps"]
-                print "cps given to oifits writer:"
-                print self.t3phi
+                #print "cps given to oifits writer:"
+                #print self.t3phi
                 self.t3phierr = kwargs["cperr"]
                 self.vispha = kwargs["pha"]
                 self.visphaerr = kwargs["phaerr"]
@@ -282,7 +286,7 @@ class OIfits():
         # T3 AMP data from V2 arrays
         self.t3amp = 0*self.t3phi.copy()
         self.t3amperr = 0*self.t3phierr.copy()
-        print self.t3amp.shape
+        #print self.t3amp.shape
         for elem in range(self.t3amp.shape[0]):
             self.t3amp[elem,:] = t3vis(np.sqrt(self.v2[elem,:]), N=self.N)#self.t3phi.copy() #np.ones((self.nwav, self.ncps))
             self.t3amperr[elem,:] = t3err(self.v2_err[elem, :], N=self.N)#self.t3phierr.copy() #np.ones((self.nwav, self.ncps))
@@ -310,7 +314,7 @@ class OIfits():
         #self.oivis = np.array(self.oivis)
         "vis understood by oifits obj:"
         #print self.oivis
-        print self.oivis2
+        #print self.oivis2
 
             #print read_in(self.datapath, wl,kw='cp')
             # needs to be in degrees
@@ -318,8 +322,8 @@ class OIfits():
             #self.t3flag[abs(self.t3phierr)>np.pi] = 1
         #print self.t3amperr
 
-        print "cps given to oifits writer, again:"
-        print self.t3phi
+        #print "cps given to oifits writer, again:"
+        #print self.t3phi
         self.t3flag[abs(self.t3phi)>self.phaseceil]=1
         for i in range(int(self.ncps)):
             """self, timeobs, int_time, t3amp, t3amperr, t3phi, t3phierr, flag, u1coord,
@@ -331,9 +335,9 @@ class OIfits():
                 array=self.array,station=(self.station,self.station,self.station))
             self.oit3.append(self.t3data)
         self.oit3=np.array(self.oit3)
-        print "cps understood by oifits obj:"
-        print self.oit3
-        print self.oit3[2].t3amp, self.oit3[2].t3phi
+        #print "cps understood by oifits obj:"
+        #print self.oit3
+        #print self.oit3[2].t3amp, self.oit3[2].t3phi
 
     def wavextension(self, wls, eff_band, clip=None):#mode, fitsfile, clip=None):
         # The OI_WAVELENGTH table -- stores wavelength info
@@ -399,12 +403,13 @@ class OIfits():
         # some extra keywords we'd like to hold onto
         self.oif.avparang = self.parang
         self.oif.parang_range = self.parang_range
+        self.oif.covariance = self.covariance
 
         self.oif.save(self.datapath+save_name)
         # Check
         f = oifits.open(self.datapath+save_name)
-        print "0th t3phi:", f.t3[0].t3phi
-        print "0th t3amp:", f.t3[0].t3amp
+        #print "0th t3phi:", f.t3[0].t3phi
+        #print "0th t3amp:", f.t3[0].t3amp
         return self.datapath+save_name
 
 if __name__ == "__main__":
