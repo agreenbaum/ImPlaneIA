@@ -455,17 +455,65 @@ Zheng Hai (Com Dev)'s mapping communicated by Mathilde Beaulieu to Anand.
 This mapping has offset, rotation, shrink x, magnification.
 Reference is a JWST Tech Report to be finalized 2013 by Anand.
 """
-def jwst_g7s6_centers_asdesigned():
-    # aka "xyMB" in Anand's  earlier mask creation routines
-    return np.array( [[ 0.00000000,  -2.640000],
-                      [-2.2863100 ,  0.0000000],
-                      [ 2.2863100 , -1.3200001],
-                      [-2.2863100 ,  1.3200001],
-                      [-1.1431500 ,  1.9800000],
-                      [ 2.2863100 ,  1.3200001],
-                      [ 1.1431500 ,  1.9800000]] )*m
-def jwst_g7s6c():
-    return 0.80*m, jwst_g7s6_centers_asdesigned()
+def jwst_g7s6_centers_asdesigned(chooseholes=None):
+    ## aka "xyMB" in Anand's  earlier mask creation routines
+    #return np.array( [[ 0.00000000,  -2.640000],
+    #                  [-2.2863100 ,  0.0000000],
+    #                  [ 2.2863100 , -1.3200001],
+    #                  [-2.2863100 ,  1.3200001],
+    #                  [-1.1431500 ,  1.9800000],
+    #                  [ 2.2863100 ,  1.3200001],
+    #                  [ 1.1431500 ,  1.9800000]] )*m
+    holedict = {} # as_built names, C2 open, C5 closed, but as designed coordinates
+    # Assemble holes by actual open segment names (as_built).  Either the full mask or the
+    # subset-of-holes mask will be V2-reversed after the as_designed centers  are defined
+    # Debug orientations with b4,c6,[c2]
+    allholes = ('b4','c2','b5','b2','c1','b6','c6')
+    b4,c2,b5,b2,c1,b6,c6 = ('b4','c2','b5','b2','c1','b6','c6')
+    #                                              design  built
+    holedict['b4'] = [ 0.00000000,  -2.640000]       #B4 -> B4
+    holedict['c2'] = [-2.2863100 ,  0.0000000]       #C5 -> C2
+    holedict['b5'] = [ 2.2863100 , -1.3200001]       #B3 -> B5
+    holedict['b2'] = [-2.2863100 ,  1.3200001]       #B6 -> B2
+    holedict['c1'] = [-1.1431500 ,  1.9800000]       #C6 -> C1
+    holedict['b6'] = [ 2.2863100 ,  1.3200001]       #B2 -> B6
+    holedict['c6'] = [ 1.1431500 ,  1.9800000]       #C1 -> C6
+
+    # as designed MB coordinates (Mathilde Beaulieu, Peter, Anand).
+    # as designed: segments C5 open, C2 closed, meters V2V3 per Paul Lightsey def
+    # as built C5 closed, C2 open
+    #
+    # undistorted pupil coords on PM.  These numbers are considered immutable.  
+    # as designed seg -> as built seg in comments each ctr entry (no distortion)
+    if chooseholes: #holes B4 B5 C6 asbuilt for orientation testing
+        print("\n  chooseholes creates mask with JWST as_built holes ", chooseholes)
+        #time.sleep(2)
+        holelist = []
+        for h in allholes:
+            if h in chooseholes: 
+                holelist.append(holedict[h])
+        ctrs_asdesigned = np.array( holelist )
+    else:
+        # the REAL THING - as_designed 7 hole, m in PM space, no distortion  shape (7,2)
+        ctrs_asdesigned = np.array( [ 
+                [ 0.00000000,  -2.640000],       #B4 -> B4  as-designed -> as-built mapping
+                [-2.2863100 ,  0.0000000],       #C5 -> C2
+                [ 2.2863100 , -1.3200001],       #B3 -> B5
+                [-2.2863100 ,  1.3200001],       #B6 -> B2
+                [-1.1431500 ,  1.9800000],       #C6 -> C1
+                [ 2.2863100 ,  1.3200001],       #B2 -> B6
+                [ 1.1431500 ,  1.9800000]    ] ) #C1 -> C6
+
+    # Preserve ctrs.as-designed (treat as immutable)
+    # Reverse V2 axis coordinates to close C5 open C2, and others follow suit... 
+    # preserve cts.as_built  (treat as immutable)
+    ctrs_asbuilt = ctrs_asdesigned.copy() # copy
+    ctrs_asbuilt[:,0] *= -1  # then flip the X axis values
+    # create and return  'live' hole centers
+    return ctrs_asbuilt * m
+
+def jwst_g7s6c(chooseholes=None):
+    return 0.80*m, jwst_g7s6_centers_asdesigned(chooseholes=chooseholes)
 
 
 def visir_sam_asmanufactured(mag):
