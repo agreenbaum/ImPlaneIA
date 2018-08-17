@@ -5,12 +5,37 @@ from astropy.io import fits
 import os, sys
 import cPickle as pickle
 from scipy.misc import comb
+import matrixDFT 
 
 m_ = 1.0
 mm_ =  m_/1000.0
 um_ = mm_/1000.0
 nm_ = um_/1000.0
 
+
+
+def rotate2dccw(vectors, thetarad):
+    """ LG++ addition
+    vectors is a list of 2d vectors - e.g. nrm hole  centers
+    positive thetarad: x decreases under slight rotation
+    positive thetarad: y increases under slight rotation
+    positive thetarad = CCW rotation
+    """
+    c, s = (np.cos(thetarad), np.sin(thetarad))
+    ctrs_rotated = []
+    for vector in vectors:
+        ctrs_rotated.append([c*vector[0] - s*vector[1], 
+                             s*vector[0] + c*vector[1]])
+    return np.array(ctrs_rotated)
+
+
+def centerpoint(s):
+    """ 
+        correct for Jinc, hex transform, 'ff' fringes to place peak in
+            central pixel (odd array) 
+            pixel corner (even array)
+    """
+    return (0.5*s[0] - 0.5,  0.5*s[1] - 0.5)
 
 def mas2rad(mas):
     rad = mas*(10**(-3)) / (3600*180/np.pi)
@@ -87,6 +112,35 @@ def rotatevectors(vectors, thetarad):
                              s*vector[0] + c*vector[1]])
     return np.array(ctrs_rotated)
 
+
+def Hex(x,y, **kwargs):
+    c = kwargs['c']
+    pitch = kwargs['pitch']
+    d = kwargs['d']
+    lam = kwargs['lam']
+    
+    xi = (x-c[0]) #(d/lam) * pitch * (x - c[0])
+    eta = (y-c[1]) #(d/lam) * pitch* (y - c[1])
+
+    myhex = hexee.g_eeGEN(xi, eta, D=(d*pitch/lam)) \
+           + hexee.g_eeGEN(-xi, eta, D=(d*pitch/lam))
+    return myhex
+
+def hex_correction(x, y, **kwargs):
+    which = kwargs['which']
+    c = kwargs['c']
+    pitch = kwargs['pitch']
+    d = kwargs['d']
+    lam = kwargs['lam']
+    xi = (x-c[0]) #(d/lam) * pitch * (x - c[0])
+    eta = (y-c[1]) #(d/lam) * pitch* (y - c[1])
+
+    if which=='ETA':
+        return hexee.glimit(xi, eta, c=c, d=d, lam=lam, pixel=pitch, minus=False) \
+            + hexee.glimit(xi, eta, c=c, d=d, lam=lam, pixel=pitch, minus=True)
+    if which == 'XI':
+        return np.sqrt(3)*d*d / 2.0
+
 def lambdasteps(lam, percent, steps=4):
     # not really percent, just fractional bandwidth
     frac = percent/2.0
@@ -106,9 +160,9 @@ def crosscorrelatePSFs(a, A, ov, verbose=False):
     """
     Assume that A is oversampled and padded by one pixel each side
     """
-    print "\nInfo: performing cross correlations\n"
-    print "\ta.shape is ", a.shape
-    print "\tA.shape is ", A.shape
+    print("\nInfo: performing cross correlations\n")
+    print("\ta.shape is ", a.shape)
+    print("\tA.shape is ", A.shape)
     #print "\tov is", ov
 
     p,q = a.shape
@@ -118,7 +172,7 @@ def crosscorrelatePSFs(a, A, ov, verbose=False):
 
 
     for x in range(2*ov):
-        if verbose: print x, ":", 
+        if verbose: print(x, ":")
         for y in range(2*ov):
             binA = krebin(A[x:x+p*ov, y:y+q*ov], a.shape)
             #print "\tbinA.shape is ", binA.shape  #DT 12/05/2014, binA.shape is  (5, 5)
@@ -128,8 +182,8 @@ def crosscorrelatePSFs(a, A, ov, verbose=False):
                                       #binned down to 5x5 is in the bottom left corner
             cormat[x,y] = np.max(rcrosscorrelate(apad, binApad, verbose=False))
                        #shape of utils.rcrosscorrelate(apad, binApad, verbose=False is 10x10
-            if verbose: print "%.3f" % cormat[x,y],
-        if verbose: print "\n"
+            if verbose: print("%.3f" % cormat[x,y])
+        if verbose: print("\n")
     return cormat
 
 """
@@ -139,32 +193,203 @@ def rebin(a, shape): # Klaus P's fastrebin from web
 """
 
 def centerit(img, r='default'):
+    print("deprecated - switch to using  'center_imagepeak'")
+    return center_imagepeak(img, r='default')
+       
+def center_imagepeak(img, r='default'):
+
     if r == 'default':
-        r = img.shape[0]-1 //2
+        r = int((img.shape[0]-1 )/2)
     else:
         pass
-    print 'Before cropping:', img.shape
-    lo = 140-40
-    hi = 140+40
+    print('Before cropping:', img.shape)
+
     ann = makedisk(img.shape[0], 11)
-    #peakx, peaky = np.where(img==np.ma.masked_invalid(img[lo:hi,lo:hi]).max())
-    peakx, peaky = np.where(img==np.ma.masked_invalid(img[ann==1]).max())
-    #print 'peaking on: ',np.ma.masked_invalid(img[lo:hi,lo:hi]).max()
-    print 'peaking on: ',np.ma.masked_invalid(img[ann==1]).max()
-    print 'peak x,y:', peakx,peaky
-    cropped = img[int(peakx-r):int(peakx+r+1),int(peaky-r):int(peaky+r+1)]
-    print 'Cropped image shape:',cropped.shape
-    print 'value at center:', cropped[r,r]
-    print np.where(cropped == cropped.max())
+
+    # following two lines take care of peaks at two or more pixel locations:
+    peakmask = np.where(img==np.ma.masked_invalid(img[ann==1]).max())
+    peakx, peaky = peakmask[0][0], peakmask[1][0]
+    print('peaking on: ',np.ma.masked_invalid(img[ann==1]).max())
+    print('peak x,y:', peakx, peaky)
+
+    #print( "[int(peakx-r){0}:int(peakx+r+1){1}, int(peaky-r){2}:int(peaky+r+1){3}]".format( 
+    #int(peakx-r),int(peakx+r+1), int(peaky-r),int(peaky+r+1)  ))
+
+    cropped = img[int(peakx-r):int(peakx+r+1), int(peaky-r):int(peaky+r+1)]
+    print('Cropped image shape:',cropped.shape)
+    print('value at center:', cropped[r,r])
+    print(np.where(cropped == cropped.max()))
+
     #pl.imshow(cropped, interpolation='nearest', cmap='bone')
     #pl.show()
     return cropped
+
+
+def find_centroid(a, thresh, verbose=False):
+    """ 
+    input a: input array (real, square), considered 'image space'
+    input thresh: normalize abs(cv = ft(a)) and define support of good cv when this is above threshold
+                  then find phase slope only in this support area.
+    returns centroid of a, as offset from array center, in pythonese as calculated by DFT's and so on..
+
+    Original domain a, Fourier domain cv
+    sft square image a to cv array, no loss or oversampling - like an fft.
+    Normalize peak of abs(cv) to unity
+    Create 'live area' mask from abs(cv) with slight undersizing 
+        (allow for 1 pixel shifts to live data still)
+        (splodges, or full image a la KP)
+    Calculate phase slopes using cv.angle() phase array
+    Calculate mean of phase slopes over mask
+    Normalize phase slopes to reflect image centroid location in pixels
+    By eye, looking at smoothness of phase slope array...
+    JWST NIRISS F480 F430M F380M 0.02
+    JWST NIRISS F277 0.02 - untested
+    GPI - untested
+
+    XY conventions meshed to LG_Model conventions:
+    if you simulate a psf with pixel_offset = ( (0.2, 0.4), ) then blind application
+
+        centroid = utils.find_centroid()  
+        
+    returns the image centroid (0.40036, 0.2000093) pixels in image space. To use this
+    in LG_Model, nrm_core,... you will want to calculate the new image center using
+
+        image_center = utils.centerpoint(s) + np.array((centroid[1], centroid[0])
+
+    and everything holds together sensibly looking at DS9 images of a.
+
+    anand@stsci.edu 2018.02
+    """
+
+    ft = matrixDFT.MatrixFourierTransform()
+    cv = ft.perform(a, a.shape[0], a.shape[0]) 
+    cvmod, cvpha = np.abs(cv), np.angle(cv)
+    cvmod = cvmod/cvmod.max() # normalize to unity peak
+    #import matplotlib.pyplot as plt
+    #plt.imshow(a)
+    #plt.show()
+    #print(np.isnan(cvmod))
+    #print(np.isnan(thresh))
+    cvmask = np.where(cvmod >= thresh)
+    cvmask_edgetrim = trim(cvmask, a.shape[0])
+    htilt, vtilt = findslope(cvpha, cvmask_edgetrim, verbose)
+
+    M = np.zeros(a.shape)
+    print(">>> utils.find_centroid(): M.shape {0}, a.shape {1}".format(M.shape, a.shape))
+    print(cvmask_edgetrim)
+    M[cvmask_edgetrim] = 1
+    print(">>> utils.find_centroid(): M.shape {0}, cvpha.shape {1}".format(M.shape, cvpha.shape))
+    if 0:
+        fits.PrimaryHDU(data=a).writeto("/Users/anand/gitsrc/nrm_analysis/rundir/3_test_LGmethods_data/img.fits", overwrite=True)
+        fits.PrimaryHDU(data=cvmod).writeto("/Users/anand/gitsrc/nrm_analysis/rundir/3_test_LGmethods_data/cvmod.fits", overwrite=True)
+        fits.PrimaryHDU(data=M*cvpha*180.0/np.pi).writeto("/Users/anand/gitsrc/nrm_analysis/rundir/3_test_LGmethods_data/cvpha.fits", overwrite=True)
+        print("cv abs max = {}".format(cvmod.max()))
+        print("utils.find_centroid: {0} locations of CV array in CV mask for this data".format(len(cvmask[0])))
+
+    return htilt, vtilt
+
+
+def findslope(a, m, verbose):
+    from astropy.stats import SigmaClip
+    """ Find slopes of an array, over pixels not bordering the edge of the array
+        You should have valid data either side of every pixel selected by the mask m.
+        a is in radians of phase (in Fourier domain) when used in NRM/KP applications.
+
+        The std dev of the middle 9 pixels are used to further clean the mask 'm'
+        of invalid slope data, where we're subtracting inside-mask-support from
+        outside-mask-support.  This mask is called newmask.
+
+        Converting tilt in radians per Fourier Domain (eg pupil_ACF) pixel 
+        Original Domain (eg image intensity) pixels:
+
+            If the tilt[0] is 2 pi radians per ODpixel you recover the same OD
+            array you started with.  That means you shifted the ODarray one
+            full lattice spacing, the input array size, so you moved it by
+            OD.shape[0].
+
+                    2 pi / FDpixel of phase slope ==> ODarray.shape[0]
+                1 radian / FDpixel of phase slope ==> ODarray.shape[0] / (2 pi) shift
+                x radian / FDpixel of phase slope ==> x * ODarray.shape[0] / (2 pi) ODpixels of shift
+
+        Gain between rad/pix phase slope and original domin pixels is  a.shape[0 or 1] / (2 pi)
+        Multiply the measured phase slope by this gain for pixels of incoming array centroid shift away from array center.
+        anand@stsci.edu 2018.02
+        """
+    a_up = np.zeros(a.shape)
+    a_dn = np.zeros(a.shape)
+    a_l = np.zeros(a.shape)
+    a_r = np.zeros(a.shape)
+    #
+    a_up[:, 1:  ]  =  a[:,  :-1]
+    a_dn[:,  :-1]  =  a[:, 1:  ]
+    #
+    a_r[1:  ,:]   =   a[ :-1,:]
+    a_l[ :-1,:]   =   a[1:,   :]
+    #
+    offsetcube = np.zeros((4, a.shape[0], a.shape[1]))
+    offsetcube[0,:,:] = a_up
+    offsetcube[1,:,:] = a_dn
+    offsetcube[2,:,:] = a_r
+    offsetcube[3,:,:] = a_l
+    if 0:
+        fits.PrimaryHDU(data=offsetcube*180.0/np.pi).writeto(
+             "/Users/anand/gitsrc/nrm_analysis/rundir/3_test_LGmethods_data/offsetcube.fits",
+             overwrite=True)
+
+    tilt = np.zeros(a.shape), np.zeros(a.shape)
+    tilt = (a_r - a_l)/2.0,  (a_up - a_dn)/2.0  # raw estimate of phase slope
+    c = centerpoint(a.shape)
+    C = (int(c[0]), int(c[1]))
+    sigh, sigv = tilt[0][C[0]-1:C[0]+1,C[1]-1:C[1]+1].std(),   tilt[1][C[0]-1:C[0]+1,C[1]-1:C[1]+1].std()
+    avgh, avgv = tilt[0][C[0]-1:C[0]+1,C[1]-1:C[1]+1].mean(),  tilt[1][C[0]-1:C[0]+1,C[1]-1:C[1]+1].mean()
+    if verbose:
+        print("C is {}".format(C))
+        print("sigh, sinv = {0}.{1}".format(sigh,sigv))
+        print("avgh, avgv = {0}.{1}".format(avgh,avgv))
+
+    # second stage mask cleaning: 5 sig rejection of mask
+    newmaskh = np.where( np.abs(tilt[0] - avgh) < 5*sigh )
+    newmaskv = np.where( np.abs(tilt[1] - avgv) < 5*sigv )
+    if verbose:
+        print("tilth over newmaskh mean {0:.4e} sig {1:.4e}".format( tilt[0][newmaskh].mean(), tilt[0][newmaskh].std() ))
+        print("tiltv over newmaskh mean {0:.4e} sig {1:.4e}".format( tilt[1][newmaskv].mean(), tilt[1][newmaskv].std() ))
+    th, tv = np.zeros(a.shape), np.zeros(a.shape)
+    th[newmaskh] = tilt[0][newmaskh]
+    tv[newmaskv] = tilt[1][newmaskv]
+    # figure out units of tilt - 
+    if 0:
+        fits.PrimaryHDU(data=th*180.0/np.pi).writeto(
+             "/Users/anand/gitsrc/nrm_analysis/rundir/3_test_LGmethods_data/tilt0.fits",
+             overwrite=True)
+        fits.PrimaryHDU(data=tv*180.0/np.pi).writeto(
+             "/Users/anand/gitsrc/nrm_analysis/rundir/3_test_LGmethods_data/tilt1.fits",
+             overwrite=True)
+    G = a.shape[0] / (2.0*np.pi),  a.shape[1] / (2.0*np.pi)
+    return G[0]*tilt[0][newmaskh].mean(), G[1]*tilt[1][newmaskv].mean() 
+
+
+def trim(m, s):
+    """ removes edge pixels from m = np.where(a<X) index mask, for example 
+        m is the index mask - assumed 2d
+        s is size of the where'd square array
+    anand@stsci.edu
+    """
+    #rint(int(s*s), len(m[0]), len(m[1]), end="")
+    xl, yl = [], []  # trimmed lists 
+    for ii in range(len(m[0])): # go through all indices in the mask x y lists
+        # test for any index being an edge index - if none are on the edge, remember the indices in new list
+        if (m[0][ii] == 0 or m[1][ii] == 0 or m[0][ii] == s-1 or m[1][ii] == s-1) == False:
+            xl.append(m[0][ii])
+            yl.append(m[1][ii])
+    #rint(len(xl), len(yl))
+    return (np.asarray(xl), np.asarray(yl))
+
 
 def deNaN(s, datain):
     ## Get rid of NaN values with nearest neighbor median
     fov=datain.shape[0]
     a2 = np.zeros((2*fov, 2*fov))
-    print "FOV:", fov, "selection shape:", (fov//2,3*fov//2,fov//2,3*fov/2)
+    print("FOV:", fov, "selection shape:", (fov//2,3*fov//2,fov//2,3*fov/2))
     a2[fov//2:fov+fov//2, fov//2 : fov+fov//2 ] = datain
     xnan, ynan = np.where(np.isnan(a2))
     for qq in range(len(a2[np.where(np.isnan(a2))])):
@@ -185,15 +410,15 @@ def get_fits_filter(fitsheader, ):
     wavestring = "WAVE"
     weightstring = "WGHT"
     filterlist = []
-    print fitsheader[:]
+    print(fitsheader[:])
     j =0
     for j in range(len(fitsheader)):
         if wavestring+str(j) in fitsheader:
             wght = fitsheader[weightstring+str(j)]
             wavl = fitsheader[wavestring+str(j)]  
-            print "wave", wavl
+            print("wave", wavl)
             filterlist.append(np.array([wght,wavl]))
-    print filterlist
+    print(filterlist)
     return filterlist
 
 
@@ -280,7 +505,7 @@ def specFromSpectralType(sptype, return_list=False):
 
     #try:
     keys = lookuptable[sptype]
-    print "Spectral type exists in table ({0}):".format(sptype), keys
+    print("Spectral type exists in table ({0}):".format(sptype), keys)
     return pysynphot.Icat('ck04models',keys[0], keys[1], keys[2])
 
 def combine_transmission(filt, SRC):
@@ -341,26 +566,25 @@ def makeA(nh, verbose=False):
     anand@stsci.edu  29 Aug 2014
         """
 
-    print "\nmakeA(): "
+    print("\nmakeA(): ")
     #                   rows         cols
     ncols = (nh*(nh-1))//2
     nrows = nh
     matrixA = np.zeros((ncols, nrows))
-    if verbose: print matrixA
+    if verbose: print(matrixA)
     row = 0
     for h2 in range(nh):
-        if verbose: print
         for h1 in range(h2+1,nh):
             if h1 >= nh:
                 break
             else:
                 if verbose:
-                    print "R%2d: "%row, 
-                    print "%d-%d"%(h1,h2)
+                    print("R%2d: "%row)
+                    print("%d-%d"%(h1,h2))
                 matrixA[row,h2] = -1
                 matrixA[row,h1] = +1
                 row += 1
-    if verbose: print
+    if verbose: print()
     return matrixA
 
 
@@ -420,7 +644,7 @@ def makeK(nh, verbose=False):
     agreenba@pha.jhu.edu  22 Aug 2015
         """
 
-    print "\nmakeK(): "
+    print("\nmakeK(): ")
     nrow = comb(nh, 3)
     ncol = nh*(nh-1)/2
 
@@ -473,8 +697,8 @@ def nb_pistons(multiplier=1.0, debug=False):
                                           -0.04779984719154552] ) # phi in waves
         phi_nb_ = phi_nb_ - phi_nb_.mean() # phi in waves, zero mean
         wl = 4.3 * um_
-        print "std dev  of piston OPD: %.1e um" % (phi_nb_.std() * wl/um_)
-        print "variance of piston OPD: %.1e rad" % (phi_nb_.var() * (4.0*np.pi*np.pi))
+        print("std dev  of piston OPD: %.1e um" % (phi_nb_.std() * wl/um_))
+        print("variance of piston OPD: %.1e rad" % (phi_nb_.var() * (4.0*np.pi*np.pi)))
         return phi_nb_ * 4.3*um_ # phi_nb in m
 
 
@@ -496,9 +720,9 @@ def get_webbpsf_filter(filtfile, specbin=None, trim=False):
         tmp_array[i,T] = thru[i][1]             # weights (peak unity, unnormalized sum)
         if 0:
             if i == len(thru)//2:
-                print "input line: %d " % i
-                print "raw input spectral wavelength: %.3e " % thru[i][0] 
-                print "cvt input spectral wavelength: %.3e " % tmp_array[i,W] 
+                print("input line: %d " % i)
+                print("raw input spectral wavelength: %.3e " % thru[i][0] )
+                print("cvt input spectral wavelength: %.3e " % tmp_array[i,W] )
 
     # remove leading and trailing throughput lines with 'flag' array of indices
     flag = np.where(tmp_array[:,T]!=0)[0]
@@ -508,7 +732,7 @@ def get_webbpsf_filter(filtfile, specbin=None, trim=False):
     # rebin as desired - fewer wavelengths for debugginng quickly
     if specbin:
         smallshape = spec.shape[0]//specbin
-        print "bin by",  specbin, "  from ", spec.shape[0], " to",  smallshape
+        print("bin by",  specbin, "  from ", spec.shape[0], " to",  smallshape)
         spec = spec[:smallshape*specbin, :]  # clip trailing 
         spec = krebin(spec, (smallshape,2))
         #print "          wl/um", spec[:,W]
@@ -518,7 +742,7 @@ def get_webbpsf_filter(filtfile, specbin=None, trim=False):
         #print "specbin - spec.shape", spec.shape
 
     if trim:
-        print "TRIMming"
+        print("TRIMming")
         wl = spec[:,W].copy()
         tr = spec[:,T].copy()
         idx = np.where((wl > (1.0 - 0.5*trim[1])*trim[0]) & (wl < (1.0 + 0.5*trim[1])*trim[0]))
@@ -527,23 +751,23 @@ def get_webbpsf_filter(filtfile, specbin=None, trim=False):
         spec = np.zeros((len(idx[0]),2))
         spec[:,1] = wl
         spec[:,0] = tr
-        print "post trim - spec.shape", spec.shape
+        print("post trim - spec.shape", spec.shape)
 
-    print "post specbin - spec.shape", spec.shape
-    print "%d spectral samples " % len(spec[:,0]) + \
-          "between %.3f and %.3f um" % (spec[0,W]/um_,spec[-1,W]/um_)
+    print("post specbin - spec.shape", spec.shape)
+    print("%d spectral samples " % len(spec[:,0]) + \
+          "between %.3f and %.3f um" % (spec[0,W]/um_,spec[-1,W]/um_))
  
     return spec
 
 def trim_webbpsf_filter(filt, specbin=None, plot=False):
-    print "================== " + filt + " ==================="
+    print("================== " + filt + " ===================")
     beta = {"F277W":0.6, "F380M":0.15, "F430M":0.17, "F480M":0.2}
     lamc = {"F277W":2.70e-6, "F380M":3.8e-6, "F430M":4.24e-6, "F480M":4.8e-6}
     filterdirectory = os.getenv('WEBBPSF_PATH')+"/NIRISS/filters/" 
     band = get_webbpsf_filter(filterdirectory+filt+"_throughput.fits", 
                               specbin=specbin, 
                               trim=(lamc[filt], beta[filt]))
-    print "filter", filt, "band.shape", band.shape,  "\n", band
+    print("filter", filt, "band.shape", band.shape,  "\n", band)
     wl = band[:,1]
     tr = band[:,0]
     if plot: plt.plot(wl/um_, np.log10(tr), label=filt)
@@ -607,31 +831,31 @@ def crosscorrelate(a=None, b=None, verbose=True):
     """
 
     if a.shape != b.shape:
-        print "crosscorrelate: need identical arrays"
+        print("crosscorrelate: need identical arrays")
         return None
 
     fac = np.sqrt(a.shape[0] * a.shape[1])
-    if verbose: print "fft factor = %.5e" % fac
+    if verbose: print("fft factor = %.5e" % fac)
 
     A = fft.fft2(a)/fac
     B = fft.fft2(b)/fac
-    if verbose: print "\tPower2d -  a: %.5e  A: %.5e " % ( (a*a.conj()).real.sum() ,  (A*A.conj()).real.sum())
+    if verbose: print("\tPower2d -  a: %.5e  A: %.5e " % ( (a*a.conj()).real.sum() ,  (A*A.conj()).real.sum()))
 
     c = fft.ifft2(A * B.conj())  * fac * fac
 
-    if verbose: print "\tPower2d -  A: %.5e  B: %.5e " % ( (A*A.conj()).real.sum() ,  (B*B.conj()).real.sum())
-    if verbose: print "\tPower2d -  c=A_correl_B: %.5e " % (c*c.conj()).real.sum()
+    if verbose: print("\tPower2d -  A: %.5e  B: %.5e " % ( (A*A.conj()).real.sum() ,  (B*B.conj()).real.sum()))
+    if verbose: print("\tPower2d -  c=A_correl_B: %.5e " % (c*c.conj()).real.sum())
 
-    if verbose: print "\t(a.sum %.5e x b.sum %.5e) = %.5e   c.sum = %.5e  ratio %.5e  " % (a.sum(), b.sum(), a.sum()*b.sum(), c.sum().real,  a.sum()*b.sum()/c.sum().real)
+    if verbose: print("\t(a.sum %.5e x b.sum %.5e) = %.5e   c.sum = %.5e  ratio %.5e  " % (a.sum(), b.sum(), a.sum()*b.sum(), c.sum().real,  a.sum()*b.sum()/c.sum().real))
 
-    if verbose: print 
+    if verbose: print()
     return fft.fftshift(c)
 
 # used in NRM_Model.py
 def quadratic(p, x):
     "  max y = -b^2/4a occurs at x = -b^2/2a"
-    print "Max y value %.5f"%(-p[1]*p[1] /(4.0*p[0]) + p[2])
-    print "occurs at x = %.5f"%(-p[1]/(2.0*p[0]))
+    print("Max y value %.5f"%(-p[1]*p[1] /(4.0*p[0]) + p[2]))
+    print("occurs at x = %.5f"%(-p[1]/(2.0*p[0])))
     return -p[1]/(2.0*p[0]), -p[1]*p[1] /(4.0*p[0]) + p[2], p[0]*x*x + p[1]*x + p[2]
 
 
@@ -668,12 +892,12 @@ def save(nrmobj, outputname, savdir = ""):
     savobj.test = 1
     with open(r"{0}{1}.json".format(savdir, outputname), "wb") as output_file:
         json.dump(savobj, output_file, default=jdefault)
-    print "success!"
+    print("success!")
 
     ffotest = json.load(open(outputname+".json", 'r'))
     
-    print hasattr(ffotest, 'test')
-    print ffotest['test']
+    print(hasattr(ffotest, 'test'))
+    print(ffotest['test'])
 
 
     # init stuff
@@ -753,19 +977,19 @@ def baseline_info(mask, pscale_mas, lam_c):
     mask.ctrs = np.array(mask.ctrs)
     uvs, bllengths, label = baselinify(mask.ctrs)
 
-    print "========================================"
-    print "All the baseline sizes:"
-    print bllengths
-    print "========================================"
-    print "Longest baseline:"
-    print bllengths.max(), "m"
-    print "corresponding to lam/D =", rad2mas(lam/bllengths.max()), "mas at {0} m \n".format(lam_c)
-    print "Shortest baseline:"
-    print bllengths.min(), "m"
-    print "corresponding to lam/D =", rad2mas(lam/bllengths.min()), "mas at {0} m".format(lam_c)
-    print "========================================"
-    print "Mask is Nyquist at",
-    print mas2rad(2*pscale_mas)*(bllengths.max())
+    print("========================================")
+    print("All the baseline sizes:")
+    print(bllengths)
+    print("========================================")
+    print("Longest baseline:")
+    print(bllengths.max(), "m")
+    print("corresponding to lam/D =", rad2mas(lam/bllengths.max()), "mas at {0} m \n".format(lam_c))
+    print("Shortest baseline:")
+    print(bllengths.min(), "m")
+    print("corresponding to lam/D =", rad2mas(lam/bllengths.min()), "mas at {0} m".format(lam_c))
+    print("========================================")
+    print("Mask is Nyquist at:")
+    print(mas2rad(2*pscale_mas)*(bllengths.max()))
 
 def corner_plot(pickfile, nbins = 100, save="my_calibrated/triangle_plot.png"):
     """
@@ -776,10 +1000,10 @@ def corner_plot(pickfile, nbins = 100, save="my_calibrated/triangle_plot.png"):
 
     mcmc_results = pickle.load(open(pickfile))
     keys = mcmc_results.keys()
-    print keys
+    print(keys)
     chain = np.zeros((len(mcmc_results[keys[0]]), len(keys)))
-    print len(keys)
-    print chain.shape
+    print(len(keys))
+    print(chain.shape)
     for ii,key in enumerate(keys):
         chain[:,ii] = mcmc_results[key]
 

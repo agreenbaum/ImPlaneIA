@@ -221,7 +221,7 @@ def matrix_operations(img, model, flux = None, verbose=False):
         print "flat img * transpose dimensions", np.shape(inverse)
 
     try: 
-        from linearfit import linearfit
+        import linearfit
 
         # dependent variables
         M = np.mat(flatimg)
@@ -243,6 +243,10 @@ def matrix_operations(img, model, flux = None, verbose=False):
 
         # do the fit
         result.fit()
+
+        # reshape the residual?
+        result.residuals = np.insert(result.residuals, naninsert, np.nan)
+        result.residuals = result.residuals.reshape(img.shape[0], img.shape[1])
 
         # delete inverse_covariance_matrix to reduce size of pickled file
         result.inverse_covariance_matrix = []
