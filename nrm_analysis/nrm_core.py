@@ -18,7 +18,7 @@ BinaryAnalyze - Detection, mcmc modeling, visualization tools
 
 """
 
-
+from __future__ import print_function
 # Standard imports
 import os, sys, time
 import numpy as np
@@ -84,11 +84,18 @@ class FringeFitter:
             self.auto_rotate = kwargs["auto_rotate"]
         else:
             self.auto_rotate = False
-        if "centering" in kwargs:
-            self.hold_centering = kwargs["centering"]
+        if "centering" in kwargs or "psf_offset" in kwargs: # if so do not find center of image in data
+            self.hold_centering = kwargs["psf_offset"] # already-known psf offset from array ctr
+            if "centering" in kwargs:
+                print("**** FringeFitter class: hold_centering deprecated.  Use psf_offset ***")
         else:
-            # default is auto centering
+            # default is auto centering, governed by hold_centering == False:
             self.hold_centering = False
+        #if "centering" in kwargs:
+        #    self.hold_centering = kwargs["centering"]
+        #else:
+        #    # default is auto centering
+        #    self.hold_centering = False
         if "savedir" in kwargs:
             self.savedir = kwargs["savedir"]
         else:
@@ -126,7 +133,7 @@ class FringeFitter:
             os.mkdir(self.savedir)
         except:
             if self.interactive is True:
-                print self.savedir+" Already exists, rewrite its contents? (y/n)"
+                print(self.savedir+" Already exists, rewrite its contents? (y/n)")
                 ans = raw_input()
                 if ans == "y":
                     pass
@@ -137,11 +144,6 @@ class FringeFitter:
             else:
                 pass
 
-        self.refimgs = self.instrument_data.ref_imgs_dir # could be taken care of in InstrumentData?
-        try:
-            os.mkdir(self.refimgs)
-        except:
-            pass
         #######################################################################
 
         #--------------------------------------------------------------------------
@@ -179,8 +181,8 @@ class FringeFitter:
             fit_fringes_parallel({"object":self, "file": self.datadir+"/"+fn,\
                                   "id":jj}, threads)
         t3 = time.time()
-        print "Parallel with {0} threads took {1}s to fit all fringes".format(\
-               threads, t3-t2)
+        print("Parallel with {0} threads took {1}s to fit all fringes".format(\
+               threads, t3-t2))
 
 
     def save_output(self, slc, nrm):
@@ -205,7 +207,7 @@ class FringeFitter:
                         self.sub_dir_str+"/modelsolution_{0:02d}.fits".format(slc),\
                         overwrite=True)
         else:
-            print "NOT SAVING ANY FITS FILES. SET save_txt_only=False TO SAVE."
+            print("NOT SAVING ANY FITS FILES. SET save_txt_only=False TO SAVE.")
 
         # default save to text files
         self.save_linfit=False
@@ -295,15 +297,15 @@ def fit_fringes_parallel(args, threads):
 
     if threads>0:
         pool = Pool(processes=threads)
-        print "Running fit_fringes in parallel with {0} threads".format(threads)
+        print("Running fit_fringes in parallel with {0} threads".format(threads))
         pool.map(fit_fringes_single_integration, store_dict)
 
     else:
         for slc in range(self.instrument_data.nwav):
-            try:
-                os.mkdir(self.refimgs+'{0:02d}'.format(slc)+'/')
-            except:
-                    pass
+            #try:
+            #    os.mkdir(self.refimgs+'{0:02d}'.format(slc)+'/')
+            #except:
+            #        pass
             fit_fringes_single_integration({"object":self, "slc":slc})
 
 def fit_fringes_single_integration(args):
@@ -316,7 +318,7 @@ def fit_fringes_single_integration(args):
                     holeshape=self.instrument_data.holeshape,\
                     over = self.oversample)
 
-    nrm.refdir=self.refimgs+'{0:02d}'.format(slc)+'/'
+    #nrm.refdir=self.refimgs+'{0:02d}'.format(slc)+'/'
     nrm.bandpass = self.instrument_data.wls[slc]
 
     if self.npix == 'default':
@@ -368,9 +370,9 @@ def fit_fringes_single_integration(args):
 
     #else:
     nrm.make_model(fov = self.ctrd.shape[0], bandpass=nrm.bandpass, \
-                   over=self.oversample,centering=nrm.bestcenter, \
+                   over=self.oversample,psf_offset=nrm.bestcenter, \
                    pixscale=nrm.pixel)
-    nrm.fit_image(self.ctrd, modelin=nrm.model)
+    nrm.fit_image(self.ctrd, modelin=nrm.model, psf_offset=nrm.bestcenter)
     """
     Attributes now stored in nrm object:
 
@@ -487,7 +489,7 @@ class Calibrate:
             self.vflag=0.0
     
         #if no savedir specified, default is current working directory
-        if self.savedir ==None:
+        if savedir ==None:
             self.savedir = os.getcwd()
         else:
             self.savedir = savedir
@@ -536,9 +538,9 @@ class Calibrate:
         if sub_dir_tag == None: 
             if self.interactive==True:
                 #print "!! naxis2 is set to a non-zero number but extra_layer"
-                print "extra_layer is not defined !! naxis2 will be ignored."
-                print "results will not be stored in a subdirectory"
-                print "proceed anyway? (y/n)"
+                print("extra_layer is not defined !! naxis2 will be ignored.")
+                print("results will not be stored in a subdirectory")
+                print("proceed anyway? (y/n)")
                 ans = raw_input()
                 if ans =='y':
                     pass
@@ -592,7 +594,7 @@ class Calibrate:
                 for qq in range(nexps):
                     # nwav files
                     cpfiles = [f for f in os.listdir(paths[ii]+exps[qq]) if "CPs" in f] 
-                    #print cpfiles
+                    #print(cpfiles)
                     ampfiles = [f for f in os.listdir(paths[ii]+exps[qq]) \
                                 if "amplitudes" in f]
                     phafiles = [f for f in os.listdir(paths[ii]+exps[qq]) if "phase" in f] 
@@ -650,9 +652,9 @@ class Calibrate:
                             self.v2_mean_cal[ii-1,slc,:], self.v2_err_cal[ii-1,slc,:], \
                             self.pha_mean_cal[ii-1,slc,:], self.pha_err_cal[ii-1, slc,:] = \
                             self.calib_steps(cps[slc,:,:], amp[slc,:,:], pha[slc,:,:], nexps, expflag=expflag)
-                        #print cps[slc, :,:].shape
-                        #print self.cp_mean_cal[ii-1, slc,:].shape
-                        #print np.tile(self.cp_mean_cal[ii-1,slc,:],(nexps, 1)).shape
+                        #print(cps[slc, :,:].shape)
+                        #print(self.cp_mean_cal[ii-1, slc,:].shape)
+                        #print(np.tile(self.cp_mean_cal[ii-1,slc,:],(nexps, 1)).shape)
 
 
             """
@@ -793,9 +795,9 @@ class Calibrate:
         errcp[errcp < (2/3.0)*np.median(errcp)] =(2/3.0)*np.median(errcp) 
         errpha[errpha < (2/3.0)*np.median(errpha)] =(2/3.0)*np.median(errpha) 
         errv2[errv2 < (2/3.0)*np.median(errv2)] =(2/3.0)*np.median(errv2) 
-        #print "input:",cps
-        #print "avg:", meancp
-        print "exposures flagged:", expflag
+        #print("input:",cps)
+        #print("avg:", meancp)
+        print("exposures flagged:", expflag)
         return meancp, errcp, meanv2, errv2, meanpha, errpha
 
     def save_to_txt(self):
@@ -840,7 +842,7 @@ class Calibrate:
 
         Check: oifits standard -- degrees or radians?
         """
-        print kwargs
+        print(kwargs)
 
         
         from misctools.write_oifits import OIfits
@@ -947,7 +949,7 @@ class BinaryAnalyze:
         self.extra_error = extra_error
 
         get_data(self)
-        if self.savedir==None:
+        if savedir==None:
             self.savedir=os.getcwd()
         else:
             self.savedir = savedir
@@ -982,16 +984,16 @@ class BinaryAnalyze:
         loglike_0 = cp_binary_model([0, 0, 0], constant, priors, None, self.uvcoords, self.cp, self.cperr)
 
         wheremax = np.where(loglike==loglike.max())
-        print "abs max", wheremax
-        print "loglike at max axis=0",wheremax[0][0], loglike[wheremax[0][0],:,:].shape
-        print "==================="
-        print "Max log likelikehood for contrast:", 
-        print cons[wheremax[0]]
-        print "Max log likelikehood for separation:", 
-        print seps[wheremax[1]], "mas"
-        print "Max log likelikehood for angle:", 
-        print angs[wheremax[2]], "deg"
-        print "==================="
+        print("abs max", wheremax)
+        print("loglike at max axis=0",wheremax[0][0], loglike[wheremax[0][0],:,:].shape)
+        print("===================")
+        print("Max log likelikehood for contrast:", )
+        print(cons[wheremax[0]])
+        print("Max log likelikehood for separation:", )
+        print(seps[wheremax[1]], "mas")
+        print("Max log likelikehood for angle:", )
+        print(angs[wheremax[2]], "deg")
+        print("===================")
         coarse_params = cons[wheremax[0]], seps[wheremax[1]], angs[wheremax[2]]
 
         plt.figure()
@@ -1083,16 +1085,13 @@ class BinaryAnalyze:
         loglike_0 = cp_binary_model([0, 0, 0], constant, priors, None, self.uvcoords, self.cp, self.cperr)
 
         wheremax = np.where(loglike==loglike.max())
-        print "abs max", wheremax
-        print "loglike at max axis=0",wheremax[0][0], loglike[wheremax[0][0],:,:].shape
-        print "==================="
-        print "Max log likelikehood for contrast:", 
-        print cons[wheremax[0]]
-        print "Max log likelikehood for separation:", 
-        print seps[wheremax[1]], "mas"
-        print "Max log likelikehood for angle:", 
-        print angs[wheremax[2]], "deg"
-        print "==================="
+        print("abs max", wheremax)
+        print("loglike at max axis=0",wheremax[0][0], loglike[wheremax[0][0],:,:].shape)
+        print("===================")
+        print("Max log likelikehood for contrast:",cons[wheremax[0]]) 
+        print("Max log likelikehood for separation:", seps[wheremax[1]], "mas")
+        print("Max log likelikehood for angle:", angs[wheremax[2]], "deg")
+        print("===================")
         coarse_params = cons[wheremax[0]], seps[wheremax[1]], angs[wheremax[2]]
         return coarse_params
 
@@ -1135,7 +1134,7 @@ class BinaryAnalyze:
                     #chi2_bin_model[i, j,k] = cp_binary_model([hyp, sep, ang], constant, priors, None, self.uvcoords, self.cp, self.cperr, stat="chi2")
         #chi2_0 = cp_binary_model([0,0,0], constant, priors, None, self.uvcoords, self.cp, self.cperr, stat="chi2")
         chi2_0 = allvis_binary_model([0,0,0], constant, priors, None, self.uvcoords, self.cp, self.cperr, self.t3amp, self.t3amperr, stat="chi2")
-        print "detecmap chi2null", chi2_0
+        print("detecmap chi2null", chi2_0)
 
         # chi^2 detection grid
         #detec_mask = - np.exp(loglike) > (25 - np.exp(loglike_0))
@@ -1147,7 +1146,7 @@ class BinaryAnalyze:
         con_index = np.ma.masked_array(chi2cube, mask=detec_mask).argmax(axis=0)
         #con_index = chi2cube.argmin(axis=0)
         detec_array = cons[con_index]
-        print detec_array.shape
+        print(detec_array.shape)
         #self.loglike = loglike
         #self.loglike_0 = loglike_0
         self.chi2cube = chi2cube
@@ -1192,11 +1191,11 @@ class BinaryAnalyze:
         # Need to add these onto uvcoords too
         uvcoords = np.rollaxis(np.rollaxis(np.rollaxis(np.tile(self.uvcoords, (nstep, nstep, 1, 1, 1, 1)), -2,0), -2, 0), -2,0)
         t1 = time.time()
-        print "took "+str(t1-t0)+"s to assemble position grids"
-        print uvcoords.shape
-        print self.cp.shape
-        print ras.shape
-        print np.shape(self.wavls)
+        print("took "+str(t1-t0)+"s to assemble position grids")
+        print(uvcoords.shape)
+        print(self.cp.shape)
+        print(ras.shape)
+        print(np.shape(self.wavls))
 
         t2 = time.time()
 
@@ -1213,7 +1212,7 @@ class BinaryAnalyze:
                                      "wavls":self.wavls, "dof": self.cp.shape[0] - 3})
             if threads>0:
                 pool = Pool(processes=threads)
-                print "Threads:", threads
+                print("Threads:", threads)
                 self.chi2grid = np.array(pool.map(chi2_grid_loop, store_dict))
             else:
                 self.chi2grid = np.zeros((nstep, nstep, nstep))
@@ -1232,7 +1231,7 @@ class BinaryAnalyze:
                                      "wavls":self.wavls, "dof": data.shape[0] - 3})
             if threads>0:
                 pool = Pool(processes=threads)
-                print "Threads:", threads
+                print("Threads:", threads)
                 self.chi2grid = np.array(pool.map(chi2_grid_loop_all, store_dict))
             else:
                 self.chi2grid = np.zeros((nstep, nstep, nstep))
@@ -1242,15 +1241,15 @@ class BinaryAnalyze:
 
         t3 = time.time()
         pool.terminate()
-        print "took "+str(t3-t2)+"s to compute all chi^2 grid points"
+        print("took "+str(t3-t2)+"s to compute all chi^2 grid points")
 
         chi2min = np.where(self.chi2grid == self.chi2grid.min())
         bestparams = np.array([self.cons[chi2min[0]][0], \
                                np.sqrt(self.ras[chi2min[1]]**2 + self.decs[chi2min[2]]**2)[0], \
                                np.arctan2(self.decs[chi2min[2]], self.ras[chi2min[1]])[0]*180/np.pi])
-        print "Best Contrast:", self.cons[chi2min[0]]
-        print "Best Separation:", np.sqrt(self.ras[chi2min[1]]**2 + self.decs[chi2min[2]]**2)
-        print "Best PA:", np.arctan2(self.decs[chi2min[2]], self.ras[chi2min[1]])*180/np.pi
+        print("Best Contrast:", self.cons[chi2min[0]])
+        print("Best Separation:", np.sqrt(self.ras[chi2min[1]]**2 + self.decs[chi2min[2]]**2))
+        print("Best PA:", np.arctan2(self.decs[chi2min[2]], self.ras[chi2min[1]])*180/np.pi)
 
         self.significance = self.chi2_null - np.min(self.chi2grid, axis=0).transpose()
         self.significance[self.significance<0] = 0
@@ -1260,11 +1259,11 @@ class BinaryAnalyze:
         return bestparams
 
     def save_chi2map(self, absolute_path_filename_save):
-        savestr = self.savedir+os.path.sep+save+"_chi2map.pick"
+        #savestr = self.savedir+os.path.sep+save+"_chi2map.pick"
         #savestr = self.savedir+os.path.sep+self.oifitsfn.replace(".oifits", "")+"_chi2map.pick"
-        f = open(savestr, "w")
-        pickle.dump(savdata, f)
-        return bestparams
+        f = open(absolute_path_filename_save, "w")
+        pickle.dump(self.chi2map_savdata, f)
+        return None
 
     def plot_chi2map(self, savdata, savestr=False, show=False):
         #unpack everything
@@ -1351,7 +1350,7 @@ class BinaryAnalyze:
         # should be shape (2, 3, ncp, nsep, ncon, nang, nwav)
         uvcoords = np.rollaxis(np.rollaxis(np.rollaxis(np.tile(self.uvcoords, \
                                (nsep, ncon, nang, 1, 1, 1, 1)), -2,0), -2, 0), -2, 0)
-        print "Computing model cps over", nsep*ncon*nang, "parameters."
+        print("Computing model cps over", nsep*ncon*nang, "parameters.")
 
         # Set up some random errors to add in per trial
         # Consider scaling random cperr by wavelength?
@@ -1366,7 +1365,7 @@ class BinaryAnalyze:
             # ...which is way too many for multiwav data...
             #errors = np.rollaxis(np.tile(self.cperr[None, ...]*randnums,\
             #                     (nsep, ncon, nang,1, 1, 1)),-3,0)
-            print "errors shape:", errors.shape
+            print("errors shape:", errors.shape)
             t1 = time.time()
             #modelcps is shape [ncp, nsep, ncon, nang, nwav]
             modelcps = model_cp_uv(uvcoords, cons, seps, angs, 1.0/self.wavls)
@@ -1375,8 +1374,8 @@ class BinaryAnalyze:
             t2 = time.time()
             #modelcps = np.rollaxis(pool.map(model_cp_uv(uvcoords, \
             #                       cons, seps, angs, 1.0/self.wavls), 0, -1)
-            print "Finished computing big grid, took", t2-t1, "s"
-            print "modelcps shape:", modelcps.shape
+            print("Finished computing big grid, took", t2-t1, "s")
+            print("modelcps shape:", modelcps.shape)
 
             """
             print "modelcps shape:", modelcps.shape
@@ -1394,7 +1393,7 @@ class BinaryAnalyze:
             print "detec_grid shape:", self.detec_grid.shape
             """
             t3 = time.time()
-            print "setting up the dictionary..."
+            print("setting up the dictionary...")
             store_dict = [{"self":self,"ntrials":ntrials, "model":modelcps, \
                            "randerrors":errors[i], "dataerrors":self.cperr} for i in range(len(errors))]
 
@@ -1405,7 +1404,7 @@ class BinaryAnalyze:
             # randomize* the measurement errors
             allerrors = np.concatenate((self.cperr, self.t3amperr))
             errors = scale*allerrors[None, ...]*randnums
-            print "errors shape:", errors.shape
+            print("errors shape:", errors.shape)
 
             #detec_grid = np.zeros((len(seps), len(cons), len(angs)))
             t1 = time.time()
@@ -1414,22 +1413,22 @@ class BinaryAnalyze:
             modelt3 = np.rollaxis(model_t3amp_uv(uvcoords, cons, seps,\
                                   angs, 1.0/self.wavls), 0, -1)
             t2 = time.time()
-            print "Finished computing big grid, took", t2-t1, "s"
-            print "modelcps shape:", modelcps.shape
-            print "modelt3 shape:", modelt3.shape
+            print("Finished computing big grid, took", t2-t1, "s")
+            print("modelcps shape:", modelcps.shape)
+            print("modelt3 shape:", modelt3.shape)
             #model = np.zeros((ncon, nsep, nang, 
             #                  modelcps.shape[-2]+modelt3.shape[-2], self.nwav))
             #model[:,:,:,:modelcps.shape[-2],:] = modelcps
             #model[:,:,:,modelcps.shape[-2]:,:] = modelt3
             model = np.concatenate((modelcps, modelt3), axis=3)
-            print self.t3amp
-            print "t3 errors"
-            print self.t3amperr
-            print "all"
-            print allerrors
-            print "v2"
-            print self.v2err
-            print "cp errors"
+            print(self.t3amp)
+            print("t3 errors")
+            print(self.t3amperr)
+            print("all")
+            print(allerrors)
+            print("v2")
+            print(self.v2err)
+            print("cp errors")
             #print model
             #simtest = model.copy() + allerrors
             #print reduced_chi2(simtest, allerrors, np.zeros(model.shape))#, dof=2*self.ncp*self.nwav - 3)
@@ -1447,19 +1446,19 @@ class BinaryAnalyze:
             #sys.exit()
 
             t3 = time.time()
-            print "setting up the dictionary..."
+            print("setting up the dictionary...")
             store_dict = [{"self":self,"ntrials":ntrials, "model":model, "randerrors":errors[i],\
                            "dataerrors":allerrors} for i in range(len(errors))]
 
         t4 = time.time()
-        print "dictionary took", t4-t3, "s to set up"
+        print("dictionary took", t4-t3, "s to set up")
         if observables=="all":
             big_detec_grid = np.sum(pool.map(detec_calc_loop_all, store_dict),axis=0) / float(ntrials)
         else:
             big_detec_grid = np.sum(pool.map(detec_calc_loop, store_dict),axis=0) / float(ntrials)
         pool.terminate()
         t5 = time.time()
-        print "Time to finish detec_calc_loop:", t5-t3, "s"
+        print("Time to finish detec_calc_loop:", t5-t3, "s")
 
         self.detec_grid = big_detec_grid.sum(axis=-1) / float(nang)
         # Get the order right
@@ -1496,7 +1495,7 @@ class BinaryAnalyze:
 
     def save_deteclims(self, savestr):
         f = open(savestr, "w")
-        pickle.dump(self.savdata, f)
+        pickle.dump(self.savdata_deteclims, f)
         f.close()
 
     def plot_deteclims(self, savdata, savestr =False, plot="off"):
@@ -1533,21 +1532,21 @@ class BinaryAnalyze:
         self.cons = conlims[0] * r**(nn)
         cons = np.tile(self.cons, (self.nwav, 1))
         cons = np.rollaxis(cons, -1, 0)
-        print "cons shape", cons.shape
+        print("cons shape", cons.shape)
         uvcoords = np.rollaxis(np.rollaxis(np.rollaxis(np.tile(self.uvcoords,\
                                (ncon, 1, 1, 1, 1)), -2,0), -2, 0), -2, 0)
-        print "uvcoords shape", uvcoords.shape
-        print "Computing model cps over", ncon, "parameters."
+        print("uvcoords shape", uvcoords.shape)
+        print("Computing model cps over", ncon, "parameters.")
         t1 = time.time()
         model_cps = model_cp_uv(uvcoords, cons, sep, pa, 1.0/self.wavls)
         t2 = time.time()
-        print "Finished computing big grid, took", t2-t1, "s"
-        print "model shape:", model_cps.shape
+        print("Finished computing big grid, took", t2-t1, "s")
+        print("model shape:", model_cps.shape)
         model_cps = np.rollaxis(model_cps, 0, -1)
-        print "new model shape", model_cps.shape
+        print("new model shape", model_cps.shape)
         datacps = np.tile(self.cp, (ncon, 1, 1))
         dataerror = np.tile(self.cperr, (ncon, 1, 1))
-        print "datacps shape", datacps.shape
+        print("datacps shape", datacps.shape)
 
         t4 = time.time()
         self.con_spectrum = np.zeros((self.nwav, len(self.cons)))
@@ -1566,7 +1565,7 @@ class BinaryAnalyze:
             #print "chi2:", chi2.shape
             self.con_spectrum[ll, :] = chi2#loglike
         t5 = time.time()
-        print "Time to finish contrast loop:", t5-t4, "s"
+        print("Time to finish contrast loop:", t5-t4, "s")
         if plot:
             plt.figure()
             plt.imshow(self.con_spectrum.transpose(), cmap="rainbow")
@@ -1627,11 +1626,11 @@ class BinaryAnalyze:
 
         def update(val):
             theta = sang.val
-            print "theta:", theta
+            print("theta:", theta)
             cratio = scrat.val
-            print "cratio:", cratio
+            print("cratio:", cratio)
             sep = ssep.val
-            print "separation:", sep
+            print("separation:", sep)
             newparams = [cratio, sep, theta]
             modelcps = model_cp_uv(self.uvcoords, cratio, \
                                    sep, theta, 1.0/self.wavls)
@@ -1685,16 +1684,16 @@ class BinaryAnalyze:
             self.priors = priors
         else:
             self.priors = [(-np.inf, np.inf) for f in range( len(self.params.keys()) ) ]
-        print "priors:"
-        print self.priors
+        print("priors:")
+        print(self.priors)
 
         #guess = np.zeros(self.ndim)
         guess = self.make_guess()
         self.ndim = len(guess)
 
         p0 = [guess + 0.1*guess*np.random.rand(self.ndim) for i in range(nwalkers)]
-        print guess
-        print "p0", len(p0)
+        print(guess)
+        print("p0", len(p0))
 
         t0 = time.time()
         #print "nwalkers", nwalkers, "args", self.constant, self.priors, self.spectrum_model, self.uvcoords, self.cp, self.cperr
@@ -1718,41 +1717,39 @@ class BinaryAnalyze:
                             args=[self.constant, self.priors, self.spectrum_model, self.uvcoords, \
                             self.cp, scale*self.cperr])
         else:
-            print "invalid choice of observable:", observables,
-            print "options are 'cp', 'v2', and 'all'"
+            print("invalid choice of observable:", observables)
+            print("options are 'cp', 'v2', and 'all'")
 
         pos, prob, state = self.sampler.run_mcmc(p0, burnin)
         self.sampler.reset()
         t2 = time.time()
-        print "burn in complete, took ", t2-t0, "s"
+        print("burn in complete, took ", t2-t0, "s")
         pos, prob, state = self.sampler.run_mcmc(pos, niter)
         t3 = time.time()
         print("Mean acceptance fraction: {0:.3f}".format(np.mean(self.sampler.acceptance_fraction)))
-        print "This number should be between ~ 0.25 and 0.5 if everything went as planned."
+        print("This number should be between ~ 0.25 and 0.5 if everything went as planned.")
 
-        print "ran mcmc, took", t3 - t2, "s"
+        print("ran mcmc, took", t3 - t2, "s")
         self.chain = self.sampler.flatchain
         self.fullchain = self.sampler.chain
 
         self.mcmc_results = {}
-        print "========================="
-        print "emcee found...."
+        print("=========================")
+        print("emcee found....")
         #for ii, key in enumerate(self.params.keys()):
         for ii, key in enumerate(self.keys):
             self.mcmc_results[key] = self.chain[:,ii]
             mean = np.mean(self.mcmc_results[key])
             err = np.std(self.mcmc_results[key])
             if "sep" in key:
-                print key, ":", mean, "+/-", err, "mas"
+                print(key, ":", mean, "+/-", err, "mas")
             elif "pa" in key:
-                print key, ":", mean, "+/-", err, "deg"
+                print(key, ":", mean, "+/-", err, "deg")
             else:
-                print key, ":", mean, "+/-", err
-        print "========================="
+                print(key, ":", mean, "+/-", err)
+        print("=========================")
         # To do: report separation in mas? pa in deg?
         # pickle self.mcmc_results here:
-        pickle.dump(self.mcmc_results, \
-                    open(self.savedir+"/mcmc_results_{0}.pick".format(spectrum_model), "wb"))
 
         return self.mcmc_results
 
@@ -1785,10 +1782,18 @@ class BinaryAnalyze:
             guess = np.array([self.params["con"]])[0] # here con is given as an array size nwav
             self.keys = ['wl_{0:02d}'.format(f) for f in range(len(guess))]
         else:
-            print "invalid spectrum_model set"
-        print "keys", self.keys
-        print "params", guess
+            print("invalid spectrum_model set")
+        print("keys", self.keys)
+        print("params", guess)
         return guess
+
+    def save_mcmc_results(self, absolute_path_filename_save):
+        pickle.dump(self.mcmc_results, \
+                    open(absolute_path_filename_save, "wb"))
+
+    def save_mcmc_chain(self, absolute_path_filename_save):
+        pickle.dump(self.chain, \
+                    open(absolute_path_filename_save, "wb"))
 
     def corner_plot(self, fn):
         import corner
@@ -2046,12 +2051,12 @@ def get_data(self):
     try:
         self.oifdata = oifits.open(self.oifitsfn)
     except:
-        print "Unable to read oifits file"
+        print("Unable to read oifits file")
     try:
         self.avparang = self.oifdata.avparang
         self.parang_range = self.oifdata.parang_range
     except:
-        print "oifits has no parang info, moving on..."
+        print("oifits has no parang info, moving on...")
     self.telescope = self.oifdata.wavelength.keys()[0]
     self.ncp = len(self.oifdata.t3)
     self.nbl = len(self.oifdata.vis2)
@@ -2224,7 +2229,7 @@ def chi2_grid_loop_all(args):
 
 class DiskAnalyze:
     def __init__(self):
-        print "not finished."
+        print("not finished.")
 
     def diffvis_model(self, params, priors):
         """
