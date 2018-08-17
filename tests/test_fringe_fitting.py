@@ -31,7 +31,6 @@ arcsec2rad = u.arcsec.to(u.rad)
 
 oversample = 11
 n_image = 77
-flip = False
 
 class FringeFittingTestCase(unittest.TestCase):
     def setUp(self):
@@ -45,6 +44,10 @@ class FringeFittingTestCase(unittest.TestCase):
         filter = 'F430M'
         pixelscale_arcsec = 0.0656 
         filter_name = 'Monochromatic '+np.str(monochromatic_wavelength_m)
+        nirissdata = InstrumentData.NIRISS(filter)
+        nirissdata.wls = [(1.0, monochromatic_wavelength_m),]
+        nirissdata.pscale_mas = pixelscale_arcsec
+        nirissdata.pscale_rad = pixelscale_arcsec * arcsec2rad
 
         self.filter = filter
         self.filter_name = filter_name
@@ -65,8 +68,9 @@ class FringeFittingTestCase(unittest.TestCase):
 
         if (not os.path.isfile(psf_image_without_oversampling)) | (overwrite): 
             from nrm_analysis.fringefitting.LG_Model import NRM_Model
-            jw = NRM_Model(mask='jwst',holeshape="hex",flip=flip)
-            jw.simulate(fov=n_image, bandpass=monochromatic_wavelength_m, over=oversample, pixel = pixelscale_arcsec * arcsec2rad)
+            jw = NRM_Model(mask=nirissdata.mask,holeshape="hex",
+                           pixscale=nirissdata.pscale_rad)
+            jw.simulate(fov=n_image, bandpass=nirissdata.wls, over=oversample)
             
             # optional writing of oversampled image
             if 0:
@@ -115,7 +119,7 @@ class FringeFittingTestCase(unittest.TestCase):
     
         ff = nrm_core.FringeFitter(nirissdata, oversample=oversample, \
                       savedir=save_dir, datadir=data_dir, \
-                      npix=n_image, interactive=False, flip=flip)
+                      npix=n_image, interactive=False)
         print('FringeFitter oversampling: %d' % ff.oversample)
     
         threads = 1
