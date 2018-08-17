@@ -104,9 +104,11 @@ def visphase(baseline, ratio, separation, angle):
     Returns: the resulting phase given a baseline, flux ratio, separation, and angle.
     To do: figure out the scaling & coordinates for the baseline.
     """
-    angle+= 90*np.pi/180.
-    alpha = -separation*np.cos(angle)
-    delta = separation*np.sin(angle)
+    #angle+= 90*np.pi/180.
+    #alpha = -separation*np.cos(angle)
+    #delta = separation*np.sin(angle)
+    alpha = separation*np.cos(angle)
+    delta = -separation*np.sin(angle)
     u = baseline[0]
     v = baseline[1]
 
@@ -128,7 +130,7 @@ def visamp(baseline, ratio,  separation, angle):
     """
 
     alpha = separation*np.cos(angle)
-    delta = separation*np.sin(angle)
+    delta = -separation*np.sin(angle)
     u = baseline[0]
     v = baseline[1]
 
@@ -201,7 +203,7 @@ def model_pha_uv(uvs, ratio, separation, pa, inv_wavl):
     #              visamp(uvs[:,0, ...], ratio, mas2rad(separation), np.pi*pa/180.)*\
     #              visamp(uvs[:,0, ...], ratio, mas2rad(separation), np.pi*pa/180.)
     model_vispha = visphase(uvs, ratio, mas2rad(separation), np.pi*pa/180.)
-    return model_vispha
+    return 180.*model_vispha/np.pi
 
 def model_cp_uv(tri_uv, ratio, separation, pa, inv_wavl):
     """
