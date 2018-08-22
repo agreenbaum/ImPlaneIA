@@ -15,6 +15,7 @@ Necessary Python packages:
 * a copy of [Paul Boley's oifits.py](http://astro.ins.urfu.ru/pages/~pboley/oifits/) in your python path
 * emcee [available here](http://dan.iel.fm/emcee/current/) or by pip install
 * DFM's corner [source here](https://github.com/dfm/corner.py) or by pip install
+*uncertainties package [information and instruction here](https://pythonhosted.org/uncertainties/)
 
 Optional Python packages:
 
@@ -24,6 +25,7 @@ Optional Python packages:
 
 *we recommend downloading the anaconda distribution for python*
 
+**For usage examples check the notebooks folder, which contains some basic tutorials.**
 
 ### Core routines: ###
 
@@ -42,22 +44,18 @@ initializes NRM_model & generates best model to match the data (fine-tuning
 
 **Step 2**: *calibrate the data.* 
 
-User defines target and calibration sources in a list [target, cal, cal, ...], 
-      pointing to the directories containing each source's measured fringe observables
-      computed from driver 1. Calculates mean and standard error, calibrates target 
-      observables with calibrator observables and does basic error propogation. Saves
-      calibrated quantities to new folder "calibrated/"
+User defines target and calibration sources in a list [target, cal, cal, ...], pointing to the directories containing each source's measured fringe observables computed from driver 1. Calculates mean and standard error, calibrates target observables with calibrator observables and does basic error propogation. Saves calibrated quantities (recommended save to oifits) to specified directory.
 
 **Step 3**: *compare the data to a model (3 options).*
 
-1. _Coarse search_ - calculates log likelihood in a coarse range of parameters and returns 
-                the highest logl set, which can be used as a first guess for the mcmc fit
-2. _"correlation" plot_ - plots measured closure phases against model closure phases, tunable 
-                parameter -- a handy tool to visualize the data
-3. _mcmc_ - uses **emcee** code to find the best fit binary model to the measured fringe observables
+Currently there is basic framework to fit the model of a binary or multiple point source. The BinaryAnalyze module accepts a calibrated oifits file and has several useful tools for exploring the data:
+
+1. _Coarse search_ - the chi2map method calculates chi^2 over a coarse range of parameters, saves a grid in position at the contrast that minimizes chi^2 at each postion, and returns a first guess for the mcmc fit
+2. _"correlation" plot_ - plots measured closure phases against model closure phases, tunable parameter -- a handy tool to visualize the data
+3. _mcmc_ - using the **emcee** package can find the best fit binary/multiple source model to the measured fringe observables
 
 ## Basic tutorial ##
-The main modules in this package are *InstrumentData* and *nrm_core*. **InstrumentData** sets up your dataset based on the instrument you're working with. **nrm_core** contains *FringeFitter*, *Calibrate*, and *Analyze*, described above. Here are basic examples of how to run this package with NIRISS or GPI data.
+The main modules in this package are *InstrumentData* and *nrm_core*. **InstrumentData** sets up your dataset based on the instrument you're working with. **nrm_core** contains *FringeFitter*, *Calibrate*, and *BinaryAnalyze*, described above. Here are basic examples of how to run this package with NIRISS or GPI data.
 
 
 ###NIRISS Example ###
@@ -133,13 +131,12 @@ e.g., starting with a list of GPI files
 	
 	gpifiles = [S20130501S00{0:02d}_spdc.fits.format(q) for q in np.arange(10)] # list files in here, e.g., spectral datacubes from May 1 2013.
 
-	gpidata = InstrumentData.GPI(gpifiles[0]) # just need a reference file to get header information for this observation. Recommended to use one of the science target files
+	gpidata = InstrumentData.GPI(gpifiles) # will pull some relevant observation parameters from the headers, such as parallactic angle. 
 
 This creates an instance of GPI, which will read header keywords from a reference file and sets up the data according to GPI standards
 
 
-	ff =  nrm_core.FringeFitter(gpidata, oversample = 5, savedir="Target", npix=121)
-	for exposure in gpifiles:
+	ff =  nrm_core.FringeFitter(gpidata, oversample = 5, savedir="Target", npix=121) for exposure in gpifiles:
 		ff.fit_fringes(exposure)
 
 This initializes the fringe fitter with the options you want for measuring fringe observables. Then it fits each fits file's data by calling the fit_fringes method. Saves the output to directory "Target/" in working directory. I usually name this by the object name. 
