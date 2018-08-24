@@ -290,7 +290,7 @@ def find_centroid(a, thresh, verbose=False):
 
 
 def findslope(a, m, verbose):
-    from astropy.stats import SigmaClip
+    #from astropy.stats import SigmaClip
     """ Find slopes of an array, over pixels not bordering the edge of the array
         You should have valid data either side of every pixel selected by the mask m.
         a is in radians of phase (in Fourier domain) when used in NRM/KP applications.

@@ -15,7 +15,8 @@ Necessary Python packages:
 * a copy of [Paul Boley's oifits.py](http://astro.ins.urfu.ru/pages/~pboley/oifits/) in your python path
 * emcee [available here](http://dan.iel.fm/emcee/current/) or by pip install
 * DFM's corner [source here](https://github.com/dfm/corner.py) or by pip install
-*uncertainties package [information and instruction here](https://pythonhosted.org/uncertainties/)
+* uncertainties package [information and instruction here](https://pythonhosted.org/uncertainties/)
+* linearfit [available here](https://pypi.org/project/linearfit/) and by pip install
 
 Optional Python packages:
 
