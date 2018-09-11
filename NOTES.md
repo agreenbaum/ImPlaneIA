@@ -22,7 +22,8 @@ Move to beta (by Sep 7) involves:
 	things still work downstream of OIfits creation. 
 
 	There are 'small' technical things to finish also - I've only done rotation-finding,
-	and still need to implement finding something else (pixel scale?). 
+	and still need to implement finding something else (pixel scale?).
+	Find the change from nominal pixel scale.
 
 	So direction from you would help me. 
 
