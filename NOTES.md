@@ -12,7 +12,7 @@ Move to beta (by Sep 7) involves:
 	
 	Anand to run first five boxes notebooks/NIRISS_AMI_tutorial.ipynb
 
-Sep 11 regrouping:
+2018.09.11 regrouping:
 
 	who is going to integrate my current code with your post-OIfits-creation code?  I might suggest deleting the affine_dev branch, re-cloning it. and replacing your fringe determining files with mine.  What would be good is to have some short quick-to-run test code to check that things still work downstream of OIfits creation. 
 
