@@ -14,11 +14,23 @@ Move to beta (by Sep 7) involves:
 
 2018.09.11 regrouping:
 
-	who is going to integrate my current code with your post-OIfits-creation code?  I might suggest deleting the affine_dev branch, re-cloning it. and replacing your fringe determining files with mine.  What would be good is to have some short quick-to-run test code to check that things still work downstream of OIfits creation. 
+	who is going to integrate my current code with your post-OIfits-creation code?  
+	I might suggest deleting the affine_dev branch, re-cloning it. and replacing your
+	fringe determining files with mine.  
+	
+	What would be good is to have some short quick-to-run test code to check that
+	things still work downstream of OIfits creation. 
 
-	There are 'small' technical things to finish also - I've only done rotation finding, and still need to implement finding something else (pixel scale?).  So direction from you would help me. 
+	There are 'small' technical things to finish also - I've only done rotation-finding,
+	and still need to implement finding something else (pixel scale?). 
 
-	One not-so-small thing to do is to write test code to check all the psf_offset implementations (I see lines like ImCtr = np.array((psf_offset[1], psf_offset[0])) here and there.  It should be unified across the calcPSF and make_model sections, and documented clearly.  This is probably best done when we look at the code simultaneously, skyping at the same time.
+	So direction from you would help me. 
+
+	One not-so-small thing to do is to write test code to check all the psf_offset
+	implementations (I see lines like ImCtr = np.array((psf_offset[1], psf_offset[0]))
+	here and there.  It should be unified across the calcPSF and make_model sections,
+	and documented clearly.  This is probably best done when we look at the code
+	simultaneously, skyping at the same time.
 
 
 Note: Anand to just do JWST NIRISS integration, 
