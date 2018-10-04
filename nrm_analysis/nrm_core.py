@@ -2,7 +2,7 @@
 
 """
 by A. Greenbaum & A. Sivaramakrishnan 
-Started April 2016 azgreenb@umich.edu
+April 2016 agreenba@pha.jhu.edu
 
 Contains 
 
@@ -12,11 +12,19 @@ Calibrate - Calibrate target data with calibrator data
 
 BinaryAnalyze - Detection, mcmc modeling, visualization tools
                 Much of this section is based on tools in the pymask code
-                developed by F. Martinache, B. Pope, and A. Cheetham
+                by F. Martinache, B. Pope, and A. Cheetham
                 We especially thank A. Cheetham for help and advising for
                 developing the analysis tools in this package. 
 
+    LG++ anand@stsci.edu nrm_core changes:
+        Removed use of 'centering' parameter, switch to psf_offsets, meant to be uniformly ds9-compatible 
+        offsets from array center (regardless of even/odd array sizes).
+
+            nrm_core.fit_image(): refslice UNTESTED w/ new utils.centroid()
+            nrm_core.fit_image(): hold_centering UNTESTED w/ new utils.centroid()
+
 """
+
 
 from __future__ import print_function
 # Standard imports
@@ -25,19 +33,19 @@ import numpy as np
 from astropy.io import fits
 from scipy.misc import comb
 from scipy.stats import sem, mstats
-import cPickle as pickle
+import pickle as pickle
 import matplotlib.pyplot as plt
 
-# Module imports
-from fringefitting.LG_Model import NRM_Model
-from  misctools import utils
-from misctools.utils import mas2rad, baselinify, rad2mas
-
-from modeling.binarymodel import model_cp_uv, model_allvis_uv, model_v2_uv, model_t3amp_uv
-from modeling.multimodel import model_bispec_uv
-from multiprocessing import Pool
-
 import oifits
+
+# Module imports
+from nrm_analysis.fringefitting.LG_Model import NRM_Model
+from nrm_analysis.misctools import utils  # AS LG++
+from nrm_analysis.misctools.utils import mas2rad, baselinify, rad2mas
+from nrm_analysis.modeling.binarymodel import model_cp_uv, model_allvis_uv, model_v2_uv, model_t3amp_uv
+from nrm_analysis.modeling.multimodel import model_bispec_uv
+
+from multiprocessing import Pool
 
 class FringeFitter:
     def __init__(self, instrument_data, **kwargs):
@@ -49,12 +57,17 @@ class FringeFitter:
 
         kwarg options:
         oversample - model oversampling (also how fine to measure the centering)
-        centering - If you already know the subpixel centering of your data, give it here (not recommended)
+        psf_offset - If you already know the subpixel centering of your data, give it here
+                     (not recommended except when debugging with perfectly know image placement))
         savedir - Where do you want to save the new files to? Default is working directory.
         datadir - Where is your data? Default is working directory.
-        npix - How many pixels of your data do you want to use? default is 121x121
-        debug - will plot the FT of your data next to the FT of a reference PSF. Needs poppy package to run
+        npix - How many pixels of your data do you want to use? 
+               Default is the shape of a data [slice or frame].  Typically odd?
+        debug - will plot the FT of your data next to the FT of a reference PSF.
+                Needs poppy package to run
         verbose_save - saves more than the standard files
+        interactive - default True, prompts user to overwrite/create fresh directory.  
+                      False will overwrite files where necessary.
 
         auto_pixscale - will search for the best pixel scale value for your data given instrument geometry
         auto_rotate - will search for the best rotation value for your data given instrument geometry
@@ -62,7 +75,6 @@ class FringeFitter:
         main method:
         * fit_fringes
 
-        Idea: default interact == True. User can turn this off to have everything automatically overwrite?
 
         """
         self.instrument_data = instrument_data
@@ -74,11 +86,6 @@ class FringeFitter:
         else:
             #default oversampling is 3
             self.oversample = 3
-        if "auto_pixscale" in kwargs:
-            # can be True/False or 1/0
-            self.auto_scale = kwargs["auto_pixscale"]
-        else:
-            self.auto_scale = False
         if "auto_rotate" in kwargs:
             # can be True/False or 1/0
             self.auto_rotate = kwargs["auto_rotate"]
@@ -91,11 +98,6 @@ class FringeFitter:
         else:
             # default is auto centering, governed by hold_centering == False:
             self.hold_centering = False
-        #if "centering" in kwargs:
-        #    self.hold_centering = kwargs["centering"]
-        #else:
-        #    # default is auto centering
-        #    self.hold_centering = False
         if "savedir" in kwargs:
             self.savedir = kwargs["savedir"]
         else:
@@ -134,7 +136,7 @@ class FringeFitter:
         except:
             if self.interactive is True:
                 print(self.savedir+" Already exists, rewrite its contents? (y/n)")
-                ans = raw_input()
+                ans = input()
                 if ans == "y":
                     pass
                 elif ans == "n":
@@ -198,11 +200,6 @@ class FringeFitter:
             fits.PrimaryHDU(data=nrm.residual).writeto(self.savedir+\
                         self.sub_dir_str+"/residual_{0:02d}.fits".format(slc), \
                         overwrite=True)
-            # For error propogation from least squares fitting, not yet working/tested:
-            #linres = nrm.linfit_result.residuals#.reshape(self.npix, self.npix)
-            #fits.PrimaryHDU(data=linres).writeto(self.savedir+\
-            #                self.sub_dir_str+"/linfit_residual_{0:02d}.fits".format(slc), \
-            #            overwrite=True)
             modelhdu.writeto(self.savedir+\
                         self.sub_dir_str+"/modelsolution_{0:02d}.fits".format(slc),\
                         overwrite=True)
@@ -210,23 +207,6 @@ class FringeFitter:
             print("NOT SAVING ANY FITS FILES. SET save_txt_only=False TO SAVE.")
 
         # default save to text files
-        self.save_linfit=False
-        if self.save_linfit==True:
-            np.savetxt(self.savedir+self.sub_dir_str+\
-                       "/linfit_phases_{0:02d}.txt".format(slc), 
-                        nrm.fringephase_cov, fmt='%r')
-            np.savetxt(self.savedir+self.sub_dir_str+\
-                       "/linfit_amplitudes_{0:02d}.txt".format(slc), 
-                        nrm.fringeamp_cov, fmt='%r')
-            np.savetxt(self.savedir+self.sub_dir_str+\
-                       "/linfit_CPs_{0:02d}.txt".format(slc), \
-                        nrm.redundant_cps_cov, fmt='%r')
-            np.savetxt(self.savedir+self.sub_dir_str+\
-                       "/linfit_CAs_{0:02d}.txt".format(slc), \
-                        nrm.redundant_cas_cov, fmt='%r')
-        else:
-            pass
-
         np.savetxt(self.savedir+self.sub_dir_str+\
                    "/solutions_{0:02d}.txt".format(slc), nrm.soln)
         np.savetxt(self.savedir+self.sub_dir_str+\
@@ -245,29 +225,15 @@ class FringeFitter:
             np.savetxt(self.savedir+self.sub_dir_str+\
                        "/flux_{0:02d}.txt".format(slc), nrm.flux)
           
-        print(nrm.linfit_result)   
+        print(nrm.linfit_result)
         if nrm.linfit_result is not None:          
             # save linearfit results to pickle file
-            #myPickleFile = os.path.join(self.savedir+self.sub_dir_str,"linearfit_result_{0:02d}.pkl".format(slc))
-            #pickle.dump( (nrm.linfit_result), open( myPickleFile , "wb" ) ) 
-            #print("Wrote pickled file  %s" % myPickleFile)
-            pass
-#             if verbose:
-#                 print("Wrote pickled file  %s" % myPickleFile)
-                       
+            myPickleFile = os.path.join(self.savedir+self.sub_dir_str,"linearfit_result_{0:02d}.pkl".format(slc))
+            pickle.dump( (nrm.linfit_result), open( myPickleFile , "wb" ) ) 
+            print("Wrote pickled file  %s" % myPickleFile)
                        
 
     def save_auto_figs(self, slc, nrm):
-        # pixel scales
-        if self.auto_scale==True:
-            plt.figure()
-            plt.plot(rad2mas(nrm.pixscales), nrm.pixscl_corr)
-            plt.vlines(rad2mas(nrm.pixscale_optimal), nrm.pixscl_corr[0],
-                        nrm.pixscl_corr[-1], linestyles='--', color='r')
-            plt.text(rad2mas(nrm.pixscales[1]), nrm.pixscl_corr[1], 
-                     "best fit at {0}".format(rad2mas(nrm.pixscale_optimal)))
-            plt.savefig(self.savedir+self.sub_dir_str+\
-                        "/pixscalecorrelation_{0:02d}.png".format(slc))
         
         # rotation
         if self.auto_rotate==True:
@@ -302,10 +268,6 @@ def fit_fringes_parallel(args, threads):
 
     else:
         for slc in range(self.instrument_data.nwav):
-            #try:
-            #    os.mkdir(self.refimgs+'{0:02d}'.format(slc)+'/')
-            #except:
-            #        pass
             fit_fringes_single_integration({"object":self, "slc":slc})
 
 def fit_fringes_single_integration(args):
@@ -313,21 +275,28 @@ def fit_fringes_single_integration(args):
     slc = args["slc"]
     id_tag = args["slc"]
 
-    nrm = NRM_Model(mask=self.instrument_data.mask, \
-                    pixscale=self.instrument_data.pscale_rad,\
-                    holeshape=self.instrument_data.holeshape,\
+    nrm = NRM_Model(mask=self.instrument_data.mask,
+                    pixscale=self.instrument_data.pscale_rad,
+                    holeshape=self.instrument_data.holeshape,
+                    affine2d=self.instrument_data.affine2d,
                     over = self.oversample)
 
-    #nrm.refdir=self.refimgs+'{0:02d}'.format(slc)+'/'
     nrm.bandpass = self.instrument_data.wls[slc]
 
     if self.npix == 'default':
         self.npix = self.scidata[slc,:,:].shape[0]
 
+    DBG = False # AS testing gross psf orientatioun while getting to LG++ beta release 2018 09
+    if DBG:
+        nrm.simulate(fov=self.npix, bandpass=self.instrument_data.wls[slc], over=self.oversample)
+        fits.PrimaryHDU(data=nrm.psf).writeto(self.savedir + "perfect.fits", overwrite=True)
+
     # New or modified in LG++
     # center the image on its peak pixel:
     # AS subtract 1 from "r" below  for testing >1/2 pixel offsets
-    self.ctrd = utils.center_imagepeak(self.scidata[slc, :,:], r = (self.npix -1)//2 - 2)  
+    self.ctrd = utils.center_imagepeak(self.scidata[slc, :,:])  
+    ## AG version LG++ is 
+    ## self.ctrd = utils.center_imagepeak(self.scidata[slc, :,:], r = (self.npix -1)//2 - 2) 
     # returned values have offsets x-y flipped:
     # Finding centroids the Fourier way assumes no bad pixels case - Fourier domain mean slope
     centroid = utils.find_centroid(self.ctrd, self.instrument_data.threshold) # offsets from array ctr
@@ -341,7 +310,6 @@ def fit_fringes_single_integration(args):
 
     print(">>>> nrm_core.fit_image(): refslice 6 lines commented out cf LG+ <<<<")
     """ LG++ this fails to run - not sure of what's needed - anand@stsci.edu 2018.02.11
-    self.ctrd = utils.centerit(self.scidata[slc, :,:], r = (self.npix -1)//2)
     refslice = self.ctrd.copy()
     if True in np.isnan(refslice):
         print(">>>> nrm_core.fit_image(): refslice UNTESTED w/ new utils.centroid() <<<<")
@@ -350,27 +318,20 @@ def fit_fringes_single_integration(args):
             refslice = utils.deNaN(20,refslice)
     """
 
-    nrm.reference = self.ctrd # rename bestcenter to bestpsfoffset or similar sometime in the future
+
+    nrm.reference = self.ctrd  # rename bestcenter to bestpsfoffset or similar sometime in the future
     if self.hold_centering == False:
-        print("\n**** nrm.core.fit_fringes_single_integration: will try to find best center for image in data")
-        print("**** nrm.core.fit_fringes_single_integration: because 'hold_centering' is False")
-        # this fn should be more descriptive
-        nrm.bestcenter = nrm.xpos, nrm.ypos ################ AS try in LG++  Works!
+        print("\n**** nrm.core.fit_fringes_single_integration:    <<HOLD_CENTERING>> False")
+        nrm.bestcenter = nrm.xpos, nrm.ypos  ################ AS try in LG++  Works!
         print("**** nrm.bestcenter {0}  nrm.xpos {1}  nrm.ypos {2}".format(nrm.bestcenter, nrm.xpos, nrm.ypos))
         print("**** nrm.core.fit_fringes_single_integration: object.best_center updated with 'centroid' output\n")
     else:
-        print(">>>> nrm_core.fit_image():  psf_offset from user... <<<<")
+        print(">>>> nrm_core.fit_image(): hold_centering UNTESTED w/ new utils.centroid().  psf_offset from user... <<<<")
         nrm.bestcenter = self.psf_offset # if center already known, python-style offsets from array center are here.
 
-    # similar if/else routines for auto scaling and rotation
-    # Aug 2018 -- PHASING OUT AUTO SCALING ROUTINES. Should all be done explicitely
-    #             by the user, outside of FringeFitter.
-    #if self.auto_scale == True:
-    #    nrm.fit_images(self.ctrd, pixguess = self.instrument_data.pscale_rad)
-
-    #else:
-    nrm.make_model(fov = self.ctrd.shape[0], bandpass=nrm.bandpass, \
-                   over=self.oversample,psf_offset=nrm.bestcenter, \
+    nrm.make_model(fov = self.ctrd.shape[0], bandpass=nrm.bandpass, 
+                   over=self.oversample,
+                   psf_offset=nrm.bestcenter,  
                    pixscale=nrm.pixel)
     nrm.fit_image(self.ctrd, modelin=nrm.model, psf_offset=nrm.bestcenter)
     """
@@ -419,7 +380,7 @@ class Calibrate:
 
     Flexible for 2 different kinds of data:
     - individual measurements per exposure
-    - an additional axis (e.g., wavelength)
+    - an additional axis (e.g., wavelength or polz)
 
     What happens in __init__:
     - Get statistics on each set of exposures
@@ -430,9 +391,6 @@ class Calibrate:
 
     * save_to_txt
     * save_to_oifits
-
-    If you know what you are doing with sub-directory structurem 
-    set interactive=False when initializing this object!
 
     """
 
@@ -493,10 +451,12 @@ class Calibrate:
             self.savedir = os.getcwd()
         else:
             self.savedir = savedir
+
         try:
             os.listdir(savedir)
         except:
             os.mkdir(savedir)
+        self.savedir = savedir
 
         # number of calibrators being used:
         self.ncals = len(paths) - 1 # number of calibrators, if zero, set to 1
@@ -513,35 +473,14 @@ class Calibrate:
         # Can be size one. Defined by instrument_data wavelength array
         self.naxis2 = instrument_data.nwav
 
-        # some warnings
 
-        # safer to just let this happen, commenting out
-        #if self.naxis2 == 1:
-        #   if sub_dir_tag is not None:
-        #       if self.interactive==True:
-        #           print "!! naxis2 is set to zero but sub_dir_tag is defined !!",
-        #           print "Are you sure you want to do this?",
-        #           print "Will look for files only in ",
-        #           print paths
-        #           print "proceed anyway? (y/n)"
-        #           ans = raw_input()
-        #           if ans =='y':
-        #               pass
-        #           elif ans == 'n':
-        #               sys.exit("stopping, naxis2 must be > 1 to use sub_dir_tag, see help")
-        #           else:
-        #               sys.exit("invalid response, stopping")
-        #       else:
-        #           pass
-                    
-        #else:
         if sub_dir_tag == None: 
             if self.interactive==True:
                 #print "!! naxis2 is set to a non-zero number but extra_layer"
                 print("extra_layer is not defined !! naxis2 will be ignored.")
                 print("results will not be stored in a subdirectory")
                 print("proceed anyway? (y/n)")
-                ans = raw_input()
+                ans = input()
                 if ans =='y':
                     pass
                 elif ans == 'n':
@@ -580,21 +519,19 @@ class Calibrate:
                 pha = np.zeros((self.naxis2, nexps, self.nbl))
                 cps = np.zeros((self.naxis2, nexps, self.ncp))
 
-                #if ii == 0:
-                #    self.cov_mat_tar = np.zeros((self.naxis2, nexps, nexps))
-                #    self.sigmasquared_tar = np.zeros((self.naxis2, nexps))
-                #    self.cov_mat_cal = np.zeros((self.naxis2, nexps, nexps))
-                #    self.sigmasquared_cal = np.zeros((self.naxis2, nexps))
-                #elif ii==1:
-                #    self.cov_mat_cal = np.zeros((self.naxis2, nexps, nexps))
-                #    self.sigmasquared_cal = np.zeros((self.naxis2, nexps))
-                #else:
-                #    pass
+                # Create the cov matrix arrays
+                if ii == 0:
+                    self.cov_mat_tar = np.zeros((self.naxis2, nexps, nexps))
+                    self.sigmasquared_tar = np.zeros((self.naxis2, nexps))
+                    self.cov_mat_cal = np.zeros((self.naxis2, nexps, nexps))
+                    self.sigmasquared_cal = np.zeros((self.naxis2, nexps))
+                else:
+                    pass
 
                 for qq in range(nexps):
                     # nwav files
                     cpfiles = [f for f in os.listdir(paths[ii]+exps[qq]) if "CPs" in f] 
-                    #print(cpfiles)
+                    print(cpfiles)
                     ampfiles = [f for f in os.listdir(paths[ii]+exps[qq]) \
                                 if "amplitudes" in f]
                     phafiles = [f for f in os.listdir(paths[ii]+exps[qq]) if "phase" in f] 
@@ -625,15 +562,6 @@ class Calibrate:
                     R_j = R_i.T
                     self.cov +=np.dot(R_i,R_j) / (nexps - 1)
 
-                ############################
-                # Oct 14 2016 -- adding in a visibilities flag. Can't be >1 that doesn't make sense.
-                # So we will knock out any exposure where this is true
-                #blflag = np.zeros(amp.shape, dtype=bool)
-                #cpflag = np.zeros(cps.shape, dtype=bool)
-                #blflag[expflag, :,:] = True 
-                #cpflag[expflag, :,:] = True 
-                # how many exposures are we removing?
-                #minusexps = len(expflag)
                 # Also adding a mask to calib steps
                 ############################
                 for slc in range(self.naxis2):
@@ -643,7 +571,6 @@ class Calibrate:
                             self.v2_mean_tar[slc,:], self.v2_err_tar[slc,:], \
                             self.pha_mean_tar[slc,:], self.pha_err_tar = \
                             self.calib_steps(cps[slc,:,:], amp[slc,:,:], pha[slc,:,:], nexps, expflag=expflag)
-                        # measured cp shape: (nwav, nexps, ncp) mean cp shape: (nwav, ncp)
 
                     else:
                         # Fixed clunkiness!
@@ -656,11 +583,10 @@ class Calibrate:
                         #print(self.cp_mean_cal[ii-1, slc,:].shape)
                         #print(np.tile(self.cp_mean_cal[ii-1,slc,:],(nexps, 1)).shape)
 
-
             """
-            ################################################
-            # Notes on calculating closure phase cov matrix?
-            ################################################
+            ####################################
+            # calculate closure phase cov matrix
+            ####################################
             # zero mean and stack wavelength+exposures
             if ii ==0:
                 flatcps = (cps-self.cp_mean_tar[:,None,:]).reshape(nexps*self.naxis2, self.ncp)
@@ -668,12 +594,13 @@ class Calibrate:
             else:
                 flatcps = (cps-self.cp_mean_cal[ii-1, :,None,:]).reshape(nexps*self.naxis2, self.ncp)
                 self.cov_mat_cal += np.cov(flatcps)
-            UPDATE: Oct 18 2016 -- description from Kraus et al. 2008
+            UPDATE: Oct 18 2016 -- trying to implement description from Kraus et al. 2008
             C_r = sum_i (phi_frame - phi_mean)^T (phi_frame - phi_mean) / (n - 1)
             Q: how do we get a "calibrated" covariance matrix?
             add to phase uncertainties:
             sig^2 = (2 sig_r^2 + (n_c - 1)sig_c*2 ) / (n_c + 1)
             """
+            nexp_c = self.sigmasquared_cal.shape[1]
 
         else:
             for ii in range(self.nobjs):
@@ -705,10 +632,9 @@ class Calibrate:
                     R_i = rearr - rearr.mean(axis=1)[:,None]
                     R_j = R_i.T
                     self.cov +=np.dot(R_i,R_j) / (nexps - 1)
+
                 ############################
                 # Oct 14 2016 -- adding in a visibilities flag. Can't be >1 that doesn't make sense.
-                #v2flag = np.zeros(amp.shape, dtype=bool)
-                #v2flag[amp>1] = True 
                 # Also adding a mask to calib steps
                 if ii==0:
                     # closure phases and squared visibilities
@@ -716,8 +642,6 @@ class Calibrate:
                         self.v2_mean_tar[0,:], self.v2_err_tar[0,:], \
                         self.pha_mean_tar[0,:], self.pha_err_tar[0,:] = \
                         self.calib_steps(cps, amp, pha, nexps, expflag=expflag)
-                    # measured cp shape: (nwav, nexps, ncp) mean cp shape: (nwav, ncp)
-                    ##self.sigmasquared_tar[0,:] = np.diagonal(self.cov_mat_tar[0,:,:])
                 else:
                     # Fixed clunkiness!
                     # closure phases and visibilities
@@ -725,7 +649,7 @@ class Calibrate:
                         self.v2_mean_cal[ii-1,0,:], self.v2_err_cal[ii-1,0,:], \
                         self.pha_mean_cal[ii-1,0,:], self.pha_err_cal[ii-1,0,:] = \
                         self.calib_steps(cps, amp, pha, nexps, expflag=expflag)
-                    # measured cp shape: (nwav, nexps, ncp) mean cp shape: (nwav, ncp)
+
 
         # Combine mean calibrator values and errors
         self.cp_mean_tot = np.zeros(self.cp_mean_cal[0].shape)
@@ -776,29 +700,22 @@ class Calibrate:
         else:
             pass
 
-        #meancp = np.mean(cps, axis=0)
         meancp = np.ma.masked_array(cps, mask=cpmask).mean(axis=0)
-        #covmat_cps = np.cov(np.rollaxis(cps - meancp, -1,0))
-
-        #meanv2 = np.mean(amps, axis=0)**2
         meanv2 = np.ma.masked_array(amps, mask=blmask).mean(axis=0)**2
-        #covmat_v2 = np.cov(np.rollaxis(amps**2 - meanv2, -1,0))
-
-        #meanpha = np.mean(pha, axis=0)
         meanpha = np.ma.masked_array(pha, mask=blmask).mean(axis=0)**2
-        #covmat_pha = np.cov(np.rollaxis(pha - meanpha, -1,0))
 
         errcp = np.sqrt(mstats.moment(np.ma.masked_array(cps, mask=cpmask), moment=2, axis=0))/np.sqrt(nexp)
         errv2 = np.sqrt(mstats.moment(np.ma.masked_array(amps**2, mask=blmask), moment=2, axis=0))/np.sqrt(nexp)
         errpha = np.sqrt(mstats.moment(np.ma.masked_array(pha, mask=blmask), moment=2, axis=0))/np.sqrt(nexp)
+
         # Set cutoff accd to Kraus 2008 - 2/3 of median
         errcp[errcp < (2/3.0)*np.median(errcp)] =(2/3.0)*np.median(errcp) 
         errpha[errpha < (2/3.0)*np.median(errpha)] =(2/3.0)*np.median(errpha) 
         errv2[errv2 < (2/3.0)*np.median(errv2)] =(2/3.0)*np.median(errv2) 
-        #print("input:",cps)
-        #print("avg:", meancp)
         print("exposures flagged:", expflag)
+
         return meancp, errcp, meanv2, errv2, meanpha, errpha
+
 
     def save_to_txt(self):
         """Saves calibrated results to text files
@@ -845,13 +762,10 @@ class Calibrate:
         print(kwargs)
 
         
-        from misctools.write_oifits import OIfits
-        #except:
-        #   print "Need oifits.py nd write_oifits.py to use this method"
-        #   return None
+        from .misctools.write_oifits import OIfits
 
         # look for kwargs, e.g., phaseceil, anything else?
-        if "phaseceil" in kwargs.keys():
+        if "phaseceil" in list(kwargs.keys()):
             self.phaseceil = kwargs["phaseceil"]
         else:
             # default for flagging closure phases (deg)
@@ -955,6 +869,7 @@ class BinaryAnalyze:
             self.savedir = savedir
         self.plot=plot
 
+
     def coarse_binary_search(self, lims, nstep=20):
         """
         For getting first guess on contrast, separation, and angle
@@ -987,12 +902,9 @@ class BinaryAnalyze:
         print("abs max", wheremax)
         print("loglike at max axis=0",wheremax[0][0], loglike[wheremax[0][0],:,:].shape)
         print("===================")
-        print("Max log likelikehood for contrast:", )
-        print(cons[wheremax[0]])
-        print("Max log likelikehood for separation:", )
-        print(seps[wheremax[1]], "mas")
-        print("Max log likelikehood for angle:", )
-        print(angs[wheremax[2]], "deg")
+        print("Max log likelikehood for contrast:",cons[wheremax[0]]) 
+        print("Max log likelikehood for separation:", seps[wheremax[1]], "mas")
+        print("Max log likelikehood for angle:", angs[wheremax[2]], "deg")
         print("===================")
         coarse_params = cons[wheremax[0]], seps[wheremax[1]], angs[wheremax[2]]
 
@@ -1033,7 +945,7 @@ class BinaryAnalyze:
         con_index = np.ma.masked_array(loglike, mask=detec_mask).argmax(axis=2)
         detec_array = cons[con_index]
         print detec_array.shape
-        self.loglike = loglike`
+        self.loglike = loglike
         self.loglike_0 = loglike_0
         plt.figure()
         plt.title("1-sigma detection?")
@@ -1088,9 +1000,12 @@ class BinaryAnalyze:
         print("abs max", wheremax)
         print("loglike at max axis=0",wheremax[0][0], loglike[wheremax[0][0],:,:].shape)
         print("===================")
-        print("Max log likelikehood for contrast:",cons[wheremax[0]]) 
-        print("Max log likelikehood for separation:", seps[wheremax[1]], "mas")
-        print("Max log likelikehood for angle:", angs[wheremax[2]], "deg")
+        print("Max log likelikehood for contrast:", end=' ') 
+        print(cons[wheremax[0]])
+        print("Max log likelikehood for separation:", end=' ') 
+        print(seps[wheremax[1]], "mas")
+        print("Max log likelikehood for angle:", end=' ') 
+        print(angs[wheremax[2]], "deg")
         print("===================")
         coarse_params = cons[wheremax[0]], seps[wheremax[1]], angs[wheremax[2]]
         return coarse_params
@@ -1129,11 +1044,12 @@ class BinaryAnalyze:
                     ang = 180*np.arctan2(decs[k], ras[j])/np.pi
                     sep = np.sqrt(ras[j]**2 + decs[k]**2)
                     params = [cons[i], sep, ang]
-                    #chi2cube[i,j,k] = cp_binary_model(params, constant, priors, None, self.uvcoords, self.cp, self.cperr, stat="chi2")
-                    chi2cube[i,j,k] = allvis_binary_model(params, constant, priors, None, self.uvcoords, self.cp, self.cperr, self.t3amp, self.t3amperr, stat="chi2")
-                    #chi2_bin_model[i, j,k] = cp_binary_model([hyp, sep, ang], constant, priors, None, self.uvcoords, self.cp, self.cperr, stat="chi2")
-        #chi2_0 = cp_binary_model([0,0,0], constant, priors, None, self.uvcoords, self.cp, self.cperr, stat="chi2")
-        chi2_0 = allvis_binary_model([0,0,0], constant, priors, None, self.uvcoords, self.cp, self.cperr, self.t3amp, self.t3amperr, stat="chi2")
+                    chi2cube[i,j,k] = allvis_binary_model(params, constant, priors, None, 
+                                                          self.uvcoords, self.cp, self.cperr, self.t3amp,
+                                                          self.t3amperr, stat="chi2")
+        chi2_0 = allvis_binary_model([0,0,0], constant, priors, None,
+                                     self.uvcoords, self.cp, self.cperr, self.t3amp, self.t3amperr,
+                                     stat="chi2")
         print("detecmap chi2null", chi2_0)
 
         # chi^2 detection grid
@@ -1258,12 +1174,14 @@ class BinaryAnalyze:
                    "significance":self.significance}
         return bestparams
 
+
     def save_chi2map(self, absolute_path_filename_save):
         #savestr = self.savedir+os.path.sep+save+"_chi2map.pick"
         #savestr = self.savedir+os.path.sep+self.oifitsfn.replace(".oifits", "")+"_chi2map.pick"
         f = open(absolute_path_filename_save, "w")
         pickle.dump(self.chi2map_savdata, f)
         return None
+
 
     def plot_chi2map(self, savdata, savestr=False, show=False):
         #unpack everything
@@ -1294,6 +1212,7 @@ class BinaryAnalyze:
             plt.show()
         plt.clf()
         return None
+
 
     def two_hyp_test():
         """
@@ -1355,8 +1274,6 @@ class BinaryAnalyze:
         # Set up some random errors to add in per trial
         # Consider scaling random cperr by wavelength?
         if observables=="cp":
-            #if cov is not None:
-            #    randnums = np.random.multivariate_normal(np.zeros((int(trials), len(self.cp)*int(self.nwav))), cov)
             randnums = np.random.randn(int(ntrials), len(self.cp), int(self.nwav))
             # randomize* the measurement errors
             # errors shape here is [ntrials, ncps, nwavs]
@@ -1416,10 +1333,6 @@ class BinaryAnalyze:
             print("Finished computing big grid, took", t2-t1, "s")
             print("modelcps shape:", modelcps.shape)
             print("modelt3 shape:", modelt3.shape)
-            #model = np.zeros((ncon, nsep, nang, 
-            #                  modelcps.shape[-2]+modelt3.shape[-2], self.nwav))
-            #model[:,:,:,:modelcps.shape[-2],:] = modelcps
-            #model[:,:,:,modelcps.shape[-2]:,:] = modelt3
             model = np.concatenate((modelcps, modelt3), axis=3)
             print(self.t3amp)
             print("t3 errors")
@@ -1429,21 +1342,7 @@ class BinaryAnalyze:
             print("v2")
             print(self.v2err)
             print("cp errors")
-            #print model
-            #simtest = model.copy() + allerrors
-            #print reduced_chi2(simtest, allerrors, np.zeros(model.shape))#, dof=2*self.ncp*self.nwav - 3)
-            #print "TEST DETEC_LIMS"
-            #allvisobs = np.zeros((self.cp.shape[0]+self.t3amp.shape[0], self.cp.shape[1]))
-            #allvisobserr = np.zeros((self.cp.shape[0]+self.t3amp.shape[0], self.cp.shape[1]))
-            #allvisobs[:self.cp.shape[0], ...] = self.cp
-            #allvisobs[self.cp.shape[0]:, ...] = self.t3amp
-            #allvisobserr[:self.cp.shape[0], ...] = self.cperr
-            #allvisobserr[self.cp.shape[0]:, ...] = self.t3amperr
-            #model = np.zeros(allvisobs.shape)
-            #model[self.cp.shape[0]:,...] = 1.0
-            #print reduced_chi2(allvisobs,  allvisobserr, model)
             #self.cperr
-            #sys.exit()
 
             t3 = time.time()
             print("setting up the dictionary...")
@@ -1493,12 +1392,7 @@ class BinaryAnalyze:
                    "detections":self.detec_grid}
         return self.savdata
 
-    def save_deteclims(self, savestr):
-        f = open(savestr, "w")
-        pickle.dump(self.savdata_deteclims, f)
-        f.close()
-
-    def plot_deteclims(self, savdata, savestr =False, plot="off"):
+    def plot_deteclims(self, savdata, savestr = False, plot="off"):
         # contour plot
         clevels = savdata["clevels"]
         seps = savdata["separations"]
@@ -1523,6 +1417,7 @@ class BinaryAnalyze:
         if savestr is not False:
             plt.savefig(savestr)
         return None
+
 
     def grid_spectrum(self, sep, pa, ncon=100, conlims=[1.0e-3, 0.999], plot=True):
         """ If the position is known (sep, pa), look for best 
@@ -1749,9 +1644,8 @@ class BinaryAnalyze:
                 print(key, ":", mean, "+/-", err)
         print("=========================")
         # To do: report separation in mas? pa in deg?
-        # pickle self.mcmc_results here:
-
         return self.mcmc_results
+
 
     def make_guess(self):
         # A few options here, can provide:
@@ -1787,6 +1681,7 @@ class BinaryAnalyze:
         print("params", guess)
         return guess
 
+
     def save_mcmc_results(self, absolute_path_filename_save):
         pickle.dump(self.mcmc_results, \
                     open(absolute_path_filename_save, "wb"))
@@ -1794,6 +1689,7 @@ class BinaryAnalyze:
     def save_mcmc_chain(self, absolute_path_filename_save):
         pickle.dump(self.chain, \
                     open(absolute_path_filename_save, "wb"))
+
 
     def corner_plot(self, fn):
         import corner
@@ -1821,6 +1717,7 @@ class BinaryAnalyze:
         plt.show()
         plt.clf()
         return self.chain_convergence
+
 
 def cp_binary_model(params, constant, priors, spectrum_model, uvcoords, cp, cperr, stat="loglike"):
     # really want to be able to give this guy some general oi_data and have bm() sort it out.
@@ -2063,9 +1960,7 @@ def get_data(self):
     self.wavls = self.oifdata.wavelength[self.telescope].eff_wave
     self.eff_band = self.oifdata.wavelength[self.telescope].eff_band
     self.nwav = len(self.wavls)
-    #self.covmat = self.oifdata.covariance
-    #self.ucoord = np.zeros((3, self.ncp))
-    self.uvcoords = np.zeros((2, 3, self.ncp))#, self.nwav))
+    self.uvcoords = np.zeros((2, 3, self.ncp))
     self.uvcoords_vis = np.zeros((2, self.nbl))
 
     # Now collect fringe observables and coordinates
@@ -2130,19 +2025,6 @@ def get_data(self):
     #for q in range(self.nwav-1):
     #   self.uvcoords[:,:,:,f] = self.uvcoords[:,:,:,0]
 
-    """
-    def detec_calc_loop(self, stored):
-        # ndetected should have shape (nsep, ncon, nang) -- the first 3 dimensions of the cp model
-        ndetected = np.zeros((stored['model'].shape[0], stored['model'].shape[1], stored['model'].shape[2]))
-        for tt in range(stored['ntrials']):
-            simcps = stored['model'].copy()
-            simcps += stored['randerrors'][tt]
-            chi2null = reduced_chi2(simcps, stored['dataerrors'], 0)
-            chi2bin = reduced_chi2(simcps, stored['dataerrors'], stored['model'])
-            ndetected += ((chi2bin - chi2null)<0.0)
-        ndetected /= float(stored['ntrials'])
-        return ndetected
-    """
 
 def detec_calc_loop(dictlist):
     # ndetected should have shape (nsep, ncon, nang) -- the first 3 dimensions of the cp model
@@ -2185,6 +2067,7 @@ def logl(data, err, model):
     #return np.sum(-np.log(err**2) - 0.5*((model - data)/err)**2)
     return loglike
 
+
 def logl_cov(flatdata, invcovmat, flatmodel):
     """
     flatdata and flatmodel must be the same shape & len=1
@@ -2197,6 +2080,7 @@ def logl_cov(flatdata, invcovmat, flatmodel):
 def reduced_chi2(data, err, model, dof=1.0):
     return (1/float(dof))*np.sum(((model - data)**2)/(err**2), axis=(-1,-2))
 
+
 def assemble_cov_mat(self):
     meancps = np.mean(self.cp, axis=0)
     flat_mean_sub_cp = (self.cp - meancps[None,:]).flatten
@@ -2208,14 +2092,6 @@ def chi2_grid_loop(args):
     p0, p1, p2 = args['params']
     modelcps = np.rollaxis(model_cp_uv(args['uvcoords'], p0, p1, p2, 1/args['wavls']), 0, -1)
     chi2 = np.sum( (modelcps - args['data'])**2 / args['error']**2, axis = (-1,-2))/ args["dof"]
-    return chi2
-
-def chi2_grid_loop_cov(args):
-    p0,p1,p2 = args['params']
-    modelcps = np.rollaxis(model_cp_uv(args['uvcoords'], p0, p1, p2, 1/args['wavls']), 0, -1)
-    flatmodel = modelcps.reshape(modelcps.size)
-    diff = args['data'].reshape(args['data'].size) - flatmodel
-    chi2 = np.dot(diff, np.dot(args['invcov'], diff))
     return chi2
 
 def chi2_grid_loop_all(args):
