@@ -18,17 +18,29 @@ from astropy.io import fits
 import os, sys, time
 
 # Module imports
-from misctools.mask_definitions import NRM_mask_definitions # mask geometries, GPI, NIRISS, VISIR supported
-from misctools import utils
+# mask geometries, GPI, NIRISS, VISIR supported...
+from .misctools.mask_definitions import NRM_mask_definitions 
+from .misctools import utils
 
 um = 1.0e-6
 
 # utility routines for InstrumentData classes
 
 def show_cvsupport_threshold(instr):
+    """ Show threshold for where 'splodge' data in CV space contains signal """
     print("cvsupport_threshold is: ", instr.cvsupport_threshold)
     print(instr.cvsupport_threshold)
 def set_cvsupport_threshold(instr, k, v):
+    """ Set threshold for where 'splodge' data in CV space contains signal
+        
+    Parameters
+    ----------
+    instr: InstrumentData instance
+    thresh: Threshold for the absolute value of the FT(interferogram).
+            Normalize abs(CV = FT(a)) for unity peak, and define the support 
+            of "good" CV when this is above threshold
+    """
+    
     instr.cvsupport_threshold[k] = v
     print("New cvsupport_threshold is: ", instr.cvsupport_threshold)
 
@@ -81,20 +93,24 @@ class GPI:
         self.band = self.obsmode[-1] # K1 is two letters
         self.ref_imgs_dir = "refimgs_"+self.band+"/"
 
-        # finding centroid from phase slope only considered cv_phase data when cv_abs data exceeds this.  
-        # absolute value of cv data normalized to unity maximum for the threshold application.
-        self.cvsupport_threshold = {"Y":0.02, "J":0.02, "H":0.02, "1":0.02, "2":0.02} # Gurus: tweak with use...
-        self.threshold = self.cvsupport_threshold[self.band]
+        # finding centroid from phase slope only considered cv_phase data 
+        # when cv_abs data exceeds this cvsupport_threshold.  
+        # Absolute value of cv data normalized to unity maximum
+        # for the threshold application.
+        # Data reduction gurus: tweak the threshold value with experience...
+        self.cvsupport_threshold = {"Y":0.02, "J":0.02, "H":0.02, "1":0.02, "2":0.02}
+        self.threshold = self.cvsupport_threshold[band]
+
 
         # Special mode for collapsed data
         if self.hdr1[0]["NAXIS3"]==1:
             # This is just a way handle data that is manually collapsed.
             # Not a standard data format for GPI.
-            print "No NAXIS3 keyword. This is probably collapsed data."
-            print "Going to fake some stuff now"
+            print("No NAXIS3 keyword. This is probably collapsed data.")
+            print("Going to fake some stuff now")
             self.mode = "WOLLASTON_FAKEOUT"
-            
-        # wavelength info: spect mode or pol mode
+
+        # wavelength info: spect mode or pol more
         if "PRISM" in self.mode:
             # GPI's spectral mode
             self.nwav = self.hdr1[0]["NAXIS3"]
@@ -121,27 +137,27 @@ class GPI:
                                 band_ctrs[self.band]+band_wdth[self.band]/2.0, num=15)
 
             if 'gpifilterpath' in kwargs:
-                print "Using GPI filter file ",
+                print("Using GPI filter file ", end='')
                 if self.band=="Y":
                     filterfile = kwargs["gpifilterpath"]+"GPI-filter-Y.fits"
-                    print kwargs["gpifilterpath"]+"GPI-filter-Y.fits"
+                    print(kwargs["gpifilterpath"]+"GPI-filter-Y.fits")
                     cutoff=0.7
                 if self.band=="J":
                     filterfile = kwargs["gpifilterpath"]+"GPI-filter-J.fits"
-                    print kwargs["gpifilterpath"]+"GPI-filter-J.fits"
+                    print(kwargs["gpifilterpath"]+"GPI-filter-J.fits")
                     cutoff=0.7
                 if self.band=="H":
                     filterfile = kwargs["gpifilterpath"]+"GPI-filter-H.fits"
-                    print kwargs["gpifilterpath"]+"GPI-filter-H.fits"
+                    print(kwargs["gpifilterpath"]+"GPI-filter-H.fits")
                     cutoff=0.7
                 if self.band=="1":
                     filterfile = kwargs["gpifilterpath"]+"GPI-filter-K1.fits"
-                    print kwargs["gpifilterpath"]+"GPI-filter-K1.fits"
+                    print(kwargs["gpifilterpath"]+"GPI-filter-K1.fits")
                     cutoff=0.94
                 if self.band=="2":
                     filterfile = kwargs["gpifilterpath"]+"GPI-filter-K2.fits"
-                    print kwargs["gpifilterpath"]+"GPI-filter-K2.fits"
-                    cutoff=0.94
+                    print(kwargs["gpifilterpath"]+"GPI-filter-K2.fits")
+                    cutoff=0.94               
                 # Read in gpi filter file
                 fitsfilter = fits.open(filterfile)[1].data
                 wavls = []
@@ -171,8 +187,6 @@ class GPI:
         # For OIFits structure
         self.wavextension = (self.wls, self.eff_band)
         if "FAKEOUT" in self.mode:
-            #lam_c = np.sum(np.array(wghts)*np.array(wavls))/np.sum(wghts)
-            #lam_w = 
             self.wavextension = ([lam_c,], [lam_w,])  
 
         # Observation info
@@ -253,9 +267,11 @@ class VISIR:
             self.wls = [self.filt, ]
         self.wavextension = (self.lam_c, self.lam_w)
         self.nwav=1
-
-        # finding centroid from phase slope only considered cv_phase data when cv_abs data exceeds this.  
-        # absolute value of cv data normalized to unity maximum for the threshold application.
+        # finding centroid from phase slope only considered cv_phase data 
+        # when cv_abs data exceeds this cvsupport_threshold.  
+        # Absolute value of cv data normalized to unity maximum
+        # for the threshold application.
+        # Data reduction gurus: tweak the threshold value with experience...
         self.cvsupport_threshold = {"threshold":0.02} # Gurus: tweak with use...
 
         self.ref_imgs_dir = "refimgs/"
@@ -306,7 +322,13 @@ class VISIR:
         return scidata, hdr
 
 class NIRISS:
-    def __init__(self, filt, objname="obj", src="A0V", out_dir='', **kwargs):
+    def __init__(self, filt, 
+                       objname="obj", 
+                       src="A0V", 
+                       out_dir='', 
+                       chooseholes=None, 
+                       affine2d=None, 
+                       **kwargs):
         """
         Initialize NIRISS class
 
@@ -317,6 +339,9 @@ class NIRISS:
         Or just look at the file structure
         Either user has webbpsf and filter file can be read, or this will use a tophat and give a warning
         """
+        
+        if chooseholes:
+            print("    **** InstrumentData.NIRISS: ", chooseholes)
 
         # define bandpass either by tophat or webbpsf filt file
         #self.wls = np.array([self.bandpass,])
@@ -324,35 +349,48 @@ class NIRISS:
         self.objname = objname
         #############################
         lam_c = {"F277W":2.77e-6, "F380M": 3.8e-6, "F430M": 4.3e-6, "F480M": 4.8e-6}
+
         lam_w = {"F277W":0.2, "F380M": 0.1, "F430M": 0.05, "F480M": 0.08}
-        lam_bin = {"F277W": 50, "F380M": 20, "F430M":20,"F480M":30}
+        lam_bin = {"F277W": 50, "F380M": 20, "F430M":20, "F480M":30}
         #############################
 
-        # only one NRM on GPI:
+        # only one NRM on JWST:
         self.arrname = "jwst_g7s6c"
         self.pscale_mas = 65
         self.pscale_rad = utils.mas2rad(self.pscale_mas)
-        self.mask = NRM_mask_definitions(maskname=self.arrname)
+        self.mask = NRM_mask_definitions(maskname=self.arrname, chooseholes=chooseholes )
         self.mask.ctrs = np.array(self.mask.ctrs)
         # Hard code any rotations? 
         # (can be moved to NRM_mask_definitions later)
         # Add in hole/baseline properties ?
         self.holeshape="hex"
 
-        # finding centroid from phase slope only considered cv_phase data when cv_abs data exceeds this.  
-        # absolute value of cv data normalized to unity maximum for the threshold application.
-        self.cvsupport_threshold = {"F277W":0.02, "F380M": 0.02, "F430M": 0.02, "F480M": 0.02} # Gurus: tweak with use...
+        # save affine deformation of pupil object or create a no-deformation object. 
+        # We apply this when sampling the PSF, not to the pupil geometry.
+        # This will set a default Ideal or a measured rotation, for example,
+        # and include pixel scale changes due to pupil distortion.
+        # Separating detector tilt pixel scale effects from pupil distortion effects is 
+        # yet to be determined... see comments in Affine class definition.
+        # AS AZG 2018 08 15 Ann Arbor
+        if affine2d is None:
+            self.affine2d = utils.Affine2d(mx=1.0,my=1.0, 
+                                           sx=0.0,sy=0.0, 
+                                           xo=0.0,yo=0.0, name="Ideal")
+        else:
+            self.affine2d = affine2d
+
+
+
+        # finding centroid from phase slope only considered cv_phase data 
+        # when cv_abs data exceeds this cvsupport_threshold.  
+        # Absolute value of cv data normalized to unity maximum
+        # for the threshold application.
+        # Data reduction gurus: tweak the threshold value with experience...
+        # Gurus: tweak cvsupport with use...
+        self.cvsupport_threshold = {"F277W":0.02, "F380M": 0.02, "F430M": 0.02, "F480M": 0.02}
         show_cvsupport_threshold(self)
         self.threshold = self.cvsupport_threshold[filt]
 
-        ## Get info from reference file 
-        #reffits = fits.open(reffile)
-        #self.hdr0 = reffits[0].header
-        #reffits.close()
-        ## instrument settings
-        #self.mode = self.hdr0["DISPERSR"]
-        #self.obsmode = self.hdr0["OBSMODE"]
-        #self.band = self.obsmode[-1] # K1 is two letters
         self.ref_imgs_dir = os.path.join(out_dir,"refimgs_"+self.filt+"/")
 
         # Wavelength info for NIRISS bands F277W, F380M, F430M, or F480M
@@ -426,3 +464,12 @@ class NIRISS:
         """Either from WEBBPSF, or tophat, etc. A set of filter files will also be provided"""
         return None
 
+    """
+    def set_affine2d(self, affine2d):
+        print("Setting InstrumentData.affine2d to {}".format(affine2d.name))
+        self.affine2d = affine2d
+
+    def get_affine2d(self):
+        print("Getting InstrumentData.affine2d to {}".format(self.affine2d.name))
+        return self.affine2d
+    """
