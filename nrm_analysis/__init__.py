@@ -1,1 +1,3 @@
-__author__ = 'agreenba'
+from .version import *
+
+__all__ = ['fringefitting','misctools','modeling','tests']
