@@ -5,7 +5,7 @@ import sys
 import time
 #import webbpsf.poppy as poppy
 import poppy
-from nrm_analysis.misctools.utils import makedisk
+from nrm_analysis.misctools.utils import makedisk, rotate2dccw
 from astropy.io import fits
 """
 
@@ -36,24 +36,13 @@ m = 1.0
 mm = 1.0e-3 * m
 um = 1.0e-6 * m
 
-def rotatevectors(vectors, thetarad):
-    """
-    vectors is a list of vectors - e.g. nrm hole  centers
-    positive x decreases under slight rotation
-    positive y increases under slight rotation
-    """
-    c, s = (np.cos(thetarad), np.sin(thetarad))
-    ctrs_rotated = []
-    for vector in vectors:
-        ctrs_rotated.append([c*vector[0] - s*vector[1], 
-                             s*vector[0] + c*vector[1]])
-    return ctrs_rotated
-
 
 class NRM_mask_definitions():
 
     def __init__(self, maskname=None, rotdeg=None, holeshape="circ", rescale=False,\
-                 verbose=False):
+                 verbose=False, chooseholes=None):
+
+        print("NRM_Mask_definitions.NIRISS: maskname",  maskname)
         if maskname not in ["gpi_g10s40",  "jwst_g7s6", "jwst_g7s6c", "visir_sam", \
                             "p1640", "keck_nirc2", "pharo"]:
             # Second row hopefully coming someday
@@ -64,18 +53,18 @@ class NRM_mask_definitions():
             raise ValueError("mask %s not supported" % maskname)
         self.maskname = maskname
         if verbose:
-            print "\n\t====================================="
-            print "Mask %s being created" % self.maskname
+            print("\n\t=====================================")
+            print("Mask %s being created" % self.maskname)
 
         if self.maskname == "gpi_g10s40":
             self.hdia, self.ctrs = gpi_g10s40(rescale=rescale)
             self.rotdeg = 115.0 # By inspection of I&T data Dec 2012
             if rotdeg is not None:
                 self.rotdeg = rotdeg
-                print "rotating by {0} deg".format(rotdeg)
+                print("rotating by {0} deg".format(rotdeg))
             else:
-                print "rotating by 115.0 deg -- hard coded."
-            self.ctrs = rotatevectors(self.ctrs, self.rotdeg*np.pi/180.0)
+                print("rotating by 115.0 deg -- hard coded.")
+            self.ctrs = rotate2dccw(self.ctrs, self.rotdeg*np.pi/180.0)
             self.rotate = self.rotdeg
             self.activeD = self.showmask() # calculates circle dia including all holes
             self.OD = 7770.1 * mm   # DGS = 7770.1 * mm with M2 cardboard baffle
@@ -85,13 +74,14 @@ class NRM_mask_definitions():
 
         elif self.maskname == "jwst_g7s6c":
             """ activeD and D taken from webbpsf-data/NIRISS/coronagraph/MASK_NRM.fits"""
-            self.hdia, self.ctrs = jwst_g7s6c()
+            print('self.maskname == "jwst_g7s6c":')
+            self.hdia, self.ctrs = jwst_g7s6c(chooseholes=chooseholes) # 
             self.activeD =  6.559*m # webbpsf kwd DIAM  - not a 'circle including all holes'
             self.OD = 6.610645669291339*m # Full pupil file size, incl padding, webbpsf kwd PUPLDIAM
             if rotdeg is not None:
                 self.rotdeg = rotdeg
         elif self.maskname == "jwst_g7s6":
-            print "\tnot finished"
+            print("\tnot finished")
 
         elif maskname=="visir_sam":
             """Mask dimensions from Eric Pantin"""
@@ -99,10 +89,10 @@ class NRM_mask_definitions():
             self.rotdeg = 9.0 # By inspection of data
             if rotdeg is not None:
                 self.rotdeg += rotdeg
-                print "rotating by {0} + 9 (hardcoded) deg".format(rotdeg)
+                print("rotating by {0} + 9 (hardcoded) deg".format(rotdeg))
             else:
-                print "rotating by 9 deg -- hard coded"
-            self.ctrs = rotatevectors(self.ctrs, self.rotdeg*np.pi/180.0)
+                print("rotating by 9 deg -- hard coded")
+            self.ctrs = rotate2dccw(self.ctrs, self.rotdeg*np.pi/180.0)
             self.rotate = self.rotdeg
             self.activeD = self.showmask() # calculated circle dia including all holes
             self.OD = 8115.0 * mm   # DVLT = 8115.0 * mm -- but what is the M2 dia??
@@ -110,7 +100,7 @@ class NRM_mask_definitions():
             self.ID = 1000.0 * mm   # Don't know this, but this number shouldn't matter
 
         else:
-            print "\tcheck back later"
+            print("\tcheck back later")
 
     # make image at angular pixel scale, at given wavelength/bandpass
     # choose pupil pixel scale 
@@ -129,10 +119,10 @@ class NRM_mask_definitions():
             start = 74
             end = None
         else:
-            print 'Must specify valid band: Yband, Jband, or Hband'
+            print('Must specify valid band: Yband, Jband, or Hband')
         fh='wlcorrection_'
         info = np.loadtxt(fldr+fh+date+'.txt')
-        print 'Returning scaled wavelengths from '+date
+        print('Returning scaled wavelengths from '+date)
         return info[start:end, 2]
 
     def get_rotation(self, band = 'Hband', date='2013_Jan15', slc=None, fldr=''):
@@ -146,7 +136,7 @@ class NRM_mask_definitions():
             start = 74
             end = None
         else:
-            print 'Must specify valid band: Yband, Jband, or Hband'
+            print('Must specify valid band: Yband, Jband, or Hband')
         fh='rotcorrection_'
         info = np.loadtxt(fldr+fh+date+'.txt')
         return info[start:end,1]
@@ -183,7 +173,7 @@ class NRM_mask_definitions():
             D = self.activeD  # light-transmitting diameter, m
 
         pupil = np.zeros((int(np.ceil(D/puplscal)), int(np.ceil(D/puplscal))))
-        print "creating pupil array with shape ", pupil.shape
+        print("creating pupil array with shape ", pupil.shape)
 
         factor=1
         #modify to add hex holes later
@@ -221,21 +211,21 @@ class NRM_mask_definitions():
         prints mask geometry, 
         returns diameter of smallest centered circle (D) enclosing live mask area
         """
-        print "\t%s" % self.maskname
-        print "\tholeD\t%+6.3f" % self.hdia
+        print("\t%s" % self.maskname)
+        print("\tholeD\t%+6.3f" % self.hdia)
 
-        print "\t\t  x/m  \t  y/m        r/m     r+h_rad/m  2(r+h)/m"
+        print("\t\t  x/m  \t  y/m        r/m     r+h_rad/m  2(r+h)/m")
         radii = []
         for ctr in self.ctrs:
-            print "\t\t%+7.3f\t%+7.3f" % (ctr[0], -1.0*ctr[1]),
+            print("\t\t%+7.3f\t%+7.3f" % (ctr[0], -1.0*ctr[1]), end=' ')
             radii.append(math.sqrt(ctr[0]*ctr[0] + ctr[1]*ctr[1]))
-            print "    %.3f " % radii[-1],
-            print "    %.3f " % (radii[-1] + self.hdia/2.0),
-            print "    %.3f " % (2.0*radii[-1] + self.hdia)
+            print("    %.3f " % radii[-1], end=' ')
+            print("    %.3f " % (radii[-1] + self.hdia/2.0), end=' ')
+            print("    %.3f " % (2.0*radii[-1] + self.hdia))
 
 
-        print "\t2X max (r+h) \t%.3f m" % (2.0*(max(radii) + 0.5*self.hdia))
-        print
+        print("\t2X max (r+h) \t%.3f m" % (2.0*(max(radii) + 0.5*self.hdia)))
+        print()
         return 2.0*(max(radii) + 0.5*self.hdia) 
         """
         anand@silmakpro.local:172  ./gpipoppy.py
@@ -333,7 +323,7 @@ def gpi_g10s40_asmanufactured(mag):
 
     # design2metal mag
     holedia = holedia * mag
-    print mag
+    print(mag)
     ctrs = []
     REVERSE = -1 # Flip y dimensions to match I&T data Dec 2012
     for r in holectrs:
@@ -369,7 +359,7 @@ def gpi_mag_asdesigned():
 
     flip = "_flip"
 
-    print """" 
+    print("""" 
     This program (gpipoppy.py) uses DGS = 7770.1 * mm with M2 cardboard baffle
     GS OD from GPI Fundamental Values (Bauman GPI_Optical_Fundamental_Values.doc)
     
@@ -381,7 +371,7 @@ def gpi_mag_asdesigned():
         LenoxSTScI_delivery_APOD_NRM10.[pdf xlsx]   (also on HIA's KT)
 
     All X,Y dimensions in m from center of mask in PM space
-    All hole DIAMETERS are in m:\n"""
+    All hole DIAMETERS are in m:\n""")
 
     ##### Preliminary set-up:- design-to-metal scale
     ##### Multiply design by MAG to get metal coords, origin at part center
@@ -392,7 +382,7 @@ def gpi_mag_asdesigned():
     ####magBarnaby2PPM = magBarnaby2LS * magLS2PPM
     ####MAG = magBarnaby2PPM
     ####print "DESIGN to PPM magnification is %.4f\n" % MAG
-    print demag
+    print(demag)
     return demag
 
 def gpi_g10s40(rescale=False):
@@ -454,16 +444,11 @@ n.b. This differs from the metal-mask-projected-to-PM-space with
 Zheng Hai (Com Dev)'s mapping communicated by Mathilde Beaulieu to Anand.
 This mapping has offset, rotation, shrink x, magnification.
 Reference is a JWST Tech Report to be finalized 2013 by Anand.
+
+jwst_g7s6_centers_asdesigned function superceded in LG++:
 """
-def jwst_g7s6_centers_asdesigned(chooseholes=None):
-    ## aka "xyMB" in Anand's  earlier mask creation routines
-    #return np.array( [[ 0.00000000,  -2.640000],
-    #                  [-2.2863100 ,  0.0000000],
-    #                  [ 2.2863100 , -1.3200001],
-    #                  [-2.2863100 ,  1.3200001],
-    #                  [-1.1431500 ,  1.9800000],
-    #                  [ 2.2863100 ,  1.3200001],
-    #                  [ 1.1431500 ,  1.9800000]] )*m
+def jwst_g7s6_centers_asbuilt(chooseholes=None):  # was jwst_g7s6_centers_asdesigned
+
     holedict = {} # as_built names, C2 open, C5 closed, but as designed coordinates
     # Assemble holes by actual open segment names (as_built).  Either the full mask or the
     # subset-of-holes mask will be V2-reversed after the as_designed centers  are defined
@@ -507,13 +492,25 @@ def jwst_g7s6_centers_asdesigned(chooseholes=None):
     # Preserve ctrs.as-designed (treat as immutable)
     # Reverse V2 axis coordinates to close C5 open C2, and others follow suit... 
     # preserve cts.as_built  (treat as immutable)
-    ctrs_asbuilt = ctrs_asdesigned.copy() # copy
-    ctrs_asbuilt[:,0] *= -1  # then flip the X axis values
-    # create and return  'live' hole centers
+    ctrs_asbuilt = ctrs_asdesigned.copy()
+
+    # create 'live' hole centers in an ideal, orthogonal undistorted xy pupil space,
+    # eg maps open hole C5 in as_designed to C2 as_built, eg C4 unaffacted....
+    ctrs_asbuilt[:,0] *= -1
+
+    # LG++ rotate hole centers by 90 deg to match MAST o/p DMS PSF with 
+    # no affine2d transformations 8/2018 AS
+    # LG++ The above aligns the hole patern with the hex analytic FT, 
+    # flat top & bottom as seen in DMS data. 8/2018 AS
+    ctrs_asbuilt = rotate2dccw(ctrs_asbuilt, np.pi/2.0) # overwrites attributes
+
+    # create 'live' hole centers in an ideal, orthogonal undistorted xy pupil space,
     return ctrs_asbuilt * m
 
+
 def jwst_g7s6c(chooseholes=None):
-    return 0.80*m, jwst_g7s6_centers_asdesigned(chooseholes=chooseholes)
+    # WARNING! JWST CHOOSEHOLES CODE NOW DUPLICATED IN LG_Model.py WARNING! ###
+    return 0.80*m, jwst_g7s6_centers_asbuilt(chooseholes=chooseholes)
 
 
 def visir_sam_asmanufactured(mag):
@@ -553,7 +550,7 @@ def visir_sam_asmanufactured(mag):
 
     # design2metal mag
     holedia = holedia * mag
-    print mag
+    print(mag)
     ctrs = []
     REVERSE = 1 # The pupil we measure with VISIR pupil imaging lens is 
                  # [probably] point symmetry reversed w.r.t reality. => OK checked
@@ -586,15 +583,15 @@ def visir_mag_asdesigned():
 
     flip = "_flip"
 
-    print """" 
+    print("""" 
     This program (VISIR.py) uses GVLT = 8115.0 * mm from SAM report c/o Eric Pantin
     (report_SAM_pupil.pdf)
     
     All X,Y dimensions in m from center of mask in PM space
-    All hole DIAMETERS are ... :\n"""
+    All hole DIAMETERS are ... :\n""")
 
     ####print "DESIGN to PPM magnification is %.4f\n" % MAG
-    print demag
+    print(demag)
     return demag
 
 
@@ -630,7 +627,7 @@ if __name__ == "__main__":
     PUPLSCAL= 0.006455708661417323 # scale (m/pixels) from webbpsf-data/NIRISS/coronagraph/MASK_NRM.fits
     # for jwst-g7s6c  fullpupil=True gets us a file like that in webbpsf-data...
     #maskobj = nrm.createnrmarray(puplscal=PUPLSCAL,fitsfile='g7s6c.fits' % r, fullpupil=True)
-    print nrm.activeD
+    print(nrm.activeD)
     sys.exit()
     maskobj = nrm.createnrmarray(puplscal=PUPLSCAL,
                                  fitsfile='/Users/anand/Desktop/jwst_g7s6c_which.fits',
