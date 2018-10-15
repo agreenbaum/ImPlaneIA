@@ -463,13 +463,3 @@ class NIRISS:
     def _generate_filter_files():
         """Either from WEBBPSF, or tophat, etc. A set of filter files will also be provided"""
         return None
-
-    """
-    def set_affine2d(self, affine2d):
-        print("Setting InstrumentData.affine2d to {}".format(affine2d.name))
-        self.affine2d = affine2d
-
-    def get_affine2d(self):
-        print("Getting InstrumentData.affine2d to {}".format(self.affine2d.name))
-        return self.affine2d
-    """
