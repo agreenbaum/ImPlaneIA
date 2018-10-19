@@ -29,6 +29,12 @@ _default_log = logging.getLogger('NRM_Model')
 #_default_log.setLevel(logging.INFO)
 _default_log.setLevel(logging.ERROR)
 
+
+VERBOSE = False
+def vprint(*args):  # VERBOSE mode printing
+    if VERBOSE: print("-----------------------------------------", *args)
+    pass
+
 """
 
 ====================
@@ -65,6 +71,7 @@ Algorithm documented in
     Greenbaum, A. Z., Pueyo, L. P., Sivaramakrishnan, A., and Lacour, S., 
     Astrophysical Journal vol. 798, Jan 2015.
 Developed with NASA APRA (AS, AZG), NSF GRFP (AZG), NASA Sagan (LP), and French taxpayer (SL)  support
+Refactored by Greenbaum, Sivaramakrishnan
 
 """
 phi_nb = np.array( [0.028838669455909766, -0.061516214504502634, \
@@ -104,8 +111,6 @@ class NRM_Model():
         self.logger.addHandler(sh)
 
         self.holeshape = holeshape
-        if pixscale==None:
-            print("PIXEL SCALE NOT SET, RUN set_pixelscale METHOD TO ADD.")
         self.pixel = pixscale # det pix in rad (square)
         self.over = over
         self.maskname = mask
@@ -154,7 +159,8 @@ class NRM_Model():
         else:
 
             try:
-                print(mask.ctrs)  
+                #print(mask.ctrs)
+                pass
                 
             except AttributeError:
                 raise AttributeError("Mask must be either 'jwst' or NRM_mask_geometry object")
@@ -191,7 +197,7 @@ class NRM_Model():
         if phi: # meters of OPD at central wavelength
             if phi == "perfect": 
                 self.phi = np.zeros(self.N) # backwards compatibility
-                print('LG_Model.__init__(): phi="perfect" deprecated in LG++.  Omit phi or use phi=None')
+                vprint('LG_Model.__init__(): phi="perfect" deprecated in LG++.  Omit phi or use phi=None')
             else:
                 self.phi = phi
         else:
@@ -220,17 +226,17 @@ class NRM_Model():
         In data reduction piupelines DO NOT USE THIS ROUTINE - use the
         BEING REMOVED - DON'T USE - use Affine2d resampling of the image plane instead.
         """
-        print("""
-        LGM_Model.set_ctrs_rot(): BEING REMOVED - DON'T USE - use Affine2d instead""")
+        vprint("""
+        LG_Model.NRM_Model.set_ctrs_rot(): BEING REMOVED - DON'T USE - use Affine2d instead""")
 
         if rotation_ccw_deg:
             self.ctrs = utils.rotate2dccw(self.ctrs_asbuilt, rotation_ccw_deg * np.pi / 180.0)
             self.rotation_ccw_deg = rotation_ccw_deg # record-keeping
-            print("\tLGModel.set_ctrs_rot: ctrs in V2V3, meters after rot %.2f deg:"%rotation_ccw_deg)
+            vprint("\tLG_Model.NRM_Model.set_ctrs_rot: ctrs in V2V3, meters after rot %.2f deg:"%rotation_ccw_deg)
         else:
-            print("\tLGModel.set_ctrs_rot: ctrs in V2V3, meters:")
+            vprint("\tLG_Model.NRM_ModelLG_Model.set_ctrs_rot: ctrs in V2V3, meters:")
 
-        print(self.ctrs, "****************")
+        vprint(self.ctrs, "****************")
 
 
     def set_pistons(self, phi_m):
@@ -239,6 +245,8 @@ class NRM_Model():
 
     def set_pixelscale(self, pixel_rad):
         """Detector pixel scale (isotropic) """
+        vprint("""
+        LG_Model.NRM_Model.set_pixel_scale({0:.6e} radians = {1:.2f} mas""".format(pixel_rad, pixel_rad/mas)) 
         self.pixel = pixel_rad
         
     def show_ctrs(self, figstr="Fig_rot", figdir=""):
@@ -298,7 +306,7 @@ class NRM_Model():
 
         if over == None: 
             over = 1  # ?  Always comes in as integer.
-            print("defaulting to oversample=1, i.e. detector pixel scale pitch used.")
+            vprint("defaulting to oversample=1, i.e. detector pixel scale pitch used.")
         #elf.pixel_sim = self.pixel/float(over)  #??? need?  
         # Deepashri prefers detector pixel scale & oversamp only in the object
 
@@ -309,7 +317,7 @@ class NRM_Model():
 
         # Monochromatic and polychromatic cases done with same loop:
         if hasattr(self.bandpass, '__iter__') == False:
-            print("Got one wavelength. Simulating monochromatic ... ")
+            vprint("Got one wavelength. Simulating monochromatic ... ")
             simbandpass = [(1.0, bandpass)]
         else:
             self.logger.debug("------Simulating Polychromatic------")
@@ -318,12 +326,12 @@ class NRM_Model():
         self.psf_over = np.zeros((over*fov, over*fov))
         nspec = 0
         # accumulate polychromatic oversampled psf in the object
-        print("**** simulate():  psf_offset {0}".format(psf_offset))
+        vprint("**** simulate():  psf_offset {0}".format(psf_offset))
         for w,l in simbandpass: # w: wavelength's weight, l: lambda (wavelength)
-            print("weight:", w, "wavelength:", l)
-            print("fov/detector pixels:", fov)
-            print("over:", over)
-            print("pixel:", self.pixel)
+            vprint("weight:", w, "wavelength:", l)
+            vprint("fov/detector pixels:", fov)
+            vprint("over:", over)
+            vprint("pixel:", self.pixel)
             self.psf_over += w * analyticnrm2.PSF(self.pixel, # det pixel scale, rad
                                                   fov,   # in detpix number
                                                   over,
@@ -370,7 +378,7 @@ class NRM_Model():
 
         # Monochromatic and polychromatic cases done with same loop:
         if hasattr(self.bandpass, '__iter__') == False:
-            print("Got one wavelength. Simulating monochromatic ... ")
+            vprint("Got one wavelength. Simulating monochromatic ... ")
             simbandpass = [(1.0, bandpass)]
         else:
             self.logger.debug("------Simulating Polychromatic------")
@@ -385,7 +393,7 @@ class NRM_Model():
         self.model_beam = np.zeros((self.over*self.fov, self.over*self.fov))
         self.fringes = np.zeros((self.N*(self.N-1)+1, self.over*self.fov, self.over*self.fov))
         for w,l in simbandpass: # w: weight, l: lambda (wavelength)
-            print("weight: {0}, lambda: {1}".format(w,l))
+            vprint("weight: {0}, lambda: {1}".format(w,l))
             # model_array returns the envelope and fringe model (a list of oversampled fov x fov slices)
             pb, ff = analyticnrm2.model_array(self.modelctrs, l, self.over,
                               self.modelpix,
@@ -402,7 +410,7 @@ class NRM_Model():
 
             # this routine multiplies the envelope by each fringe "image"
             self.model_over = analyticnrm2.multiplyenv(pb, ff)
-            print("LG_Model.make_model: NRM MODEL model shape:", self.model_over.shape)
+            #print("LG_Model.make_model: NRM MODEL model shape:", self.model_over.shape)
 
             model_binned = np.zeros((self.fov,self.fov, self.model_over.shape[2]))
             # loop over slices "sl" in the model
@@ -411,18 +419,18 @@ class NRM_Model():
 
             self.model += w*model_binned
     
-        print("LG_Model.make_model: self.model", type(self.model), type(self.model[0,0,0]))
+        #print("LG_Model.make_model: self.model", type(self.model), type(self.model[0,0,0]))
         return self.model
 
 
     def fit_image(self, image, reference=None, pixguess=None, rotguess=0, psf_offset=(0,0),
                   modelin=None, savepsfs=False):
 
-        print("\n    **** LG_Model.NRM_Model.fit_image: psf_offset {}".format(psf_offset))
+        vprint("\n    **** LG_Model.NRM_Model.fit_image: psf_offset {}".format(psf_offset))
         if hasattr(modelin, 'shape'):
-            print("    **** LG_Model.NRM_Model.fit_image modelin passed in")
+            vprint("    **** LG_Model.NRM_Model.fit_image modelin passed in")
         else:
-            print("    **** LG_Model.NRM_Model.fit_image: modelin is None\n")
+            vprint("    **** LG_Model.NRM_Model.fit_image: modelin is None\n")
         #time.sleep(3)
 
         """
@@ -442,7 +450,7 @@ class NRM_Model():
         self.saveval = savepsfs
 
         if modelin is None:
-            print("    **** LG_Model.NRM_Model.fit_image: fittingmodel   no modelin")
+            vprint("    **** LG_Model.NRM_Model.fit_image: fittingmodel   no modelin")
             # No model provided - now perform a set of automatic routines
 
             # A Cleaned up version of your image to enable Fourier fitting for 
@@ -469,14 +477,14 @@ class NRM_Model():
                     centering=self.bestcenter, fitswrite=self.saveval)
 
             self.pixscale_measured=self.pixel
-            print("pixel scale (mas):", utils.rad2mas(self.pixel))
+            vprint("pixel scale (mas):", utils.rad2mas(self.pixel))
             self.fov=image.shape[0]
             self.fittingmodel=self.make_model(self.fov, bandpass=self.bandpass, 
                             over=self.over, rotate=True,
                             psf_offset=self.bestcenter, 
                             pixscale=self.pixel)
         else:
-            print("    **** LG_Model.NRM_Model.fit_image: fittingmodel=modelin")
+            vprint("    **** LG_Model.NRM_Model.fit_image: fittingmodel=modelin")
             self.fittingmodel = modelin
             
         self.soln, self.residual, self.cond,self.linfit_result = \
@@ -499,7 +507,7 @@ class NRM_Model():
 
     # LG++ with sim data - don't use this cos you already found center in nrm_core
     def determine_center(self, centering): # mostly for internal use from fit_image...
-            print("\n    **** LG_Model.NRM_Model.determine_center: centering {}".format(centering))
+            vprint("\n    **** LG_Model.NRM_Model.determine_center: centering {}".format(centering))
             sys.exit("    **** LG_Model.NRM_Model.determine_center")
 
             # First find the fractional-pixel centering
@@ -603,13 +611,13 @@ class NRM_Model():
         # ---------------------------------
         # ---------------------------------
         if len(pixfiles)>4:
-            print("reading in existing reference files...")
-            print('in directory {0}'.format(self.datapath+self.refdir))
-            print(pixfiles)
+            vprint("reading in existing reference files...")
+            vprint('in directory {0}'.format(self.datapath+self.refdir))
+            vprint(pixfiles)
             self.pixscales = np.zeros(len(pixfiles))
             pixscl_corrlist = np.zeros((len(pixfiles), reffov, reffov))
             for q, scalfile in enumerate(pixfiles):
-                print(q)
+                vprint(q)
                 f = fits.open(self.datapath+self.refdir+pixfiles[q])
                 psf, filehdr=f[0].data, f[0].header
                 self.test_pixscale=filehdr['PIXSCL']
@@ -617,17 +625,17 @@ class NRM_Model():
                 f.close()
                 pixscl_corrlist[q,:,:] = run_data_correlate(img,psf)
                 self.pixscl_corr[q] = np.max(pixscl_corrlist[q])
-                print('max correlation',self.pixscl_corr[q])
+                vprint('max correlation',self.pixscl_corr[q])
                 if True in np.isnan(self.pixscl_corr):
                     raise ValueError("Correlation produced NaNs,"\
                              " please check your work!")
 
         else:
-            print('creating new reference files...')
-            print('in directory {0}'.format(self.datapath+self.refdir))
+            vprint('creating new reference files...')
+            vprint('in directory {0}'.format(self.datapath+self.refdir))
             self.pixscales = np.zeros(len(self.scallist))
             for q, scal in enumerate(self.scallist):
-                print(q)
+                vprint(q)
                 self.test_pixscale = self.pixel*scal
                 self.pixscales[q] = self.test_pixscale
                 psf = self.simulate(bandpass=self.bandpass, fov=reffov, 
@@ -654,11 +662,11 @@ class NRM_Model():
                                 vals=self.pixscl_corr)
         self.pixscale_factor = self.pixscale_optimal/self.pixel
         closestpixscale = self.pixscales[self.pixscl_corr==self.pixscl_corr.max()][0]
-        print('PIXSCALE DEBUG')
-        print(closestpixscale)
+        vprint('PIXSCALE DEBUG')
+        vprint(closestpixscale)
 
-        print('NRM_Model pixel scale:',self.pixscale_optimal)
-        print('fraction of guess:', self.pixscale_factor)
+        vprint('NRM_Model pixel scale:',self.pixscale_optimal)
+        vprint('fraction of guess:', self.pixscale_factor)
         radlist = self.rotlist_rad  #DT, AS Jan 2016
         corrlist = np.zeros((len(radlist), reffov, reffov))
         self.corrs = np.zeros(len(radlist))
@@ -668,24 +676,24 @@ class NRM_Model():
         else:
             rotfiles = []
         if len(rotfiles)>4:
-            print("reading from file")
+            vprint("reading from file")
             self.rots = np.zeros(len(rotfiles)) 
             for q, rotfilefile in enumerate(rotfiles):
                 f = fits.open(self.datapath+self.refdir+rotfile)
-                print(self.datapath+self.refdir+rotfile, end=' ')
-                print("rotfile", rotfile)
+                vprint(self.datapath+self.refdir+rotfile, end=' ')
+                vprint("rotfile", rotfile)
                 psf, filehdr=f[0].data, f[0].header
                 self.rots[q] = filehdr['ROTRAD']
                 f.close()
                 corrlist[q,:,:] = run_data_correlate(psf, img)
                 self.corrs[q] = np.max(corrlist[q])
-                print('max rot correlation: ',self.corrs[q])
+                vprint('max rot correlation: ',self.corrs[q])
             self.corrs = self.corrs[np.argsort(self.rots)]
             self.rots = self.rots[np.argsort(self.rots)]
         else:
             self.rots = radlist
             for q,rad in enumerate(radlist):
-                print('no rotation files found, creating new...')
+                vprint('no rotation files found, creating new...')
                 psf = self.simulate(bandpass=self.bandpass, fov=reffov, 
                 #pixel = closestpixscale, rotate=rad,
                 pixel = self.pixscale_optimal, rotate=rad,
@@ -711,16 +719,16 @@ class NRM_Model():
                     fov=reffov, rotate=self.rot_measured,
                     centering=centering)
 
-        print('--------------- WHAT THE MATCHING ROUTINE FOUND ---------------')
-        print('scaling factor:', self.pixscale_factor)
-        print('pixel scale (mas):', utils.rad2mas(self.pixscale_optimal))
-        print('rotation (rad):', self.rot_measured)
-        print('--------------- -------------- ---------------')
+        vprint('--------------- WHAT THE MATCHING ROUTINE FOUND ---------------')
+        vprint('scaling factor:', self.pixscale_factor)
+        vprint('pixel scale (mas):', utils.rad2mas(self.pixscale_optimal))
+        vprint('rotation (rad):', self.rot_measured)
+        vprint('--------------- -------------- ---------------')
 
         try:
             self.gof = goodness_of_fit(img,self.refpsf)
         except:
-            print("rewrite goodness_of_fit, it failed.")
+            vprint("rewrite goodness_of_fit, it failed.")
             self.gof = False
         return self.pixscale_factor, self.rot_measured,self.gof
 
@@ -796,13 +804,13 @@ class NRM_Model():
         self.xpos, self.ypos = self.x_offset/float(self.over), self.y_offset/float(self.over)
         verbose=False
         if verbose:
-            print("x_peak_python,y_peak_python", x_peak,y_peak)
-            print("x_peak_ds9,y_peak_ds9", x_peak_ds9,y_peak_ds9)
-            print("first value is x, second value is y")
-            print("printing offsets from the center of perfect PSF in oversampled pixels...")
-            print("x_offset, y_offset", self.x_offset, self.y_offset)
-            print("printing offsets from the center of perfect PSF in detector pixels...")
-            print("x_offset, y_offset", self.xpos,self.ypos)         
+            vprint("x_peak_python,y_peak_python", x_peak,y_peak)
+            vprint("x_peak_ds9,y_peak_ds9", x_peak_ds9,y_peak_ds9)
+            vprint("first value is x, second value is y")
+            vprint("printing offsets from the center of perfect PSF in oversampled pixels...")
+            vprint("x_offset, y_offset", self.x_offset, self.y_offset)
+            vprint("printing offsets from the center of perfect PSF in detector pixels...")
+            vprint("x_offset, y_offset", self.xpos,self.ypos)         
 
 
 
@@ -818,7 +826,7 @@ def save(nrmobj, outputname, savdir = ""):
     savobj.test = 1
     with open(r"{0}.ffo".format(savdir, outputname), "wb") as output_file:
         json.dump(savobj, output_file)
-    print("success!")
+    vprint("success!")
 
     # init stuff
     savobj.pscale_rad, savobj.pscale_mas = nrmobj.pixel, utils.rad2mas(nrmobj.pixel)
@@ -906,7 +914,7 @@ def image_plane_correlate(data,model):
     if True in np.isnan(multiply):
         raise ValueError("data*model produced NaNs,"\
                     " please check your work!")
-    print("masked data*model:", multiply, "model sum:", model.sum())
+    vprint("masked data*model:", multiply, "model sum:", model.sum())
     return multiply.sum()/((np.ma.masked_invalid(data)**2).sum())
     #return (multiply/(np.ma.masked_invalid(data)**2))
     #multiply = np.nan_to_num(model*data)
@@ -914,6 +922,6 @@ def image_plane_correlate(data,model):
 
 def run_data_correlate(data, model):
     sci = data
-    print("shape sci",np.shape(sci))
-    print("shape model", np.shape(model))
+    vprint("shape sci",np.shape(sci))
+    vprint("shape model", np.shape(model))
     return utils.rcrosscorrelate(sci, model)

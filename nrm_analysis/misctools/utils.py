@@ -44,7 +44,7 @@ class Affine2d():
                                  F{ ( my*u - sy*v) / Delta, 
                                     (-sx*u + mx*v) / Delta  }
     where  
-                Delta = mx * my - sx * sy).
+                Delta = mx * my - sx * sy.
 
     The reverse transformation, from (x',y') to (x,y) is given by:
 
@@ -108,16 +108,20 @@ class Affine2d():
 
         Parameters
         ----------
-        mx : float x magnification
-        my : float y magnification
-        sx : float x shear with y
-        sy : float y shear with x
-        xo : float offset in pupil space
-        yo : float offset in pupil space
+        mx : float x magnification # dimensionless
+        my : float y magnification # dimensionless
+        sx : float x shear with y # dimensionless
+        sy : float y shear with x # dimensionless
+
+        The following two parameters need understanding and documentation...
+        xo : float offset in pupil space # dimension???  So far we only use zero.  Probably units of original (undistorted) x & y pixels.
+        yo : float offset in pupil space # dimension???  So far we only use zero.  Probably units of original (undistorted) x & y pixels.
+
         rotradccw: None (no op, the default value), or...
-                   a pure counter-clockwise rotation of *THE VECTOR TO A POINT*,
+                   a counter-clockwise rotation of *THE VECTOR FROM THE ORIGIN TO A POINT*,
                    in a FIXED COORDINATE FRAME, by this angle (radians)
                    (as viewed in ds9 or with fits NAXIS1 on X and NAXIS2 on Y).
+
         name: string, optional
         """
 

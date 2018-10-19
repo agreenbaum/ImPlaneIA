@@ -17,7 +17,14 @@ from astropy import units as u
 from astropy.units import cds
 cds.enable()
 
-print ("CWD: "+os.getcwd())
+
+VERBOSE = False
+def vprint(*args):  # VERBOSE mode printing
+    if VERBOSE: print("-----------------------------------------", *args)
+    pass
+
+
+vprint("CWD: "+os.getcwd())
 
 # in a module...
 from  .. import misctools  # why can't I import misctools.utils this way too????
@@ -140,12 +147,12 @@ def interf(kx, ky, **kwargs):
     lam = kwargs['lam']
     pitch = kwargs['pitch'] # detpixscale/oversample
     affine2d = kwargs['affine2d']
-    print(" psfctr ", psfctr)
-    print(" ctrs ", ctrs)
-    print(" phi ",  phi)
-    print(" lam ", lam)
-    print(" pitch ", pitch)
-    print(" affine2d ", affine2d.name)
+    vprint(" psfctr ", psfctr)
+    vprint(" ctrs ", ctrs)
+    vprint(" phi ",  phi)
+    vprint(" lam ", lam)
+    vprint(" pitch ", pitch)
+    vprint(" affine2d ", affine2d.name)
 
     # Question: where should the affine transf of psf_offset be done?  Here before phasor?
     # Figure out wht is correct... 
@@ -174,7 +181,7 @@ def ASF(detpixel, fov, oversample, ctrs, d, lam, phi, psf_offset, affine2d, verb
     ImCtr = np.array( misctools.utils.centerpoint((oversample*fov,oversample*fov)) ) + \
             np.array((psf_offset[1],psf_offset[0]))*oversample # note flip 1 and 0
     ImCtr =  image_center(fov, oversample, psf_offset)
-    print("ASF ImCtr {0}".format(ImCtr))
+    vprint("ASF ImCtr {0}".format(ImCtr))
     return np.fromfunction(Jinc, (oversample*fov,oversample*fov),
                            c=ImCtr, 
                            D=d, 
@@ -190,7 +197,7 @@ def ASFfringe(detpixel, fov, oversample, ctrs, lam, phi, psf_offset, affine2d,
     ImCtr = np.array( misctools.utils.centerpoint((oversample*fov,oversample*fov)) ) + \
             np.array(psf_offset)*oversample 
     ImCtr =  image_center(fov, oversample, psf_offset)
-    print("ASFfringe ImCtr {0}".format(ImCtr))
+    vprint("ASFfringe ImCtr {0}".format(ImCtr))
     return np.fromfunction(interf, (oversample*fov,oversample*fov), 
                            c=ImCtr,
                            ctrs=ctrs, 
@@ -213,7 +220,7 @@ def ASFhex(detpixel, fov, oversample, ctrs, d, lam, phi, psf_offset, affine2d):
     ImCtr = np.array( misctools.utils.centerpoint((oversample*fov,oversample*fov)) ) + \
             np.array((psf_offset[1],psf_offset[0]))*oversample # note flip 1 and 0
     ImCtr =  image_center(fov, oversample, psf_offset)
-    print("ASFhex ImCtr {0}".format(ImCtr))
+    vprint("ASFhex ImCtr {0}".format(ImCtr))
     # debugging code to try out affine2d rotations, unify fringe model orient w/pupil orient
     if 1: # normal operations
         return hextransformEE.hextransform(
@@ -274,10 +281,10 @@ def PSF(detpixel, fov, oversample, ctrs, d, lam, phi, psf_offset, affine2d,
             % shape)
 
     if verbose:
-        print("-----------------")
-        print(" PSF Parameters:")
-        print("-----------------")
-        print(("pitch: {0}, fov: {1}, oversampling: {2}, centers: {3}".format(detpixel,
+        vprint("-----------------")
+        vprint(" PSF Parameters:")
+        vprint("-----------------")
+        vprint(("pitch: {0}, fov: {1}, oversampling: {2}, centers: {3}".format(detpixel,
             fov, oversample, ctrs) + 
             "d: {0}, wavelength: {1}, pistons: {2}, shape: {3}".format(d, lam, 
             phi, shape)))
@@ -307,13 +314,13 @@ def harmonicfringes(**kwargs):
     ImCtr =  image_center(fov, oversample, psf_offset)
 
     if 0:
-        print(" harmonicfringes: ", end='')
-        print(" ImCtr {}".format( ImCtr), end="" )
-        print(" lam {}".format( lam) )
-        print(" detpix pitch {}".format( pitch) )
-        print(" pitch for calculation {}".format( pitch/oversample) )
-        print(" over  {}".format( oversample), end="" )
-        print(" fov/detpix  {}".format( fov), end="" )
+        vprint(" harmonicfringes: ", end='')
+        vprint(" ImCtr {}".format( ImCtr), end="" )
+        vprint(" lam {}".format( lam) )
+        vprint(" detpix pitch {}".format( pitch) )
+        vprint(" pitch for calculation {}".format( pitch/oversample) )
+        vprint(" over  {}".format( oversample), end="" )
+        vprint(" fov/detpix  {}".format( fov), end="" )
 
     return (np.fromfunction(ffc, (fov*oversample, fov*oversample), c=ImCtr,
                                                                    baseline=baseline,
