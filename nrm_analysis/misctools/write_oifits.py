@@ -12,13 +12,15 @@ import numpy as np
 import oifits
 import datetime
 from scipy.misc import comb
-from mask_definitions import NRM_mask_definitions
 import sys,os
-from nrm_analysis.misctools.utils import flip, rotatevectors, t3vis, t3err
+#rom nrm_analysis.misctools.utils import flip, rotatevectors, t3vis, t3err
+from nrm_analysis.misctools.utils import                      t3vis, t3err
+from nrm_analysis.misctools.mask_definitions import NRM_mask_definitions
 
 def count_bls(ctrs):
     N = len(ctrs)
-    nbl = N*(N-1)/2
+    nbl = N*(N-1)//2
+    nbl = int(nbl)
     # labels uv points by holes they came from
     bl_label = np.zeros((nbl, 2))
     u = np.zeros(nbl)
@@ -116,7 +118,7 @@ class OIfits():
             self.datapath = ''
 
         self.N = len(nrmobj.ctrs)   
-        self.nbl = int(self.N*(self.N-1)/2)
+        self.nbl = int(self.N*(self.N-1)//2)
         self.ncps = int(comb(self.N,3))
         # Parse through kwdict to see what user decided to specify
         try:
@@ -159,42 +161,47 @@ class OIfits():
         try:
             self.maskrotdeg = kwdict['maskrotdeg']
         except:
-            print "no mask rotation"
+            print("no mask rotation")
             self.maskrotdeg=0
         try:
             self.phaseceil = kwdict['phaseceil']
         except:
-            print "no phases will be flagged as bad"
+            print("no phases will be flagged as bad")
             self.phaseceil=1e10
-        try: 
-            # This really shouldn't be turned on but just in case the user is REALLY sure.
-            self.flip = kwdict['flip']
-        except:
-            self.flip=False
+        """
+        if 0:
+            try: 
+                # This really shouldn't be turned on but just in case the user is REALLY sure.
+                self.flip = kwdict['flip']
+            except:
+                self.flip=False
         try:
             self.covariance = kwdict["covariance"]
         except:
             self.covariance = None
+        """
 
         self.oitarget = np.array([self.target])
 
         # uv coordinates
         if kwdict['TEL'] == 'GEMINI':
-            print 'Gemini Telescope -- GPI data, rotating by 24.5 for lenslets'
+            print('Gemini Telescope -- GPI data, rotating by 24.5 for lenslets')
             self.paoff = -24.5 # The lenslet rotation (cc)
         else:
             self.paoff = 0
 
-        # Again this should not have to be turned on.
-        if self.flip == True:
-            nrmobj.ctrs = rotatevectors(flip(rotatevectors(nrmobj.ctrs,\
-                            self.maskrotdeg*np.pi/180.)),\
-                    (-self.parang+self.paoff)*np.pi/180)
-        # Rotate coordinates to get the correct sky position
-        else:
-            pass
-            #nrmobj.ctrs = rotatevectors(nrmobj.ctrs,\
-            #        (-self.parang+self.paoff+self.maskrotdeg)*np.pi/180.)
+        """
+            # Again this should not have to be turned on.
+            if self.flip == True:
+                nrmobj.ctrs = rotatevectors(flip(rotatevectors(nrmobj.ctrs,\
+                                self.maskrotdeg*np.pi/180.)),\
+                        (-self.parang+self.paoff)*np.pi/180)
+            # Rotate coordinates to get the correct sky position
+            else:
+                pass
+                #nrmobj.ctrs = rotatevectors(nrmobj.ctrs,\
+                #        (-self.parang+self.paoff+self.maskrotdeg)*np.pi/180.)
+        """
 
         self.ucoord, self.vcoord, self.labels = count_bls(nrmobj.ctrs)
         # closure phase coordinates
@@ -226,8 +233,8 @@ class OIfits():
         # will flag based on phaseceil parameter, below
         self.t3flag = np.zeros((self.nwav, self.ncps))
         if 0:
-            print self.wls
-            print self.datapath
+            print(self.wls)
+            print(self.datapath)
 
         # default is read_from_txt -- looks in calibrated directory for these files
         if read_from_txt == True:
@@ -348,7 +355,7 @@ class OIfits():
         # April 2016: Maybe this is a place to have an instrument definition?
         """
         if self.mode == 'gpi_spect':
-            print 'SPECT MODE'
+            print('SPECT MODE')
             self.wls  = wl_list(fitsfile)
             self.wls  = wavls
             if clip is not None:    
@@ -357,13 +364,13 @@ class OIfits():
             self.eff_band = np.ones(self.nwav)*(self.wls[-1] - self.wls[0])/self.nwav
         elif self.mode == 'gpi_pol':
             # Should have lookup here for different bands?
-            print 'POL MODE'
+            print('POL MODE')
             self.wls = np.array(['045','2268'])
             self.nwav = len(self.wls)
             tmpwls  = wl_list(fitsfile)
             self.eff_band = np.ones(self.nwav)*(tmpwls[-1] - tmpwls[0])
         else:
-            print 'NO MODE SPECIFIED'
+            print('NO MODE SPECIFIED')
             # must specify a monochromatic wavelength
             self.wls = np.array([self.wav_um,])
             self.nwav = len(self.wls)
@@ -413,6 +420,7 @@ class OIfits():
         return self.datapath+save_name
 
 if __name__ == "__main__":
+
 
     maskname= 'gpi_g10s40'
     gpimask = NRM_mask_definitions(maskname = maskname)
