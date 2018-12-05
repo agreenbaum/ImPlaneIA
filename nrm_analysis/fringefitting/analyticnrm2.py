@@ -186,7 +186,7 @@ def PSF(detpixel, fov, oversample, ctrs, d, lam, phi, psf_offset,
 
     if shape == 'circ':
         asf = ASF(detpixel, fov, oversample, ctrs, d, lam, phi, psf_offset) * asf_fringe
-    if shape == 'circonly':
+    elif shape == 'circonly':
         asf = ASF(detpixel, fov, oversample, ctrs, d, lam, phi, psf_offset)
     elif shape == 'hex':
         asf = ASFhex(detpixel, fov, oversample, ctrs, d, lam, phi, psf_offset) * asf_fringe

@@ -327,7 +327,12 @@ def fit_fringes_single_integration(args):
     # New or modified in LG++
     # center the image on its peak pixel:
     # AS subtract 1 from "r" below  for testing >1/2 pixel offsets
-    self.ctrd = utils.center_imagepeak(self.scidata[slc, :,:], r = (self.npix -1)//2 - 2)  
+    if self.instrument_data.arrname=="NIRC2_9NRM":
+        self.ctrd = utils.center_imagepeak(self.scidata[slc, :,:], 
+                        r = (self.npix -1)//2 - 2, cntrimg=False)  
+    else:
+        self.ctrd = utils.center_imagepeak(self.scidata[slc, :,:], 
+                        r = (self.npix -1)//2 - 2)  
     # returned values have offsets x-y flipped:
     # Finding centroids the Fourier way assumes no bad pixels case - Fourier domain mean slope
     centroid = utils.find_centroid(self.ctrd, self.instrument_data.threshold) # offsets from array ctr
@@ -576,6 +581,7 @@ class Calibrate:
             for ii in range(self.nobjs):
                 exps = [f for f in os.listdir(paths[ii]) if self.sub_dir_tag in f]
                 nexps = len(exps)
+                print("DEBUG: "+str(nexps))
                 amp = np.zeros((self.naxis2, nexps, self.nbl))
                 pha = np.zeros((self.naxis2, nexps, self.nbl))
                 cps = np.zeros((self.naxis2, nexps, self.ncp))
@@ -676,16 +682,19 @@ class Calibrate:
             """
 
         else:
+            print("else")
             for ii in range(self.nobjs):
 
                 cpfiles = [f for f in os.listdir(paths[ii]) if "CPs" in f] 
                 ampfiles = [f for f in os.listdir(paths[ii]) if "amplitudes" in f]
                 phafiles = [f for f in os.listdir(paths[ii]) if "phase" in f]
                 nexps = len(cpfiles)
+                print("nexp: "+str(nexps))
 
                 amp = np.zeros((nexps, self.nbl))
                 pha = np.zeros((nexps, self.nbl))
                 cps = np.zeros((nexps, self.ncp))
+                print(nexps)
                 for qq in range(nexps):
                     amp[qq,:] = np.loadtxt(paths[ii]+"/"+ampfiles[qq])
                     expflag=[]
@@ -797,7 +806,7 @@ class Calibrate:
         errv2[errv2 < (2/3.0)*np.median(errv2)] =(2/3.0)*np.median(errv2) 
         #print("input:",cps)
         #print("avg:", meancp)
-        print("exposures flagged:", expflag)
+        #print("exposures flagged:", expflag)
         return meancp, errcp, meanv2, errv2, meanpha, errpha
 
     def save_to_txt(self):
@@ -1263,6 +1272,7 @@ class BinaryAnalyze:
         #savestr = self.savedir+os.path.sep+self.oifitsfn.replace(".oifits", "")+"_chi2map.pick"
         f = open(absolute_path_filename_save, "w")
         pickle.dump(self.chi2map_savdata, f)
+        f.close()
         return None
 
     def plot_chi2map(self, savdata, savestr=False, show=False):
@@ -1788,12 +1798,14 @@ class BinaryAnalyze:
         return guess
 
     def save_mcmc_results(self, absolute_path_filename_save):
-        pickle.dump(self.mcmc_results, \
-                    open(absolute_path_filename_save, "wb"))
+        f = open(absolute_path_filename_save, "wb")
+        pickle.dump(self.mcmc_results, f)
+        f.close()
 
     def save_mcmc_chain(self, absolute_path_filename_save):
-        pickle.dump(self.chain, \
-                    open(absolute_path_filename_save, "wb"))
+        f = open(absolute_path_filename_save, "wb")
+        pickle.dump(self.chain, f)
+        f.close()
 
     def corner_plot(self, fn):
         import corner
@@ -1817,7 +1829,9 @@ class BinaryAnalyze:
             self.chain_convergence[self.keys[ii]] = samples[:,ii]
         plt.savefig(self.savedir+"/chain_convergence.pdf")
         # Pickle and save this data?
-        pickle.dump(self.chain_convergence, open(self.savedir+"/chain_convergence.pick", "wb"))
+        f = open(self.savedir+"/chain_convergence.pick", "wb")
+        pickle.dump(self.chain_convergence, f)
+        f.close()
         plt.show()
         plt.clf()
         return self.chain_convergence
@@ -2180,7 +2194,7 @@ def logl(data, err, model):
     #   #ll += -0.5*np.log(2*np.pi)*data[2*ii].size + np.sum(-np.log(data[2*ii+1]**2)
     #return -0.5*np.log(2*np.pi) - np.sum(np.log(err)) - np.sum((model - data)**2/(2*data**2))
     #return -0.5*np.log(2*np.pi)*data.size + np.sum(-np.log(err**2) - 0.5*((model - data)/err)**2)
-    chi2 = np.sum(((data-model)/err)**2)
+    chi2 = np.nansum(((data-model)/err)**2)
     loglike = -chi2/2
     #return np.sum(-np.log(err**2) - 0.5*((model - data)/err)**2)
     return loglike
@@ -2207,7 +2221,7 @@ def chi2_grid_loop(args):
     # Model from data, err, uvcoords, params, wavls
     p0, p1, p2 = args['params']
     modelcps = np.rollaxis(model_cp_uv(args['uvcoords'], p0, p1, p2, 1/args['wavls']), 0, -1)
-    chi2 = np.sum( (modelcps - args['data'])**2 / args['error']**2, axis = (-1,-2))/ args["dof"]
+    chi2 = np.nansum( (modelcps - args['data'])**2 / args['error']**2, axis = (-1,-2))/ args["dof"]
     return chi2
 
 def chi2_grid_loop_cov(args):
@@ -2224,7 +2238,7 @@ def chi2_grid_loop_all(args):
     modelcps = np.rollaxis(model_cp_uv(args['uvcoords'], p0, p1, p2, 1/args['wavls']), 0, -1)
     modelt3 = np.rollaxis(model_t3amp_uv(args['uvcoords'], p0, p1, p2, 1/args['wavls']), 0, -1)
     model = np.concatenate((modelcps, modelt3), axis=2)
-    chi2 = np.sum( (model - args['data'])**2 / args['error']**2, axis = (-1,-2))/ args["dof"]
+    chi2 = np.nansum( (model - args['data'])**2 / args['error']**2, axis = (-1,-2))/ args["dof"]
     return chi2
 
 class DiskAnalyze:
