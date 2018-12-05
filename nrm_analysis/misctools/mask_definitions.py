@@ -55,7 +55,7 @@ class NRM_mask_definitions():
     def __init__(self, maskname=None, rotdeg=None, holeshape="circ", rescale=False,\
                  verbose=False):
         if maskname not in ["gpi_g10s40",  "jwst_g7s6", "jwst_g7s6c", "visir_sam", \
-                            "p1640", "keck_nirc2", "pharo"]:
+                            "p1640", "keck_nirc2", "pharo", "NIRC2_9NRM"]:
             # Second row hopefully coming someday
             raise ValueError("mask %s not supported" % maskname)
         if holeshape == None:
@@ -108,6 +108,23 @@ class NRM_mask_definitions():
             self.OD = 8115.0 * mm   # DVLT = 8115.0 * mm -- but what is the M2 dia??
                                     # From Eric Pantin Document
             self.ID = 1000.0 * mm   # Don't know this, but this number shouldn't matter
+
+        if maskname=="NIRC2_9NRM":
+            """Mask dimensions from Steph Sallum?"""
+            self.hdia, self.ctrs = keck_nrm()
+            self.rotdeg = 0.0 # By inspection of data
+            if rotdeg is not None:
+                self.rotdeg += rotdeg
+                print("rotating by {0} + 9 (hardcoded) deg".format(rotdeg))
+            else:
+                print("rotating by 9 deg -- hard coded")
+            self.ctrs = rotatevectors(self.ctrs, self.rotdeg*np.pi/180.0)
+            self.rotate = self.rotdeg
+            self.activeD = self.showmask() # calculated circle dia including all holes
+            self.OD = 10.0   # DVLT = 8115.0 * mm -- but what is the M2 dia??
+                                    # From Eric Pantin Document
+            self.ID = 1.0    # Don't know this, but this number shouldn't matter
+
 
         else:
             print "\tcheck back later"
@@ -621,6 +638,24 @@ def visir_sam(rescale=False):
 
         pixels ??mas are nyquist at ??um
     """
+
+def keck_nrm(rescale=False):
+    """
+    Multiply by the 'rescale' factor to adjust hole sizes and centers in entrance pupil (PM)
+    (Magnify the physical mask coordinates up to the primary mirror size)
+    """
+    hdia = 1.098 # m
+    # All projected onto the primary in m
+    ctrs = np.array([[-3.44,  -2.22],
+                    [-4.57 ,  -1.00],
+                    [-2.01 ,   2.52],
+                    [-0.20 ,   4.09],
+                    [ 1.42 ,   4.46],
+                    [ 3.19 ,   0.48],
+                    [ 3.65 ,  -1.87],
+                    [ 3.15 ,  -3.46],
+                    [-1.18 ,  -3.01]])
+    return hdia, ctrs
 
 
 if __name__ == "__main__":

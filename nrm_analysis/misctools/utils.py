@@ -196,7 +196,7 @@ def centerit(img, r='default'):
     print("deprecated - switch to using  'center_imagepeak'")
     return center_imagepeak(img, r='default')
        
-def center_imagepeak(img, r='default'):
+def center_imagepeak(img, r='default', cntrimg = True):
 
     if r == 'default':
         r = int((img.shape[0]-1 )/2)
@@ -204,7 +204,12 @@ def center_imagepeak(img, r='default'):
         pass
     print('Before cropping:', img.shape)
 
-    ann = makedisk(img.shape[0], 11)
+    if cntrimg==True:
+        # If we know the peak of the image is close to the center
+        ann = makedisk(img.shape[0], 11)
+    else:
+        # Peak of the image can be anywhere
+        ann = np.ones((img.shape[0], img.shape[1]))
 
     # following two lines take care of peaks at two or more pixel locations:
     peakmask = np.where(img==np.ma.masked_invalid(img[ann==1]).max())

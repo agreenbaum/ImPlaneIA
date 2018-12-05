@@ -224,7 +224,7 @@ class GPI:
         return sci, hdr
 
 class VISIR:
-    def __init__(self, objname, src = "A0V"):
+    def __init__(self, objname="obj", band="11.3", src = "A0V"):
         """
         Initialize VISIR class
 
@@ -232,6 +232,7 @@ class VISIR:
         objname - string w/name of object observed
         src - if pysynphot is installed, can provide a guess at the stellar spectrum
         """
+        self.band = band
 
         self.objname = objname
 
@@ -246,17 +247,21 @@ class VISIR:
         # this can be swapped with an actual filter file
         self.lam_c = 11.3*1e-6 # 11.3 microns
         self.lam_w = 0.6/11.3 # 0.6 micron bandpass
-        self.filt = tophatfilter(11.3*um, 0.6/11.3, npoints=10)
+        self.filt = utils.tophatfilter(11.3*um, 0.6/11.3, npoints=10)
         try:
             self.wls = [utils.combine_transmission(self.filt, src), ]
         except:
             self.wls = [self.filt, ]
-        self.wavextension = (self.lam_c, self.lam_w)
+        #self.wavextension = (self.lam_c, self.lam_w)
+        #self.wavextension = (self.lam_c*np.ones(self.nexp), \
+        #                     self.lam_w*np.ones(self.nexp))
+        self.wavextension = ([self.lam_c,], [self.lam_w,])
         self.nwav=1
 
         # finding centroid from phase slope only considered cv_phase data when cv_abs data exceeds this.  
         # absolute value of cv data normalized to unity maximum for the threshold application.
-        self.cvsupport_threshold = {"threshold":0.02} # Gurus: tweak with use...
+        self.cvsupport_threshold = {"10.5":0.02, "11.3":0.02} # Gurus: tweak with use...
+        self.threshold = self.cvsupport_threshold[self.band]
 
         self.ref_imgs_dir = "refimgs/"
 
@@ -299,10 +304,16 @@ class VISIR:
         hdr=fitsfile[0].header
         #self.sub_dir_str = self.filt+"_"+objname
         self.sub_dir_str = '/' + fn.split('/')[-1].replace('.fits', '')
-        self.nexp = scidata.shape[0]
+        #self.nexp = scidata.shape[0]
         # rewrite wavextension to be same length as nexp
-        self.wavextension = (self.lam_c*np.ones(self.nexp), \
-                             self.lam_w*np.ones(self.nexp))
+        if len(scidata.shape)==3:
+            self.nwav=scidata.shape[0]
+            [self.wls.append(self.wls[0]) for f in range(self.nwav-1)]
+            return scidata, hdr
+        elif len(scidata.shape)==2:
+            return np.array([scidata,]), hdr
+        else:
+            sys.exit("invalid data dimensions for NIRISS. Should have dimensionality of 2 or 3.")
         return scidata, hdr
 
 class NIRISS:
@@ -425,4 +436,188 @@ class NIRISS:
     def _generate_filter_files():
         """Either from WEBBPSF, or tophat, etc. A set of filter files will also be provided"""
         return None
+
+
+class NIRC2:
+    def __init__(self, reffile, **kwargs):
+        """
+        Initialize NIRC2 class
+
+        ARGUMENTS:
+        objname - string w/name of object observed
+        src - if pysynphot is installed, can provide a guess at the stellar spectrum
+
+        IFU simulation option set IFU = True
+        """
+
+        if "IFU" in kwargs:
+            if kwargs["IFU"]==True:
+                self.mode = "PRISM"
+            else:
+                self.mode = "BROADBAND"
+        else:
+            self.mode = "BROADBAND"
+        if "src" in kwargs:
+            src = kwargs["src"]
+        else:
+            pass
+
+        self.arrname = "NIRC2_9NRM"
+        self.pscale_mas = 9.952 # mas
+        self.pscale_rad = utils.mas2rad(self.pscale_mas)
+        self.mask = NRM_mask_definitions(maskname=self.arrname)
+        self.mask.ctrs = np.array(self.mask.ctrs)
+        # Hard code -1.5 deg rotation in data (April 2016)
+        # (can be moved to NRM_mask_definitions later)
+        self.mask.ctrs = utils.rotate2dccw(self.mask.ctrs, 1.0*np.pi/180.0)#, np.pi/10.)
+        # Add in hole/baseline properties ?
+        self.holeshape="circ"
+
+        self.threshold = 0.02
+
+        # Get info from reference file 
+        self.hdr = []
+        #self.refdata = []
+        if type(reffile)==str:
+            reffile = [reffile,]
+        for fn in reffile:
+            reffits = fits.open(fn)
+            self.hdr.append(reffits[0].header)
+            reffits.close()
+        # instrument settings
+        self.band = self.hdr[0]["FWINAME"]
+
+        self.objname = self.hdr[0]["OBJECT"]
+
+        # tophat filter
+        # this can be swapped with an actual filter file
+        #band_ctrs = {"Kp":1.633*um/2.0,"Lp":3.1*um}
+        band_ctrs = {"Kp":2.2*um,"Lp":3.1*um}
+        band_wdth = {"Kp":(0.35)*um, "Lp":(4.126 - 3.426)*um}
+
+        lam_c = band_ctrs[self.band]
+        lam_w = band_wdth[self.band]
+
+        # wavelength info: spect mode or pol more
+        if "PRISM" in self.mode:
+            # GPI's spectral mode
+            self.nwav = 36 #self.hdr1[0]["NAXIS3"]
+            self.wls = np.linspace(lam_c - lam_w/2.0, lam_c-lam_w/2.0, num=36)*1e-6
+            self.eff_band = um*np.ones(self.nwav)*(self.wls[-1] - self.wls[0])/self.nwav
+            # For OIFits structure
+            self.wavextension = (self.wls, self.eff_band)
+        elif "BROADBAND" in self.mode:
+            # GPI's pol mode. Will define this for the DIFFERENTIAL VISIBILITIES
+
+            self.nwav=1
+
+            # Define the bands in case we use a tophat filter
+            wghts = np.ones(11)
+            wavls = np.linspace(lam_c-lam_w/2.0, \
+                                lam_c+lam_w/2.0, num=len(wghts))
+
+
+            transmission = np.array([[wghts[f], wavls[f]] for f in range(len(wghts))])
+            self.wls = [transmission, ]
+            #self.wls = [np.sum(wghts*wavls) /float(len(wavls)), ]
+            self.eff_band = np.array([lam_w, ])
+            # For OIFits structure
+            self.wavextension = ([lam_c,], [lam_w,])
+
+
+
+        try:
+            self.wls = [utils.combine_transmission(transmission, src), ]
+        except:
+            self.wls = [transmission, ]
+        #self.wavextension = (lam_c, lam_w)
+        self.nwav=1
+
+        # finding centroid from phase slope only considered cv_phase data when cv_abs data exceeds this.  
+        # absolute value of cv data normalized to unity maximum for the threshold application.
+        self.cvsupport_threshold = {"threshold":0.02} # Gurus: tweak with use...
+
+        self.ref_imgs_dir = "refimgs/"
+
+        #############################
+        # Observation info - I don't know yet how JWST data headers will be structured
+        self.telname= "Keck"
+        try:
+            self.ra, self.dec = self.hdr[0]["RA"], self.hdr[0]["DEC"]
+        except:
+            self.ra, self.dec = 00, 00
+        try:
+            self.date = self.hdr[0]["DATE"]
+            self.month = self.date[8:10]
+            self.day = self.date[5:7]
+            self.year = self.date[:4]
+        except:
+            lt = time.localtime()
+            self.date = "{0}{1:02d}{2:02d}".format(lt[0],lt[1],lt[2])
+            self.month = lt[1]
+            self.day = lt[2]
+            self.year = lt[0]
+
+
+        self.parangs = []
+        self.itime = []
+        self.crpa = []
+        self.rotposns = []
+        self.instangs = []
+        self.derotangs = []
+        for ii in range(len(reffile)):
+            self.parangs.append(self.hdr[ii]["PARANG"])
+            self.rotposns.append(self.hdr[ii]["ROTPOSN"])
+            self.instangs.append(self.hdr[ii]["INSTANGL"])
+            # From Tom Esposito:
+            # PARANG + ROTPOSN - INSTANGL - 0.262 
+            self.derotangs.append(self.hdr[ii]["ROTPOSN"]+self.hdr[ii]["ROTPOSN"] \
+                                  -self.hdr[ii]["INSTANGL"]-0.262)
+            self.itime.append(self.hdr[ii]["ITIME"])
+            if "CRPA" in self.hdr[ii]:
+                self.crpa.append(self.hdr[ii]["CRPA"])
+        self.avderotang = np.mean(self.derotangs)
+        self.avparang = np.mean(self.parangs)
+        if len(self.crpa)>0:
+            self.avcassang = np.mean(self.crpa)
+        else:
+            self.avcassang = 0.0
+        self.parang_range = abs(self.parangs[-1] - self.parangs[0])
+        self.totalinttime = np.sum(self.itime)
+
+
+        try:
+            self.pa = self.hdr0["PA"]
+        except:
+            self.pa = 00
+
+        #############################:w
+        self.parang_range = abs(self.parangs[-1] - self.parangs[0])
+        self.totalinttime = np.sum(self.itime)
+        self.ref_imgs_dir = "refimgs/"
+
+    def read_data(self, fn):
+
+        fitsfile = fits.open(fn)
+        sci=fitsfile[0].data
+        hdr=fitsfile[0].header
+        fitsfile.close()
+        #fitshdr = fitsfile[0].header
+        self.sub_dir_str = fn.split("/")[-1][:-5]
+
+        if len(sci.shape)==3:
+            if self.mode=="PRISM":
+                return sci, hdr
+            elif self.mode=="BROADBAND":
+                self.nwav=sci.shape[0]
+                [self.wls.append(self.wls[0]) for f in range(self.nwav-1)]
+                return sci, hdr
+        elif len(sci.shape)==2:
+            if self.mode=="BROADBAND":
+                return np.array([sci,]), hdr
+        else:
+            sys.exit("invalid data dimensions for NIRC2. Should have dimensionality of 2 or 3.")
+
+        return sci, hdr
+
 
