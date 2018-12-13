@@ -1,3 +1,4 @@
+
 BETA- ACHIEVED FOR anand0xff affine
 
 AZG-AS skype 2018.08.24:
@@ -42,3 +43,10 @@ New_and_better_scaling and auto_find_center [to be] removed
 AMI paper writing focus ~mid September?
 
 Deepashri involved in test exercising/writing whenever (month or two?)
+
+Dec 13 2018 AZG AS skype.  Next meeting ~1 week
+  
+	Calib initializing - try abs path names
+	Cut down targ & cal to a few (eg 3) slices each for faster  debugging
+	Examine residual fits w/screen share w/AZG
+	
