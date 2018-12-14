@@ -50,3 +50,23 @@ Dec 13 2018 AZG AS skype.  Next meeting ~1 week
 	Cut down targ & cal to a few (eg 3) slices each for faster  debugging
 	Examine residual fits w/screen share w/AZG
 	
+Dec 14 2018 AS
+
+	Fixed path fragility of datadir - no defaulting to "."  (could have repercussions for other instruments?)
+	Created two-slice cubes in example_data/niriss_niriss
+	Adjusted file names and datadir value in ami notebook
+	Notebook now runs through to ascii fringe info output, 
+	residuals look ~antisymmetric (flip and invert a second residuals*.fits in ds9, then blink)
+	
+	Notebook fails in 
+	In [8]  calib.save_to_oifits("exampleoifitsfiles.oifits") 
+	~/gitsrc/agreenbaum/ImPlaneIA/nrm_analysis/misctools/write_oifits.py in oi_data(self, read_from_txt, **kwargs)
+    332         #print "cps given to oifits writer, again:"
+    333         #print self.t3phi
+	--> 334         self.t3flag[abs(self.t3phi)>self.phaseceil]=1
+    335         for i in range(int(self.ncps)):
+    336             """self, timeobs, int_time, t3amp, t3amperr, t3phi, t3phierr, flag, u1coord,
+
+	IndexError: boolean index did not match indexed array along dimension 0; dimension is 1 but corresponding boolean dimension is 2
+
+	
