@@ -105,7 +105,10 @@ class FringeFitter:
         if "datadir" in kwargs:
             self.datadir = kwargs["datadir"]
         else:
-            self.datadir = os.getcwd()
+            sys.exit("""
+            FringeFitter: datadir missing.  Where is your data?  Fragile option of 
+            default datadir=os.getcwd() removed  - AS 12/2018 affinedev merge
+            """)
         if "npix" in kwargs:
             self.npix = kwargs["npix"]
         else:
@@ -175,12 +178,14 @@ class FringeFitter:
             fns = [fns, ]
 
         # Can get fringes for images in parallel
-        store_dict = [{"object":self, "file":self.datadir+"/"+fn,"id":jj} \
+        #tore_dict = [{"object":self, "file":self.datadir+"/"+fn,"id":jj} \ # AS remove self.datadir
+        store_dict = [{"object":self, "file":                 fn,"id":jj} \
                         for jj,fn in enumerate(fns)]
 
         t2 = time.time()
         for jj, fn in enumerate(fns):
-            fit_fringes_parallel({"object":self, "file": self.datadir+"/"+fn,\
+            #it_fringes_parallel({"object":self, "file": self.datadir+"/"+fn,\ # AS remove self.datadir
+            fit_fringes_parallel({"object":self, "file":                  fn,\
                                   "id":jj}, threads)
         t3 = time.time()
         print("Parallel with {0} threads took {1}s to fit all fringes".format(\
