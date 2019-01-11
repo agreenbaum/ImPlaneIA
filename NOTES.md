@@ -69,4 +69,10 @@ Dec 14 2018 AS
 
 	IndexError: boolean index did not match indexed array along dimension 0; dimension is 1 but corresponding boolean dimension is 2
 
+Jan 11 2019 AS AZG
+
+	Fixed py3 issues with nrm_core.get_data(), replaced oifits py2 with py3.
+	NIRISS test notebook runs to completion, incl mcmc binary model fit.
+	Had to re-initialize with an InstrumentData("NIRISS") to reset nwav to unity before running nrm_core.calibrate().  Puzzling why this was needed.
+	TBD: output cleanup for faster running
 	
