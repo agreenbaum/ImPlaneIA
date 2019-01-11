@@ -623,6 +623,7 @@ class Calibrate:
                     expflag=[]
                     if True in (amp[qq,:]>1):
                         expflag.append(qq)
+                    print(cpfiles[qq])
                     pha[qq,:] = np.loadtxt(paths[ii]+"/"+phafiles[qq])
                     cps[qq,:] = np.loadtxt(paths[ii]+"/"+cpfiles[qq])
 
@@ -1659,7 +1660,7 @@ class BinaryAnalyze:
         # 3. contrast_min, slope -- 2 parameters (position is given as constant)
         # 4. nwav different contrasts - nwav parameters (position is given as constant)
         if self.spectrum_model==None:
-            ncomp = np.size(self.params[self.params.keys()[0]])
+            ncomp = np.size(self.params[list(self.params.keys())[0]])
             guess = np.zeros(len(self.params)*ncomp)
             guess[0::3] = self.params['con']
             guess[1::3] = self.params['sep']
@@ -1959,7 +1960,21 @@ def get_data(self):
         self.parang_range = self.oifdata.parang_range
     except:
         print("oifits has no parang info, moving on...")
-    self.telescope = self.oifdata.wavelength.keys()[0]
+
+    print("Apparently we opened ", self.oifitsfn, "successfully")
+    #variables = self.oifdata.__dict__.keys()
+    #print("\n***** \n",variables)
+    #print("\n\t")
+    #print(" attribute values are:", 'target', type(self.oifdata.target), self.oifdata.target, "\n\t")
+    #print(" attribute values are:", 'header', type(self.oifdata.header), self.oifdata.header, "\n\t") 
+    #print(" attribute values are:", 'wavelength', type(self.oifdata.wavelength), self.oifdata.wavelength, "\n\t")
+    #print(" attribute values are:", 'vis2', type(self.oifdata.vis2), self.oifdata.vis2, "\n\t")
+    #print(" attribute values are:", 't3', type(self.oifdata.t3), self.oifdata.t3, "\n\t")
+    #print(" attribute values are:", 'vis', type(self.oifdata.vis), self.oifdata.vis, "\n\t")
+    #print(" attribute values are:", 'array', type(self.oifdata.array), self.oifdata.array, "\n\t")
+    #print("***** \n")
+
+    self.telescope = list(self.oifdata.wavelength.keys())[0]
     self.ncp = len(self.oifdata.t3)
     self.nbl = len(self.oifdata.vis2)
     self.wavls = self.oifdata.wavelength[self.telescope].eff_wave

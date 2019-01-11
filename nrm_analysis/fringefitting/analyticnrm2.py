@@ -259,7 +259,7 @@ def PSF(detpixel, fov, oversample, ctrs, d, lam, phi, psf_offset, affine2d,
         shape: one of 'circonly', 'circ', 'hexonly', 'hex', 'fringeonly'
     """
 
-    misctools.utils.printout(ctrs, "                                   analyticnrm2:PSF_"+affine2d.name)
+    #misctools.utils.printout(ctrs, "                                   analyticnrm2:PSF_"+affine2d.name)
 
     # Now deal with primary beam shapes... 
     if shape == 'circ': 
@@ -358,7 +358,7 @@ def model_array(ctrs, lam, oversample, pitch, fov, d, psf_offset=(0,0),
     # psf_offset in detpix
     # returns real 2d array of primary beam, list of fringe arays
 
-    misctools.utils.printout(ctrs, "                                   analyticnrm2:model_array"+affine2d.name)
+    #misctools.utils.printout(ctrs, "                                   analyticnrm2:model_array"+affine2d.name)
 
     nholes = ctrs.shape[0]
     phi = np.zeros((nholes,)) # no phase errors in the model slices...

@@ -175,11 +175,11 @@ class OIfits():
                 self.flip = kwdict['flip']
             except:
                 self.flip=False
+        """
         try:
             self.covariance = kwdict["covariance"]
         except:
             self.covariance = None
-        """
 
         self.oitarget = np.array([self.target])
 
@@ -411,6 +411,11 @@ class OIfits():
         self.oif.avparang = self.parang
         self.oif.parang_range = self.parang_range
         self.oif.covariance = self.covariance
+
+        print(self.oif.wavelength)
+        print(type(self.oif.wavelength))
+        from future.utils import iteritems
+        print(iteritems(self.oif.wavelength))
 
         self.oif.save(self.datapath+save_name)
         # Check
