@@ -324,6 +324,9 @@ class OIfits():
 
         #print "cps given to oifits writer, again:"
         #print self.t3phi
+        print(np.shape(self.t3flag))
+        print(np.shape(self.t3phi))
+        print(np.shape(self.phaseceil))
         self.t3flag[abs(self.t3phi)>self.phaseceil]=1
         for i in range(int(self.ncps)):
             """self, timeobs, int_time, t3amp, t3amperr, t3phi, t3phierr, flag, u1coord,
