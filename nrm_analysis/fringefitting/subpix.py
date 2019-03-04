@@ -49,7 +49,7 @@ def weightpixels(array, weightarray):
 def pixelpowerprof(s = np.array([3,3]), power = 4, ctr = None ):
     shape = np.array(s)
     center = shape / 2
-    print center
+    print(center)
     y,x = np.indices(s)
     pix = (shape[0] /2.0)*np.ones(shape) - np.abs( (x - center[0])**power + (y - center[1])**power )**(1/float(power))
     return pix
