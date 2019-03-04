@@ -1,5 +1,4 @@
 #! /usr/bin/env python
-from __future__ import print_function
 import numpy as np
 from astropy.io import fits
 import os
@@ -36,19 +35,28 @@ def gfunction(xi, eta, **kwargs):  #was g_eeAG
     lam = kwargs['lam']
     xi = (d/lam)*pixel*(xi - c[0])
     eta = (d/lam)*pixel*(eta - c[1])
+    affine2d = kwargs["affine2d"]
 
-    if kwargs['minus'] is True:
-        xi = -1*xi
     i = 1j
     Pi = np.pi
-    g = np.exp(-i*Pi*(2*eta/np.sqrt(3) + xi)) * (\
-            (np.sqrt(3)*eta - 3*xi) *
-        (np.exp(i*Pi*np.sqrt(3)*eta) - np.exp(i*Pi*(4*eta/np.sqrt(3) + xi)))  + \
-        (np.sqrt(3)*eta + 3*xi) * (np.exp(i*Pi*eta/np.sqrt(3)) - np.exp(i*Pi*xi)) ) \
-        / (4*Pi*Pi*(eta*eta*eta - 3*eta*xi*xi))
 
-    return g
+    xip, etap = affine2d.distortFargs(xi,eta)
 
+    if kwargs['minus'] is True:
+        xip = -1*xip
+
+    g = np.exp(-i*Pi*(2*etap/np.sqrt(3) + xip)) * \
+        ( \
+          (np.sqrt(3)*etap - 3*xip) * \
+          (np.exp(i*Pi*np.sqrt(3)*etap) - np.exp(i*Pi*(4*etap/np.sqrt(3) + xip)))  + \
+          (np.sqrt(3)*etap + 3*xip) * \
+          (np.exp(i*Pi*etap/np.sqrt(3)) - np.exp(i*Pi*xip)) \
+         ) / \
+         (4*Pi*Pi*(etap*etap*etap - 3*etap*xip*xip))
+
+    return g*affine2d.distortphase(xi,eta)
+
+"""
 def glimit(xi, eta, **kwargs):
     c = kwargs['c']
     pixel = kwargs['pixel']
@@ -56,15 +64,19 @@ def glimit(xi, eta, **kwargs):
     lam = kwargs['lam']
     xi = (d/lam)*pixel*(xi - c[0])
     eta = (d/lam)*pixel*(eta - c[1])
+    affine2d = kwargs["affine2d"]
 
     if kwargs['minus'] is True:
         xi = -1*xi
     Pi = np.pi
+    xip, etap = affine2d.distortFargs(xi,eta)
     g = ( np.exp(-1j*Pi*xi)/(2*np.sqrt(3)*Pi*Pi*xi*xi) ) * \
         ( -1 + 1j*Pi*xi + np.exp(1j*Pi*xi)-2j*Pi*xi*np.exp(1j*Pi*xi) )
 
-    return g
+    return g*affine2d.distortphase(xi,eta)
+"""
 
+"""
 def centralpix(xi, eta, **kwargs):
     c = kwargs['c']
     pixel = kwargs['pixel']
@@ -77,16 +89,26 @@ def centralpix(xi, eta, **kwargs):
         xi = -1*xi
     i = 1j
     Pi = np.pi
+    
+    xip, etap = affine2d.distortFargs(xi,eta)
     g = np.sqrt(3) / 4.0
+    return g*affine2d.distortphase(xi,eta)
+"""
 
-    return g
 
-#ef hex_eeAG(s=(121,121), c=None, d=0.80, lam=4.3e-6, pitch=mas2rad(65)):
-def hextransform(s=None, c=None, d=None, lam=None, pitch=None, DEBUG=False, odir=None): # was hex_eeAG
+def hextransform(s=None, c=None, d=None, lam=None, pitch=None, affine2d=None, 
+                 DEBUG=False, odir=None): # was hex_eeAG
     """
-        returns a forced REAL array, so the assumption is no shift in pupil plane
+        returns the complex array analytical transform of a (distorted if necessary) hexagon
         d/m flat-to-flat distance, lam/m, pitch/rad
         c is the center of the PSF (if no phase aberrations), NOT an offset from array center.
+    """
+    """
+    LG++ avoids NaN's by avoiding exact rotations of 15 degrees in Affine2d, for example,
+    or finding pupil rotation by hand
+
+    LG++ avoids central pixel singularity by offsetting any integer-like offset request by 1e-13
+    of an oversampled pixel
     """
     if c is None:
         """  anand@stsci.edu Wed Mar 22 11:54:54 EDT 2017
@@ -108,44 +130,55 @@ def hextransform(s=None, c=None, d=None, lam=None, pitch=None, DEBUG=False, odir
             hex imag mean max min 0.0 3.60952587264e-15 -3.60952587264e-15
         """
         c = (float(s[0])/2.0  - 0.5,  float(s[1])/2.0  - 0.5)
+
     print(("Center:",c, "Shape:", s))
 
-    # ?? 2017 g = np.fromfunction(gfunction, s, d=d, c=c, lam=lam, pixel=pitch, minus=False)
-    hex_complex = np.fromfunction(gfunction, s, d=d, c=c, lam=lam, pixel=pitch, minus=False) + \
-                  np.fromfunction(gfunction, s, d=d, c=c, lam=lam, pixel=pitch, minus=True)
-    # There will be a strip of NaNs down the middle (eta-axis)
-    (xnan, ynan)= np.where(np.isnan(hex_complex))
-    # The "yval" will be the same for all points
-    # loop over the xi values
-    for index in range(len(xnan)):
-        """
-        Replace NaN strip with limiting behavior. Calls from function glimit.
-        """
-        hex_complex[xnan[index], ynan[index]] = \
-            glimit(xnan[index], ynan[index], d=d, c=c, lam=lam, pixel=pitch, minus=False) + \
-            glimit(xnan[index], ynan[index], d=d, c=c, lam=lam, pixel=pitch, minus=True)
-        """ changed 2017        v
-            glimit(xnan[index], xnan[index], d=d, c=c, lam=lam, pixel=pitch, minus=False) + \
-            glimit(xnan[index], xnan[index], d=d, c=c, lam=lam, pixel=pitch, minus=True)
-                                ^
-        """
-    (xnan, ynan)= np.where(np.isnan(hex_complex))
-    #print "wherenan", xnan, ynan
+    # deal with central pixel singularity:
+    c_adjust = c
+    cpsingularityflag = False
 
-    for index in range(len(xnan)):
-        """
-        Replace NaN strip with limiting behavior. Calls from function glimit, which 
-        doesn't give the right values at the moment for the origin.
-        """
-        hex_complex[xnan[index], ynan[index]] =  \
-            centralpix(xnan[index], ynan[index], d=d, c=c, lam=lam, pixel=pitch, minus=False) + \
-            centralpix(xnan[index], xnan[index], d=d, c=c, lam=lam, pixel=pitch, minus=True)
+    epsilon_offset = 1.0e-8 
+    # check psf - psf_rotated_by_90 for 'noise' at
+    # singularity lines to optimize choice
+    # OV 1
+    # with 1e-8 the noise is at most few x 1e-8 cf central hex value (0.75) of the PSF. 
+    # At this offset, the 5deg - rot(95 deg) noise is ~1e-8 so not significant cf 0.75 peak.
+    # OV 5  difference noise < 1e-7
+    # OV 13  difference noise < 1e-5 for CP on 0 - 90, -13 elsewhere; for 5 - 95 noise is -13 everywhere.
+    #
+    # Conclusion - finer oversampling reduces the singularity noise effect...
+    # For critical work, ignore the line of pixels vertically/horizontally through
+    # the origin if the hex rotation is exactly zero.
+    #
+    # Could use refactoring to eg average two rows either side of singularity???
+    # Might be better numerically.  Obviously a  WIP...  Jun 21 2018.
+    #
+    # anand@stsci.edu Jun 2018
+    
+    d0, d1 = (c[0] - int(c[0]), c[1] - int(c[1]))  # the fractional part of the offsets
+    # Are they very small (i.e. 'almost exactly' centered on 0)?
+    if (abs(d0) <  0.5*epsilon_offset): # we might have the singular central pixel here...
+        c_adjust[0] = c[0]+ epsilon_offset
+        cpsingularityflag = True  # if so set up the central pixel singularity flag
+    if abs(d1) <  0.5*epsilon_offset: # we might have the singular central pixel here...
+        c_adjust[1] = c[1]+ epsilon_offset
+        cpsingularityflag = True  # if so set up the central pixel singularity flag
 
-    if DEBUG:
-        hr = hex_complex.real
-        hi = hex_complex.imag
-        print(("hex real mean max min",  hr.mean(), hr.max(), hr.min()))
-        print(("hex imag mean max min",  hi.mean(), hi.max(), hi.min(), " should be very small"))
+    hex_complex = np.fromfunction(gfunction, s, d=d, c=c_adjust, lam=lam, pixel=pitch, affine2d=affine2d, minus=False) + \
+                  np.fromfunction(gfunction, s, d=d, c=c_adjust, lam=lam, pixel=pitch, affine2d=affine2d, minus=True)
+
+    if cpsingularityflag:
+        print("**** info:  central pixel singularity - nudge center by epsilon_offset {0:.1e}, c0,c1=({1:f},{2:f}), determinant={3:.4e} ".format(epsilon_offset, int(c[0]), int(c[1]), affine2d.determinant))
+
+    FUDGE = np.sqrt(4.0)  # this gives the analyticcentral PSF correctly.  Figure it out later if needed.
+    # At center of psf distortion phasor is unity, so just use determinant...
+    hex_complex[int(c[0]),int(c[1])] = FUDGE * (np.sqrt(3) / 4.0) # * affine2d.determinant seems not to be needed
+
+    if DEBUG: # only to be used with caution, and affine2d being the Identity tfmn.
+        ## hr = hex_complex.real
+        ## hi = hex_complex.imag
+        ## print(("\t***\thex real mean max min",  hr.mean(), hr.max(), hr.min()))
+        ## print(("\t***\thex imag mean max min",  hi.mean(), hi.max(), hi.min(), " should be very small"))
 
         """  anand@stsci.edu Wed Mar 22 11:54:54 EDT 2017  DEBUG on..."""
         """  anand@stsci.edu Thu Nov  9 11:00:10 EST 2017
@@ -153,27 +186,73 @@ def hextransform(s=None, c=None, d=None, lam=None, pitch=None, DEBUG=False, odir
              centering interpretations of FFT cf analytical calculation of ASF (probably) 
              The sanity check is to see the 'spatially-filtered by finite fov' pupil
              that matches the assumed hex geometry (flat up, not point-up)
-        """
         hexhole = np.fft.fftshift(np.fft.fft2(np.fft.fftshift(hex_complex)))
         fits.PrimaryHDU(data=np.abs(hexhole) ).writeto(odir+"%d_hexpupilrecovered_mod.fits"%s[0], overwrite=True)
         maxmod = np.abs(hexhole).max()
         maskpha = np.where(np.abs(hexhole)<maxmod/10.0)
-        """ phase via this fft is misleading - anand@stsci.edu """
+        """ """ phase via this fft is misleading - anand@stsci.edu """
 
-    # The assumption here is tht the imaginary component is machine-noise zero.
-    # This assumption checks out OK.
-    # Endnote to this tfm - if the complex part is always tiny->zero,
-    # why pass it a center at all?  Why not calculate c here and get it right?
-    # Think through how this is actually used after the call.
-    # 
-    return hex_complex.real
+        (xnan, ynan)= np.where(np.isnan(hex_complex))
+        print("explore central pixel singularity", type(xnan), xnan, ynan)
+        print("************Are there any NaN's???  len(np.where(np.isnan(hex_complex))[0])", len(xnan))
+
+    return hex_complex
 
 
+
+def recttransform(s=None, c=None, d=None, lam=None, pitch=None, affine2d=None, 
+                 DEBUG=False, odir=None): 
+    """
+        returns the analytical transform of a (distorted if necessary) rectangle
+        d/m longer flat-to-flat distance, lam/m, pitch/rad
+        Rectangle assumed to be half as wide as long (rat=0.5).
+        c is the center of the PSF (if no phase aberrations), NOT an offset from array center.
+    """
+    if c is None:
+        c = (float(s[0])/2.0  - 0.5,  float(s[1])/2.0  - 0.5)
+    print(("Center:",c, "Shape:", s))
+
+    rat = 0.5 # y dimension of rectangle / x dimension of rectangle
+    rect_complex = np.fromfunction(sincxy, s, a=d, b=rat*d, c=c, lam=lam, pitch=pitch, affine2d=affine2d)
+    return rect_complex
+
+
+
+def sincxy(x, y, **kwargs): # LG++
+    """ d/m diam, lam/m, pitch/rad , returns real tfm of rectangular aperture
+        Use centerpoint(s): return (0.5*s[0] - 0.5,  0.5*s[1] - 0.5)
+        Place peak in:
+            central pixel (odd array) 
+            pixel corner (even array)
+        use c[0] - 1 to move peak *down* in ds9
+        use c[1] - 1 to move peak *left* in ds9
+    """
+    # x, y are the integer fromfunc array indices
+    c = kwargs['c']  # in 'integer detector pixel' units, in the oversampled detector pixel space.
+    pitch = kwargs['pitch'] # AS assumes this is in radians.
+    a = kwargs['a'] # length: eg meters
+    b = kwargs['b'] # width: eg meters
+    # Force a to be 6.5m
+    a = 6.5
+    b = a/2.0
+    lam = kwargs['lam'] # length: eg meters
+    affine2d = kwargs['affine2d']
+    """
+    Image plane origin xc,yc is given by x-c[0], y-c[1] 
+        These xc,yc are the coords that have the affine tfmn defined appropriately,
+        with the origin of the affine2d unchanged by the tfmn.
+    The analytical sinc is centered on this origin
+    """
+    # where do we put pitchx pitchy in?  tbc
+    xprime, yprime = affine2d.distortFargs(x-c[0],y-c[1])
+    return np.sinc((np.pi*a/lam) * (xprime*pitch)) * np.sinc((np.pi*b/lam) * (yprime*pitch)) * \
+           affine2d.distortphase( (x-c[0])*pitch/lam, (y-c[1])*pitch/lam )
+
+
+"""
 def test_hextransform(s, odir="", pitch=None, c=None):
-    modasf = hextransform(s=s,  c=c, d=0.80, lam=4.3e-6, pitch=pitch, DEBUG=True, odir=odir)
-    #pl.imshow(modasf, interpolation='nearest')
+    modasf = np.abs(hextransform(s=s,  c=c, d=0.80, lam=4.3e-6, pitch=pitch, DEBUG=True, odir=odir))
     fits.PrimaryHDU(data=modasf).writeto(odir+"%d_HexModASFlimtest.fits"%s[0], overwrite=True)
-    #pl.show()
 
 
 def main():
@@ -209,4 +288,5 @@ def main():
 if __name__ == "__main__":
 
     main()
+"""
 
