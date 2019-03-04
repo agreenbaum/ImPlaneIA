@@ -258,7 +258,6 @@ def PSF(detpixel, fov, oversample, ctrs, d, lam, phi, psf_offset, affine2d,
         affine2d - a near-identity or near-unity abs(determinant).
         shape: one of 'circonly', 'circ', 'hexonly', 'hex', 'fringeonly'
     """
-
     #misctools.utils.printout(ctrs, "                                   analyticnrm2:PSF_"+affine2d.name)
 
     # Now deal with primary beam shapes... 
@@ -274,6 +273,19 @@ def PSF(detpixel, fov, oversample, ctrs, d, lam, phi, psf_offset, affine2d,
         asf = ASFhex(detpixel, fov, oversample, ctrs, d, lam, phi, psf_offset, affine2d)
     elif shape == 'fringeonly':
         asf_fringe = ASFfringe(detpixel, fov, oversample, ctrs, lam, phi, psf_offset, affine2d)
+
+    #We presume we'll use the fringe pattern of hole centers treated as delta functions
+    #asf_fringe = ASFfringe(detpixel, fov, oversample, ctrs, lam, phi, psf_offset)
+
+    #if shape == 'circ':
+    #    asf = ASF(detpixel, fov, oversample, ctrs, d, lam, phi, psf_offset) * asf_fringe
+    #elif shape == 'circonly':
+    #    asf = ASF(detpixel, fov, oversample, ctrs, d, lam, phi, psf_offset)
+    #elif shape == 'hex':
+    #    asf = ASFhex(detpixel, fov, oversample, ctrs, d, lam, phi, psf_offset) * asf_fringe
+    #elif shape == 'hexonly':
+    #    asf = ASFhex(detpixel, fov, oversample, ctrs, d, lam, phi, psf_offset)
+    #elif shape == 'fringe':
         asf = asf_fringe
     else:
         raise ValueError(

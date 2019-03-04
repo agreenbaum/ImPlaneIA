@@ -433,7 +433,11 @@ def crosscorrelatePSFs(a, A, ov, verbose=False):
     return cormat
 
 
-def center_imagepeak(img):
+#def centerit(img, r='default'):
+#    print("deprecated - switch to using  'center_imagepeak'")
+#    return center_imagepeak(img, r='default')
+       
+def center_imagepeak(img, r='default', cntrimg = True):
 
     """Return a cropped version of the input image centered on the peak pixel.
 
@@ -447,16 +451,20 @@ def center_imagepeak(img):
         Cropped to place the brightest pixel at the center of the img array
 
     """
+    peakx, peaky, h = min_distance_to_edge(img, cntrimg=cntrimg)
+    if r == 'default':
+        r = h.copy()
+    else:
+        pass
 
-    peakx, peaky, h = min_distance_to_edge(img)
-    cropped = img[int(peakx-h):int(peakx+h+1), int(peaky-h):int(peaky+h+1)]
+    cropped = img[int(peakx-r):int(peakx+r+1), int(peaky-r):int(peaky+r+1)]
     print('Cropped image shape:',cropped.shape)
-    print('value at center:', cropped[h,h])
+    print('value at center:', cropped[r,r])
     print(np.where(cropped == cropped.max()))
     return cropped
 
 
-def min_distance_to_edge(img):
+def min_distance_to_edge(img, cntrimg = True):
     """Return pixel distance to closest detector edge.
 
     Parameters
@@ -471,12 +479,17 @@ def min_distance_to_edge(img):
     """
     print('Before cropping:', img.shape)
 
-    ann = makedisk(img.shape[0], 31) # search radius around the center of array
-
-    peakmask = np.where(img==np.ma.masked_invalid(img[ann==1]).max())
+    if cntrimg==True:
+        # Only look for the peak pixel at the center of the image
+        ann = makedisk(img.shape[0], 31) # search radius around the center of array
+    else:
+        # Peak of the image can be anywhere
+        ann = np.ones((img.shape[0], img.shape[1]))
+        
+    peakmask = np.where(img==np.nanmax(np.ma.masked_invalid(img[ann==1])))
     # following line takes care of peaks at two or more identical-value max pixel locations:
     peakx, peaky = peakmask[0][0], peakmask[1][0]
-    print('utils.min_distance_from_edge: peaking on: ',np.ma.masked_invalid(img[ann==1]).max())
+    print('utils.min_distance_from_edge: peaking on: ',np.nanmax(np.ma.masked_invalid(img[ann==1])))
     print('putils.min_distance_from_edge: peak x,y:', peakx, peaky)
 
     dhigh = (img.shape[0] - peakx - 1, img.shape[1] - peaky - 1)
