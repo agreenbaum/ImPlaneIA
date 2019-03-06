@@ -13,6 +13,7 @@ VISIR SAM
 """
 
 # Standard Imports
+from __future__ import print_function
 import numpy as np
 from astropy.io import fits
 import os, sys, time

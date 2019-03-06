@@ -8,6 +8,7 @@ given a directory where all the associated measurements are stored.
 Alex Greenbaum agreenba@pha.jhu.edu Nov 2014
 """
 
+from __future__ import print_function
 import numpy as np
 import oifits
 import datetime
@@ -417,8 +418,8 @@ class OIfits():
 
         print(self.oif.wavelength)
         print(type(self.oif.wavelength))
-        from future.utils import iteritems
-        print(iteritems(self.oif.wavelength))
+        #from future.utils import iteritems
+        #print(iteritems(self.oif.wavelength))
 
         self.oif.save(self.datapath+save_name)
         # Check
