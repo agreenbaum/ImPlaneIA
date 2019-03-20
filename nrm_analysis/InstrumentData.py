@@ -66,15 +66,22 @@ class GPI:
 
         # only one NRM on GPI:
         self.arrname = "gpi_g10s40"
-        self.pscale_mas = 14.14 
+        self.pscale_mas = 14.1667 #14.27 looks like a better match March 2019
         self.pscale_rad = utils.mas2rad(self.pscale_mas)
         self.mask = NRM_mask_definitions(maskname=self.arrname)
         self.mask.ctrs = np.array(self.mask.ctrs)
         # Hard code -1.5 deg rotation in data (April 2016)
         # (can be moved to NRM_mask_definitions later)
-        self.mask.ctrs = utils.rotatevectors(self.mask.ctrs, -1.3*np.pi/180.)
+        self.mask.ctrs = utils.rotate2dccw(self.mask.ctrs, (-3.7)*np.pi/180.)
         # Add in hole/baseline properties ?
         self.holeshape="circ"
+        affine2d = kwargs.get( 'affine2d', None)
+        if affine2d is None:
+            self.affine2d = utils.Affine2d(mx=1.0,my=1.0, 
+                                           sx=0.0,sy=0.0, 
+                                           xo=0.0,yo=0.0, name="Ideal")
+        else:
+            self.affine2d = affine2d
 
         # Get info from reference file 
         self.hdr0 = []
@@ -100,7 +107,7 @@ class GPI:
         # for the threshold application.
         # Data reduction gurus: tweak the threshold value with experience...
         self.cvsupport_threshold = {"Y":0.02, "J":0.02, "H":0.02, "1":0.02, "2":0.02}
-        self.threshold = self.cvsupport_threshold[band]
+        self.threshold = self.cvsupport_threshold[self.band]
 
 
         # Special mode for collapsed data
@@ -239,7 +246,8 @@ class GPI:
         return sci, hdr
 
 class VISIR:
-    def __init__(self, objname="obj", band="11.3", src = "A0V"):
+    def __init__(self, objname="obj", band="11.3", src = "A0V",
+                 affine2d=None):
         """
         Initialize VISIR class
 
@@ -256,13 +264,28 @@ class VISIR:
         self.pscale_rad = utils.mas2rad(self.pscale_mas)
         self.mask = NRM_mask_definitions(maskname=self.arrname)
         self.mask.ctrs = np.array(self.mask.ctrs)
+        #self.mask.ctrs[:,1]*=-1
         self.holeshape="hex"
+        #self.mask.ctrs = utils.rotate2dccw(self.mask.ctrs, 7.5*np.pi/180.)
+
+        if affine2d is None:
+            self.affine2d = utils.Affine2d(mx=1.0,my=1.0, 
+                                           sx=0.0,sy=0.0, 
+                                           xo=0.0,yo=0.0, name="Ideal")
+        else:
+            self.affine2d = affine2d
 
         # tophat filter
         # this can be swapped with an actual filter file
-        self.lam_c = 11.3*1e-6 # 11.3 microns
-        self.lam_w = 0.6/11.3 # 0.6 micron bandpass
-        self.filt = utils.tophatfilter(11.3*um, 0.6/11.3, npoints=10)
+        if self.band=="11.3":
+            self.lam_c = 11.3*1e-6 # 11.3 microns
+            self.lam_w = 0.6/11.3 # 0.6 micron bandpass
+        elif self.band=="10.5":
+            self.lam_c = 10.5*1e-6 # 11.3 microns
+            self.lam_w = 0.1/10.5 # 0.6 micron bandpass
+        else:
+            raise ValueError("options for band are '11.3' or '10.5' \n{0} not supported".format(band))
+        self.filt = utils.tophatfilter(self.lam_c, self.lam_w, npoints=10)
         try:
             self.wls = [utils.combine_transmission(self.filt, src), ]
         except:
@@ -497,6 +520,13 @@ class NIRC2:
             src = kwargs["src"]
         else:
             pass
+        affine2d = kwargs.get( 'affine2d', None )
+        if affine2d is None:
+            self.affine2d = utils.Affine2d(mx=1.0,my=1.0, 
+                                           sx=0.0,sy=0.0, 
+                                           xo=0.0,yo=0.0, name="Ideal")
+        else:
+            self.affine2d = affine2d
 
         self.arrname = "NIRC2_9NRM"
         self.pscale_mas = 9.952 # mas

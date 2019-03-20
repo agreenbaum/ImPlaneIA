@@ -8,6 +8,7 @@ import time
 import poppy
 from nrm_analysis.misctools.utils import makedisk, rotate2dccw
 from astropy.io import fits
+from copy import copy
 """
 
 ================
@@ -59,14 +60,14 @@ class NRM_mask_definitions():
 
         if self.maskname == "gpi_g10s40":
             self.hdia, self.ctrs = gpi_g10s40(rescale=rescale)
-            self.rotdeg = 115.0 # By inspection of I&T data Dec 2012
-            if rotdeg is not None:
-                self.rotdeg = rotdeg
-                print("rotating by {0} deg".format(rotdeg))
-            else:
-                print("rotating by 115.0 deg -- hard coded.")
-            self.ctrs = rotate2dccw(self.ctrs, self.rotdeg*np.pi/180.0)
-            self.rotate = self.rotdeg
+            #self.rotdeg = 115.0 # By inspection of I&T data Dec 2012
+            #if rotdeg is not None:
+            #    self.rotdeg = rotdeg
+            #    print("rotating by {0} deg".format(rotdeg))
+            #else:
+            #    print("rotating by 115.0 deg -- hard coded.")
+            #self.ctrs = rotate2dccw(self.ctrs, self.rotdeg*np.pi/180.0)
+            #self.rotate = self.rotdeg
             self.activeD = self.showmask() # calculates circle dia including all holes
             self.OD = 7770.1 * mm   # DGS = 7770.1 * mm with M2 cardboard baffle
                         # GS OD from GPI fundamental values
@@ -343,11 +344,19 @@ def gpi_g10s40_asmanufactured(mag):
     holedia = holedia * mag
     print(mag)
     ctrs = []
-    REVERSE = -1 # Flip y dimensions to match I&T data Dec 2012
+    #REVERSE = -1 # Flip y dimensions to match I&T data Dec 2012
+    REVERSE = 1 # With new affine updates, need to reverse the reverse March 2019
     for r in holectrs:
         ctrs.append([r[0]*mag, r[1]*mag*REVERSE])
     # return cut-the-metal coords per Lenox PPM mm spec in meters on PM
-    return holedia, ctrs
+    ctrs_asbuilt = copy(ctrs)
+
+    # March 2019:
+    # Rotate hole centers by 90 deg to match GPI detector with new coordinate handling
+    # no affine2d transformations 8/2018 AS
+    ctrs_asbuilt = rotate2dccw(ctrs_asbuilt, 160*np.pi/180.0) # overwrites attributes
+
+    return holedia, ctrs_asbuilt
 
 
 def gpi_mag_asdesigned():

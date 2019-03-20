@@ -102,13 +102,13 @@ class FringeFitter:
             self.savedir = kwargs["savedir"]
         else:
             self.savedir = os.getcwd()
-        if "datadir" in kwargs:
-            self.datadir = kwargs["datadir"]
-        else:
-            sys.exit("""
-            FringeFitter: datadir missing.  Where is your data?  Fragile option of 
-            default datadir=os.getcwd() removed  - AS 12/2018 affinedev merge
-            """)
+        #if "datadir" in kwargs:
+        #    self.datadir = kwargs["datadir"]
+        #else:
+        #    sys.exit("""
+        #    FringeFitter: datadir missing.  Where is your data?  Fragile option of 
+        #    default datadir=os.getcwd() removed  - AS 12/2018 affinedev merge
+        #    """)
         if "npix" in kwargs:
             self.npix = kwargs["npix"]
         else:
@@ -304,6 +304,9 @@ def fit_fringes_single_integration(args):
     if self.instrument_data.arrname=="NIRC2_9NRM":
         self.ctrd = utils.center_imagepeak(self.scidata[slc, :,:], 
                         r = (self.npix -1)//2 - 2, cntrimg=False)  
+    elif self.instrument_data.arrname=="gpi_g10s40":
+        self.ctrd = utils.center_imagepeak(self.scidata[slc, :,:], 
+                        r = (self.npix -1)//2 - 2, cntrimg=True)  
     else:
         self.ctrd = utils.center_imagepeak(self.scidata[slc, :,:])  
         # Old AG LG++ version
