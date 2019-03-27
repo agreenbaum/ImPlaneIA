@@ -234,7 +234,8 @@ class FringeFitter:
         if nrm.linfit_result is not None:          
             # save linearfit results to pickle file
             myPickleFile = os.path.join(self.savedir+self.sub_dir_str,"linearfit_result_{0:02d}.pkl".format(slc))
-            pickle.dump( (nrm.linfit_result), open( myPickleFile , "wb" ) ) 
+            with open( myPickleFile , "wb" ) as f:
+                pickle.dump((nrm.linfit_result), f) 
             print("Wrote pickled file  %s" % myPickleFile)
                        
 
@@ -270,6 +271,8 @@ def fit_fringes_parallel(args, threads):
         pool = Pool(processes=threads)
         print("Running fit_fringes in parallel with {0} threads".format(threads))
         pool.map(fit_fringes_single_integration, store_dict)
+        pool.close()
+        pool.join()
 
     else:
         for slc in range(self.instrument_data.nwav):
