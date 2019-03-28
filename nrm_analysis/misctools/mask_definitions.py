@@ -88,7 +88,7 @@ class NRM_mask_definitions():
         elif maskname=="visir_sam":
             """Mask dimensions from Eric Pantin"""
             self.hdia, self.ctrs = visir_sam(rescale=rescale)
-            self.rotdeg = 9.0 # By inspection of data
+            self.rotdeg = 16.5 # By inspection of data
             if rotdeg is not None:
                 self.rotdeg += rotdeg
                 print("rotating by {0} + 9 (hardcoded) deg".format(rotdeg))
@@ -104,13 +104,13 @@ class NRM_mask_definitions():
         if maskname=="NIRC2_9NRM":
             """Mask dimensions from Steph Sallum?"""
             self.hdia, self.ctrs = keck_nrm()
-            self.rotdeg = 0.0 # By inspection of data
+            self.rotdeg = 28.0 # By inspection of data
             if rotdeg is not None:
                 self.rotdeg += rotdeg
                 print("rotating by {0} + 9 (hardcoded) deg".format(rotdeg))
             else:
                 print("rotating by 9 deg -- hard coded")
-            self.ctrs = rotatevectors(self.ctrs, self.rotdeg*np.pi/180.0)
+            self.ctrs = rotate2dccw(self.ctrs, self.rotdeg*np.pi/180.0)
             self.rotate = self.rotdeg
             self.activeD = self.showmask() # calculated circle dia including all holes
             self.OD = 10.0   # DVLT = 8115.0 * mm -- but what is the M2 dia??
@@ -380,6 +380,8 @@ def gpi_mag_asdesigned():
     DGS = 7770.1 * mm # with M2 baffle GS OD Bauman  http://dms.hia.nrc.ca/view.php?fDocumentId=2164
     D = DGS
     d = 11.998 * mm # with M2 baffle GS OD Bauman  http://dms.hia.nrc.ca/view.php?fDocumentId=2164
+    #d = 11.68 * mm # March 2019 update based on manufactured values.
+    #demag = 0.99*d/D  # about 1/800...
     demag = d/D  # about 1/800...
 
     dppm = 11.671 * mm  # Precision Optical or Aktiwave dapod 11.68
@@ -579,7 +581,7 @@ def visir_sam_asmanufactured(mag):
     holedia = holedia * mag
     print(mag)
     ctrs = []
-    REVERSE = 1 # The pupil we measure with VISIR pupil imaging lens is 
+    REVERSE = -1 # The pupil we measure with VISIR pupil imaging lens is 
                  # [probably] point symmetry reversed w.r.t reality. => OK checked
     for r in holectrs:
         ctrs.append([r[0]*mag*REVERSE, r[1]*mag*REVERSE])
@@ -608,7 +610,6 @@ def visir_mag_asdesigned():
     d = 2.8 * mm # diam of hex in pupil
     demag = d/D  # about 1/800...
 
-    flip = "_flip"
 
     print("""" 
     This program (VISIR.py) uses GVLT = 8115.0 * mm from SAM report c/o Eric Pantin
@@ -653,7 +654,7 @@ def keck_nrm(rescale=False):
     """
     hdia = 1.098 # m
     # All projected onto the primary in m
-    ctrs = np.array([[-3.44,  -2.22],
+    holectrs = np.array([[-3.44,  -2.22],
                     [-4.57 ,  -1.00],
                     [-2.01 ,   2.52],
                     [-0.20 ,   4.09],
@@ -662,6 +663,13 @@ def keck_nrm(rescale=False):
                     [ 3.65 ,  -1.87],
                     [ 3.15 ,  -3.46],
                     [-1.18 ,  -3.01]])
+
+    ctrs = []
+    REVERSE = -1 # The pupil we measure with VISIR pupil imaging lens is 
+                 # [probably] point symmetry reversed w.r.t reality. => OK checked
+    for r in holectrs:
+        ctrs.append([r[0], r[1]*REVERSE])
+
     return hdia, ctrs
 
 

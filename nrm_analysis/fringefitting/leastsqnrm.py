@@ -105,7 +105,11 @@ def matrix_operations(img, model, flux = None, verbose=False, linfit=False):
             linfit_result = None
     #         if verbose:
             print("linearfit module not imported, no covariances saved.")
-    
+    else:
+        linfit_result = None
+        if verbose:
+            print("linearfit module not imported, no covariances saved.")
+
     return x, res, cond, linfit_result
     
 
