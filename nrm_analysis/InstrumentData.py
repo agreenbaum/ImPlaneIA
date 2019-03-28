@@ -561,8 +561,8 @@ class NIRC2:
         # tophat filter
         # this can be swapped with an actual filter file
         #band_ctrs = {"Kp":1.633*um/2.0,"Lp":3.1*um}
-        band_ctrs = {"CH4_short":1.5923*um,"Kp":2.2*um,"Lp":3.1*um}
-        band_wdth = {"CH4_short":(0.1257)*um,"Kp":(0.3)*um, "Lp":(4.126 - 3.426)*um}
+        band_ctrs = {"J":1.248*um, "H":1.633*um, "CH4_short":1.5923*um,"Kp":2.2*um,"Lp":3.1*um}
+        band_wdth = {"J":0.163*um, "H":0.296*um, "CH4_short":(0.1257)*um,"Kp":(0.3)*um, "Lp":(4.126 - 3.426)*um}
 
         lam_c = band_ctrs[self.band]
         lam_w = band_wdth[self.band]
