@@ -284,7 +284,7 @@ class VISIR:
             self.lam_c = 11.3*1e-6 # 11.3 microns
             self.lam_w = 0.6/11.3 # 0.6 micron bandpass
         elif self.band=="10.5":
-            self.lam_c = 10.5*1e-6 # 11.3 microns
+            self.lam_c = 10.6*1e-6 # 11.3 microns
             self.lam_w = 0.1/10.5 # 0.6 micron bandpass
         else:
             raise ValueError("options for band are '11.3' or '10.5' \n{0} not supported".format(band))
@@ -571,12 +571,12 @@ class NIRC2:
         if "PRISM" in self.mode:
             # GPI's spectral mode
             self.nwav = 36 #self.hdr1[0]["NAXIS3"]
-            self.wls = np.linspace(lam_c - lam_w/2.0, lam_c-lam_w/2.0, num=36)*1e-6
+            self.wls = np.linspace(lam_c - lam_w/2.0, lam_c+lam_w/2.0, num=36)*1e-6
             self.eff_band = um*np.ones(self.nwav)*(self.wls[-1] - self.wls[0])/self.nwav
             # For OIFits structure
             self.wavextension = (self.wls, self.eff_band)
         elif "BROADBAND" in self.mode:
-            # GPI's pol mode. Will define this for the DIFFERENTIAL VISIBILITIES
+            # Copied from GPI's pol mode.
 
             self.nwav=1
 

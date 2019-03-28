@@ -24,7 +24,7 @@ def scaling(img, photons):  # RENAME this function
     return photons / total
 
 
-def matrix_operations(img, model, flux = None, verbose=False):
+def matrix_operations(img, model, flux = None, verbose=False, linfit=False):
     # least squares matrix operations to solve A x = b, where A is the model,
     # b is the data (image), and x is the coefficient vector we are solving for.
     # In 2-D data x = inv(At.A).(At.b) 
@@ -70,41 +70,46 @@ def matrix_operations(img, model, flux = None, verbose=False):
         print("transpose * image data dimensions", np.shape(data_vector))
         print("flat img * transpose dimensions", np.shape(inverse))
 
-    try: 
-        from linearfit import linearfit
+    if linfit: 
+        try:
+            from linearfit import linearfit
 
-        # dependent variables
-        M = np.mat(flatimg)
+            # dependent variables
+            M = np.mat(flatimg)
 
-        # photon noise
-        noise = np.sqrt(np.abs(flatimg))
+            # photon noise
+            noise = np.sqrt(np.abs(flatimg))
 
-        # this sets the weights of pixels fulfilling condition to zero
-        weights = np.where(np.abs(flatimg)<=1.0, 0.0, 1.0/(noise**2))    
+            # this sets the weights of pixels fulfilling condition to zero
+            weights = np.where(np.abs(flatimg)<=1.0, 0.0, 1.0/(noise**2))    
 
-        # uniform weight
-        wy = weights
-        S = np.mat(np.diag(wy));
-        # matrix of independent variables
-        C = np.mat(flatmodeltransp)
+            # uniform weight
+            wy = weights
+            S = np.mat(np.diag(wy));
+            # matrix of independent variables
+            C = np.mat(flatmodeltransp)
 
-        # initialize object
-        result = linearfit.LinearFit(M,S,C)
+            # initialize object
+            result = linearfit.LinearFit(M,S,C)
 
-        # do the fit
-        result.fit()
+            # do the fit
+            result.fit()
 
-        # delete inverse_covariance_matrix to reduce size of pickled file
-        result.inverse_covariance_matrix = []
+            # delete inverse_covariance_matrix to reduce size of pickled file
+            result.inverse_covariance_matrix = []
 
-        linfit_result = result
-        print("Returned linearfit result")
+            linfit_result = result
+            print("Returned linearfit result")
 
-    except ImportError:
+        except ImportError:
+            linfit_result = None
+    #         if verbose:
+            print("linearfit module not imported, no covariances saved.")
+    else:
         linfit_result = None
-#         if verbose:
-        print("linearfit module not imported, no covariances saved.")
-    
+        if verbose:
+            print("linearfit module not imported, no covariances saved.")
+
     return x, res, cond, linfit_result
     
 
