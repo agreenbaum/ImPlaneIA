@@ -83,10 +83,11 @@ class NRM_mask_definitions():
             self.OD = 6.610645669291339*m # Full pupil file size, incl padding, webbpsf kwd PUPLDIAM
             if rotdeg is not None:
                 self.rotdeg = rotdeg
+                
         elif self.maskname == "jwst_g7s6":
             print("\tnot finished")
 
-        elif maskname=="visir_sam":
+        elif self.maskname == "visir_sam":
             """Mask dimensions from Eric Pantin"""
             self.hdia, self.ctrs = visir_sam(rescale=rescale)
             self.rotdeg = 9.0 # By inspection of data
@@ -102,7 +103,7 @@ class NRM_mask_definitions():
                                     # From Eric Pantin Document
             self.ID = 1000.0 * mm   # Don't know this, but this number shouldn't matter
 
-        if maskname=="NIRC2_9NRM":
+        elif self.maskname == "NIRC2_9NRM":
             """Mask dimensions from Steph Sallum?"""
             self.hdia, self.ctrs = keck_nrm()
             self.rotdeg = 0.0 # By inspection of data
@@ -117,7 +118,6 @@ class NRM_mask_definitions():
             self.OD = 10.0   # DVLT = 8115.0 * mm -- but what is the M2 dia??
                                     # From Eric Pantin Document
             self.ID = 1.0    # Don't know this, but this number shouldn't matter
-
 
         else:
             print("\tcheck back later")
