@@ -640,7 +640,7 @@ class NIRC2:
             self.instangs.append(self.hdr[ii]["INSTANGL"])
             # From Tom Esposito:
             # PARANG + ROTPOSN - INSTANGL - 0.262 
-            self.derotangs.append(self.hdr[ii]["ROTPOSN"]+self.hdr[ii]["ROTPOSN"] \
+            self.derotangs.append(self.hdr[ii]["PARANG"]+self.hdr[ii]["ROTPOSN"] \
                                   -self.hdr[ii]["INSTANGL"]-0.262)
             self.itime.append(self.hdr[ii]["ITIME"])
             if "CRPA" in self.hdr[ii]:
