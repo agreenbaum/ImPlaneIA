@@ -1613,7 +1613,11 @@ class BinaryAnalyze:
         guess = self.make_guess()
         self.ndim = len(guess)
 
-        p0 = [guess + 0.1*guess*np.random.rand(self.ndim) for i in range(nwalkers)]
+        p0 = np.array([guess + 0.1*guess*np.random.rand(self.ndim) for i in range(nwalkers)])
+        # some logic to check that the random jitter doesn't move us out of the prior
+        for i in range(self.ndim):
+            p0[:, i] = np.clip(p0[:, i], self.priors[i][0], self.priors[i][1])
+
         print(guess)
         print("p0", len(p0))
 
