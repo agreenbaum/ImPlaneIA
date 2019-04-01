@@ -532,7 +532,7 @@ class Calibrate:
         if sub_dir_tag is not None:
             self.sub_dir_tag = sub_dir_tag
             for ii in range(self.nobjs):
-                exps = [f for f in os.listdir(paths[ii]) if self.sub_dir_tag in f]
+                exps = [f for f in os.listdir(paths[ii]) if self.sub_dir_tag in f and os.path.isdir(f)]
                 nexps = len(exps)
                 print("DEBUG: "+str(nexps))
                 amp = np.zeros((self.naxis2, nexps, self.nbl))
@@ -1269,7 +1269,7 @@ class BinaryAnalyze:
         save: to save or not to save? Default set to false. If turned on
               will save as detection_limits .pick and .pdf. Must change
               filename separately in driver/commands if running multiple.
-        scale: Error scale -- typically set to Nholes/3 to account for
+        scale: Error scale -- typically set to sqrt(Nholes/3) to account for
                # indepent closure phases compared to total.
         """
         pool = Pool(processes = threads)
@@ -1417,7 +1417,7 @@ class BinaryAnalyze:
         self.savdata_deteclims = {"clevels": clevels, "separations": self.seps, \
                    "angles":self.angs, "contrasts":self.cons, \
                    "detections":self.detec_grid}
-        return self.savdata
+        return self.savdata_deteclims
 
     def plot_deteclims(self, savdata, savestr = False, plot="off"):
         # contour plot
@@ -1613,8 +1613,13 @@ class BinaryAnalyze:
         guess = self.make_guess()
         self.ndim = len(guess)
 
+        # check if PA guess = 0.0 to ensure that the walkers have different values
+        if guess[2] == 0.0:
+            guess[2] = 360.0
+
         p0 = np.array([guess + 0.1*guess*np.random.rand(self.ndim) for i in range(nwalkers)])
-        # some logic to check that the random jitter doesn't move us out of the prior
+        # wrap PA and check that the random jitter doesn't move us out of the prior
+        p0[...,2] = p0[...,2] % 360.0
         for i in range(self.ndim):
             p0[:, i] = np.clip(p0[:, i], self.priors[i][0], self.priors[i][1])
 
