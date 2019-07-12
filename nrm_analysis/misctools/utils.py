@@ -5,7 +5,7 @@ import numpy.fft as fft
 from astropy.io import fits
 import os, sys
 import pickle as pickle
-from scipy.misc import comb
+from scipy.special import comb
 import time
 import poppy.matrixDFT as matrixDFT
 
