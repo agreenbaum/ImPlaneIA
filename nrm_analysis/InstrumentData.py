@@ -241,7 +241,10 @@ class GPI:
         hdr=fitsfile[1].header
         fitsfile.close()
         #fitshdr = fitsfile[0].header
-        self.sub_dir_str = fn[-21:-10]
+        if 'distorcorr' in fn:
+            self.sub_dir_str = fn[-32:-21]
+        else:
+            self.sub_dir_str = fn[-21:-10]
 
         return sci, hdr
 
@@ -558,8 +561,8 @@ class NIRC2:
         # tophat filter
         # this can be swapped with an actual filter file
         #band_ctrs = {"Kp":1.633*um/2.0,"Lp":3.1*um}
-        band_ctrs = {"Kp":2.2*um,"Lp":3.1*um}
-        band_wdth = {"Kp":(0.3)*um, "Lp":(4.126 - 3.426)*um}
+        band_ctrs = {"J":1.248*um, "H":1.633*um, "CH4_short":1.5923*um,"Kp":2.2*um,"Lp":3.1*um}
+        band_wdth = {"J":0.163*um, "H":0.296*um, "CH4_short":(0.1257)*um,"Kp":(0.3)*um, "Lp":(4.126 - 3.426)*um}
 
         lam_c = band_ctrs[self.band]
         lam_w = band_wdth[self.band]
@@ -637,7 +640,7 @@ class NIRC2:
             self.instangs.append(self.hdr[ii]["INSTANGL"])
             # From Tom Esposito:
             # PARANG + ROTPOSN - INSTANGL - 0.262 
-            self.derotangs.append(self.hdr[ii]["ROTPOSN"]+self.hdr[ii]["ROTPOSN"] \
+            self.derotangs.append(self.hdr[ii]["PARANG"]+self.hdr[ii]["ROTPOSN"] \
                                   -self.hdr[ii]["INSTANGL"]-0.262)
             self.itime.append(self.hdr[ii]["ITIME"])
             if "CRPA" in self.hdr[ii]:

@@ -12,7 +12,7 @@ from __future__ import print_function
 import numpy as np
 import oifits
 import datetime
-from scipy.misc import comb
+from scipy.special import comb
 import sys,os
 #rom nrm_analysis.misctools.utils import flip, rotatevectors, t3vis, t3err
 from nrm_analysis.misctools.utils import                      t3vis, t3err

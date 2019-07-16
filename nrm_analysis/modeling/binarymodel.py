@@ -2,7 +2,7 @@
 
 import numpy as np
 import os
-from scipy.misc import comb
+from scipy.special import comb
 from nrm_analysis.misctools.utils import mas2rad, rad2mas
 from argparse import ArgumentParser
 

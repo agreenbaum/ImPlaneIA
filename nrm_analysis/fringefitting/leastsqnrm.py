@@ -7,7 +7,7 @@ import numpy as np
 import scipy.special
 import numpy.linalg as linalg
 import sys
-from scipy.misc import comb
+from scipy.special import comb
 import os, pickle
 from uncertainties import unumpy  # pip install if you need
 

@@ -31,7 +31,7 @@ from __future__ import print_function
 import os, sys, time
 import numpy as np
 from astropy.io import fits
-from scipy.misc import comb
+from scipy.special import comb
 from scipy.stats import sem, mstats
 import pickle as pickle
 import matplotlib.pyplot as plt
@@ -234,7 +234,8 @@ class FringeFitter:
         if nrm.linfit_result is not None:          
             # save linearfit results to pickle file
             myPickleFile = os.path.join(self.savedir+self.sub_dir_str,"linearfit_result_{0:02d}.pkl".format(slc))
-            pickle.dump( (nrm.linfit_result), open( myPickleFile , "wb" ) ) 
+            with open( myPickleFile , "wb" ) as f:
+                pickle.dump((nrm.linfit_result), f) 
             print("Wrote pickled file  %s" % myPickleFile)
                        
 
@@ -270,6 +271,8 @@ def fit_fringes_parallel(args, threads):
         pool = Pool(processes=threads)
         print("Running fit_fringes in parallel with {0} threads".format(threads))
         pool.map(fit_fringes_single_integration, store_dict)
+        pool.close()
+        pool.join()
 
     else:
         for slc in range(self.instrument_data.nwav):
@@ -529,7 +532,7 @@ class Calibrate:
         if sub_dir_tag is not None:
             self.sub_dir_tag = sub_dir_tag
             for ii in range(self.nobjs):
-                exps = [f for f in os.listdir(paths[ii]) if self.sub_dir_tag in f]
+                exps = [f for f in os.listdir(paths[ii]) if self.sub_dir_tag in f and os.path.isdir(os.path.join(paths[ii],f))]
                 nexps = len(exps)
                 print("DEBUG: "+str(nexps))
                 amp = np.zeros((self.naxis2, nexps, self.nbl))
@@ -544,7 +547,7 @@ class Calibrate:
                     self.sigmasquared_cal = np.zeros((self.naxis2, nexps))
                 else:
                     pass
-
+                expflag=[]
                 for qq in range(nexps):
                     # nwav files
                     cpfiles = [f for f in os.listdir(paths[ii]+exps[qq]) if "CPs" in f] 
@@ -552,7 +555,6 @@ class Calibrate:
                     ampfiles = [f for f in os.listdir(paths[ii]+exps[qq]) \
                                 if "amplitudes" in f]
                     phafiles = [f for f in os.listdir(paths[ii]+exps[qq]) if "phase" in f] 
-                    expflag=[]
                     for slc in range(len(cpfiles)):
                         amp[slc, qq,:] = np.loadtxt(paths[ii]+exps[qq]+"/"+ampfiles[slc])
                         cps[slc, qq,:] = np.loadtxt(paths[ii]+exps[qq]+"/"+cpfiles[slc])
@@ -560,7 +562,9 @@ class Calibrate:
                     # 10/14/2016 -- flag the exposure if we get amplitudes > 1
                     # Also flag the exposure if vflag is set, to reject fraction indicated
                     if True in (amp[:,qq,:]>1):
+                        print('amp > 1 for {}'.format(exps[qq]))
                         expflag.append(qq)
+
                 if self.vflag>0.0:
                     self.ncut = int(self.vflag*nexps) # how many are we cutting out
                     sorted_exps = np.argsort(amp.mean(axis=(0,-1)))
@@ -633,10 +637,11 @@ class Calibrate:
                 pha = np.zeros((nexps, self.nbl))
                 cps = np.zeros((nexps, self.ncp))
                 print(nexps)
+                expflag=[]
                 for qq in range(nexps):
                     amp[qq,:] = np.loadtxt(paths[ii]+"/"+ampfiles[qq])
-                    expflag=[]
                     if True in (amp[qq,:]>1):
+                        print('amp > 1 for {}'.format(ampfiles[qq]))
                         expflag.append(qq)
                     print(cpfiles[qq])
                     pha[qq,:] = np.loadtxt(paths[ii]+"/"+phafiles[qq])
@@ -712,6 +717,7 @@ class Calibrate:
         #########################
         # 10/14/16 Change flags exposures where vis > 1 anywhere
         # Apply the exposure flag
+        expflag = None
         cpmask = np.zeros(cps.shape, dtype=bool)
         blmask = np.zeros(amps.shape, dtype=bool)
         if expflag is not None:
@@ -720,6 +726,8 @@ class Calibrate:
             blmask[expflag, :] = True
         else:
             pass
+
+        print('nexp after mask {:d}'.format(nexp))
 
         meancp = np.ma.masked_array(cps, mask=cpmask).mean(axis=0)
         meanv2 = np.ma.masked_array(amps, mask=blmask).mean(axis=0)**2
@@ -1266,7 +1274,7 @@ class BinaryAnalyze:
         save: to save or not to save? Default set to false. If turned on
               will save as detection_limits .pick and .pdf. Must change
               filename separately in driver/commands if running multiple.
-        scale: Error scale -- typically set to Nholes/3 to account for
+        scale: Error scale -- typically set to sqrt(Nholes/3) to account for
                # indepent closure phases compared to total.
         """
         pool = Pool(processes = threads)
@@ -1414,7 +1422,7 @@ class BinaryAnalyze:
         self.savdata_deteclims = {"clevels": clevels, "separations": self.seps, \
                    "angles":self.angs, "contrasts":self.cons, \
                    "detections":self.detec_grid}
-        return self.savdata
+        return self.savdata_deteclims
 
     def plot_deteclims(self, savdata, savestr = False, plot="off"):
         # contour plot
@@ -1610,7 +1618,20 @@ class BinaryAnalyze:
         guess = self.make_guess()
         self.ndim = len(guess)
 
-        p0 = [guess + 0.1*guess*np.random.rand(self.ndim) for i in range(nwalkers)]
+        # check if PA guess = 0.0 to ensure that the walkers have different values
+        if guess[2] == 0.0:
+            guess[2] = 360.0
+
+        p0 = np.array([guess + 0.1*guess*np.random.rand(self.ndim) for i in range(nwalkers)])
+        # wrap PA and check that the random jitter doesn't move us out of the prior
+        if (self.priors[2][0] == 0) & (self.priors[2][1] == 360):
+            p0[...,2] = p0[...,2] % 360.0
+        elif (self.priors[2][0] == -180) & (self.priors[2][1] == 180):
+            p0[...,2] = ((p0[...,2]+180.) % 360.0)-180.
+
+        for i in range(self.ndim):
+            p0[:, i] = np.clip(p0[:, i], self.priors[i][0], self.priors[i][1])
+
         print(guess)
         print("p0", len(p0))
 
@@ -1717,10 +1738,10 @@ class BinaryAnalyze:
         f.close()
 
 
-    def corner_plot(self, fn):
+    def corner_plot(self, fn, title_fmt=None):
         import corner
         plt.figure(1)
-        fig = corner.corner(self.chain, labels = self.keys, bins = 50, show_titles=True)
+        fig = corner.corner(self.chain, labels = self.keys, bins = 50, show_titles=True, title_fmt=title_fmt)
         plt.savefig(self.savedir+fn)
         if self.plot=="on":
             plt.show()
@@ -2135,6 +2156,7 @@ def chi2_grid_loop(args):
     modelcps = np.rollaxis(model_cp_uv(args['uvcoords'], p0, p1, p2, 1/args['wavls']), 0, -1)
     chi2 = np.nansum( (modelcps - args['data'])**2 / args['error']**2, axis = (-1,-2))/ args["dof"]
     return chi2
+
 
 def chi2_grid_loop_all(args):
     # Model from data, err, uvcoords, params, wavls
