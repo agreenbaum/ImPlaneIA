@@ -539,7 +539,10 @@ def jwst_g7s6_centers_asbuilt(chooseholes=None):  # was jwst_g7s6_centers_asdesi
 
 def jwst_g7s6c(chooseholes=None):
     # WARNING! JWST CHOOSEHOLES CODE NOW DUPLICATED IN LG_Model.py WARNING! ###
-    return 0.80*m, jwst_g7s6_centers_asbuilt(chooseholes=chooseholes)
+    #return 0.80*m, jwst_g7s6_centers_asbuilt(chooseholes=chooseholes) #comment out 2019 Aug w/Joel to match webbpsf 0.8.something
+    f2f = 0.82 * m # m flat to flat
+    print("f2f in mask_definitions.py is {:0.2f}".format(f2f))
+    return f2f, jwst_g7s6_centers_asbuilt(chooseholes=chooseholes)
 
 
 def visir_sam_asmanufactured(mag):
