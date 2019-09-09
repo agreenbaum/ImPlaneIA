@@ -30,7 +30,7 @@ _default_log = logging.getLogger('NRM_Model')
 _default_log.setLevel(logging.ERROR)
 
 
-VERBOSE = False
+VERBOSE = True
 def vprint(*args):  # VERBOSE mode printing
     if VERBOSE: print("-----------------------------------------", *args)
     pass
@@ -153,7 +153,9 @@ class NRM_Model():
                         [-1.1431500 ,  1.9800000],       #C6 -> C1
                         [ 2.2863100 ,  1.3200001],       #B2 -> B6
                         [ 1.1431500 ,  1.9800000]    ] ) #C1 -> C6
-            self.d = 0.80 * m
+            #self.d = 0.80 * m
+            self.d = 0.82 * m
+            print("hex hole flat_to_dflat distance in LG_Model() is {:0.2f}".format(self.d))
             self.D = 6.5 * m
 
         else:
@@ -168,6 +170,7 @@ class NRM_Model():
             self.ctrs, self.d, self.D = np.array(mask.ctrs), mask.hdia, mask.activeD
 
         if mask=='jwst':
+            self.instrument = 'NIRISS'
             """
             Preserve ctrs.as_designed (treat as immutable)
             Reverse V2 axis coordinates to close C5 open C2, and others follow suit... 

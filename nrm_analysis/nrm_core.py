@@ -36,7 +36,7 @@ from scipy.stats import sem, mstats
 import pickle as pickle
 import matplotlib.pyplot as plt
 
-import oifits
+import nrm_analysis.oifits as oifits
 
 # Module imports
 from nrm_analysis.fringefitting.LG_Model import NRM_Model

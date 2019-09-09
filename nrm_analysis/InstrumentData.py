@@ -384,17 +384,24 @@ class NIRISS:
         self.filt = filt
         self.objname = objname
         #############################
-        lam_c = {"F277W":2.77e-6, "F380M": 3.8e-6, "F430M": 4.3e-6, "F480M": 4.8e-6}
+        lam_c = {"F277W":2.77e-6, 
+                 "F380M": 3.8e-6, 
+                 "F430M": 4.28521033106325E-06,
+                 "F480M": 4.8e-6}
+        
 
-        lam_w = {"F277W":0.2, "F380M": 0.1, "F430M": 0.05, "F480M": 0.08}
-        lam_bin = {"F277W": 50, "F380M": 20, "F430M":20, "F480M":30}
+        lam_w = {"F277W":0.2, "F380M": 0.1, "F430M": 0.0436, "F480M": 0.08}
+        # about 12 wavs in f430m lam_bin = {"F277W": 50, "F380M": 20, "F430M":40, "F480M":30}
+        lam_bin = {"F277W": 50, "F380M": 20, "F430M":120, "F480M":30}
         #############################
 
         # only one NRM on JWST:
+        self.instrument = "NIRISS"
         self.arrname = "jwst_g7s6c"
-        self.pscale_mas = 65
+        self.pscale_mas = 65.6
         self.pscale_rad = utils.mas2rad(self.pscale_mas)
         self.mask = NRM_mask_definitions(maskname=self.arrname, chooseholes=chooseholes )
+        self.mask.hdia = self.mask.hdia
         self.mask.ctrs = np.array(self.mask.ctrs)
         # Hard code any rotations? 
         # (can be moved to NRM_mask_definitions later)

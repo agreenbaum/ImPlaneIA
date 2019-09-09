@@ -1,5 +1,27 @@
 # nrm_analysis README #
 
+self.oif.save(self.datapath+save_name): ../example_data/noise//example.oifits
+Writing data in a new OIFITS file...
+Writing OI_ARRAY table...
+Writing OI_TARGET table...
+Writing OI_WAVELENGTH table...
+Writing OI_VIS table...
+Traceback (most recent call last):
+  File "./NIRISS_AMI_tutorial.py", line 125, in <module>
+    calib.save_to_oifits(oifitsfn) # will save into specified "savedir"
+  File "/Users/anand/gitsrc/ImPlaneIA/nrm_analysis/nrm_core.py", line 847, in save_to_oifits
+    oif.write(fn_out)
+  File "/Users/anand/gitsrc/ImPlaneIA/nrm_analysis/misctools/write_oifits.py", line 504, in write
+    self.oi_file.write(self.datapath+save_name)
+  File "/Users/anand/gitsrc/ImPlaneIA/nrm_analysis/misctools/js_oifits.py", line 227, in write
+    pyfits.Column(name='FLAG', format='%dL'%nwave, array=data.flag),\
+  File "/Users/anand/anaconda3/envs/astroconda/lib/python3.5/site-packages/astropy/io/fits/hdu/table.py", line 128, in from_columns
+    character_as_bytes=character_as_bytes)
+  File "/Users/anand/anaconda3/envs/astroconda/lib/python3.5/site-packages/astropy/io/fits/fitsrec.py", line 323, in from_columns
+    dim = arr.shape[0]
+
+
+
 Reduces aperture masking images to fringe observables, calibrates, does basic model fitting. Package development led by Alexandra Greenbaum following legacy code by Greenbaum, Anand Sivaramakrishnan, and Laurent Pueyo. Contributions from Sivaramakrishnan, Deepashri Thatte, and Johannes Sahlmann.
 
 To get the source files:

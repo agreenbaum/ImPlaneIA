@@ -59,6 +59,7 @@ class NRM_mask_definitions():
             print("Mask %s being created" % self.maskname)
 
         if self.maskname == "gpi_g10s40":
+            self.instrument = 'GPI'
             self.hdia, self.ctrs = gpi_g10s40(rescale=rescale)
             #self.rotdeg = 115.0 # By inspection of I&T data Dec 2012
             #if rotdeg is not None:
@@ -77,6 +78,7 @@ class NRM_mask_definitions():
         elif self.maskname == "jwst_g7s6c":
             """ activeD and D taken from webbpsf-data/NIRISS/coronagraph/MASK_NRM.fits"""
             print('self.maskname == "jwst_g7s6c":')
+            self.instrument = 'NIRISS'
             self.hdia, self.ctrs = jwst_g7s6c(chooseholes=chooseholes) # 
             self.activeD =  6.559*m # webbpsf kwd DIAM  - not a 'circle including all holes'
             self.OD = 6.610645669291339*m # Full pupil file size, incl padding, webbpsf kwd PUPLDIAM
@@ -88,6 +90,7 @@ class NRM_mask_definitions():
 
         elif self.maskname == "visir_sam":
             """Mask dimensions from Eric Pantin"""
+            self.instrument = 'VISIR'
             self.hdia, self.ctrs = visir_sam(rescale=rescale)
             self.rotdeg = 16.5 # By inspection of data
             if rotdeg is not None:
@@ -103,6 +106,7 @@ class NRM_mask_definitions():
             self.ID = 1000.0 * mm   # Don't know this, but this number shouldn't matter
 
         elif self.maskname == "NIRC2_9NRM":
+            self.instrument = 'NIRC2'
             """Mask dimensions from Steph Sallum?"""
             self.hdia, self.ctrs = keck_nrm()
             self.rotdeg = 28.0 # By inspection of data
@@ -539,7 +543,10 @@ def jwst_g7s6_centers_asbuilt(chooseholes=None):  # was jwst_g7s6_centers_asdesi
 
 def jwst_g7s6c(chooseholes=None):
     # WARNING! JWST CHOOSEHOLES CODE NOW DUPLICATED IN LG_Model.py WARNING! ###
-    return 0.80*m, jwst_g7s6_centers_asbuilt(chooseholes=chooseholes)
+    #return 0.80*m, jwst_g7s6_centers_asbuilt(chooseholes=chooseholes) #comment out 2019 Aug w/Joel to match webbpsf 0.8.something
+    f2f = 0.82 * m # m flat to flat
+    print("f2f in mask_definitions.py is {:0.2f}".format(f2f))
+    return f2f, jwst_g7s6_centers_asbuilt(chooseholes=chooseholes)
 
 
 def visir_sam_asmanufactured(mag):
