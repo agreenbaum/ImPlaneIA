@@ -36,7 +36,7 @@ from scipy.stats import sem, mstats
 import pickle as pickle
 import matplotlib.pyplot as plt
 
-import oifits
+#import nrm_analysis.oifits as oifits
 
 # Module imports
 from nrm_analysis.fringefitting.LG_Model import NRM_Model
@@ -413,31 +413,32 @@ class Calibrate:
 
     """
 
-    def __init__(self, paths, instrument_data, savedir=None, sub_dir_tag=None, **kwargs):
+    def __init__(self, objpaths, instrument_data, savedir=None, extra_dimension=None, **kwargs):
         """
         Initilize the class
 
         e.g., to run this in a driver 
             gpidata = InstrumentData.GPI(reffile)
-            calib = Calibrate(paths, gpidata)
+            calib = Calibrate(objpaths, gpidata)
             calib.write_to_oifits("dataset.oifits")
         
         instrument_data - stores the mask geometry (namely # holes),
                     instrument info, and wavelength obs mode info
                     an instance of the appropriate data class
 
-        paths       - paths containing target and calibrator(s) fringe 
-                    observables. This is done per target. The first path is 
-                    assumed to be the target, the remaining paths belong to any 
-                    and all calibrators
+        objpaths       - List of directory paths (e.g. [tgtpth, calpth1, calpth2, ...]
+                    containing fringe observables for tgt, cal1, [cal2,...].
+                    The first path is the target.  One or more calibrators follow.
+                    Used to be parameter 'paths'.
 
         savedir     - default is in the working directory; can give path from
                       CWD or absolute path.
 
-        sub_dir_tag - Does this dataset have an additional axis?
-                    (e.g. wavelength or polz)
-                    This is a file string in each object folder to access
-                    the additional layer of data
+        extra_dimension - Dataset has extra dimesion: wavelength or polarization, for example.
+                    Value None means the data files are in the "object" level directory
+                    Value string file (directory??)  in each object level folder containing 
+                    additional layer of data
+                    Used to be parameter 'sub_dir_tag'
         
         This will load all the observations into attributes:
         cp_mean_cal ... size [ncals, naxis2, ncp]
@@ -478,10 +479,10 @@ class Calibrate:
         self.savedir = savedir
 
         # number of calibrators being used:
-        self.ncals = len(paths) - 1 # number of calibrators, if zero, set to 1
+        self.ncals = len(objpaths) - 1 # number of calibrators, if zero, set to 1
         if self.ncals==0:# No calibrators given
             self.ncals = 1 # to avoid empty arrays
-        self.nobjs = len(paths) # number of total objects
+        self.nobjs = len(objpaths) # number of total objects
 
         self.N = len(instrument_data.mask.ctrs)
         self.nbl = int(self.N*(self.N-1)/2)
@@ -491,21 +492,22 @@ class Calibrate:
         # Additional axis (e.g., wavelength axis)
         # Can be size one. Defined by instrument_data wavelength array
         self.naxis2 = instrument_data.nwav
+        print("nrm_core.Calibrate: self.naxis2 = instrument_data.nwav = ", instrument_data.nwav)
 
 
-        if sub_dir_tag == None: 
+        if extra_dimension == None: 
             if self.interactive==True:
                 #print "!! naxis2 is set to a non-zero number but extra_layer"
-                print("extra_layer is not defined !! naxis2 will be ignored.")
-                print("results will not be stored in a subdirectory")
-                print("proceed anyway? (y/n)")
+                print("extra dimension is not defined, so NAXIS2 will be ignored.")
+                print("results will not be stored at the object level directory")
+                print("Do you want proceed anyway? (y/n)")
                 ans = input()
                 if ans =='y':
                     pass
                 elif ans == 'n':
-                    sys.exit("stopping, try providing 'sub_dir_tag' keyword arg")
+                    sys.exit("OK, stopping.  Try providing 'extra_dimension' keyword arg to Calibrate()")
                 else:
-                    sys.exit("invalid response, stopping. Try providing 'sub_dir_tag' keyword arg")
+                    sys.exit("Exiting: Provide 'extra_dimension' keyword arg to Calibrate() to access polz, wavelens directories")
             else:
                 pass
 
@@ -529,10 +531,12 @@ class Calibrate:
         #self.cov_mat_cal = np.zeros(nexps*self.naxi2)
 
         # is there a subdirectory (e.g. for the exposure -- need to make this default)
-        if sub_dir_tag is not None:
-            self.sub_dir_tag = sub_dir_tag
+        if extra_dimension is not None:
+            self.extra_dimension = extra_dimension
             for ii in range(self.nobjs):
-                exps = [f for f in os.listdir(paths[ii]) if self.sub_dir_tag in f and os.path.isdir(os.path.join(paths[ii],f))]
+                exps = [f for f in os.listdir(objpaths[ii]) \
+                        if self.extra_dimension in f and  \
+                        os.path.isdir(os.path.join(objpaths[ii],f))]
                 nexps = len(exps)
                 print("DEBUG: "+str(nexps))
                 amp = np.zeros((self.naxis2, nexps, self.nbl))
@@ -550,15 +554,15 @@ class Calibrate:
                 expflag=[]
                 for qq in range(nexps):
                     # nwav files
-                    cpfiles = [f for f in os.listdir(paths[ii]+exps[qq]) if "CPs" in f] 
+                    cpfiles = [f for f in os.listdir(objpaths[ii]+exps[qq]) if "CPs" in f] 
                     print(cpfiles)
-                    ampfiles = [f for f in os.listdir(paths[ii]+exps[qq]) \
+                    ampfiles = [f for f in os.listdir(objpaths[ii]+exps[qq]) \
                                 if "amplitudes" in f]
-                    phafiles = [f for f in os.listdir(paths[ii]+exps[qq]) if "phase" in f] 
+                    phafiles = [f for f in os.listdir(objpaths[ii]+exps[qq]) if "phase" in f] 
                     for slc in range(len(cpfiles)):
-                        amp[slc, qq,:] = np.loadtxt(paths[ii]+exps[qq]+"/"+ampfiles[slc])
-                        cps[slc, qq,:] = np.loadtxt(paths[ii]+exps[qq]+"/"+cpfiles[slc])
-                        pha[slc, qq,:] = np.loadtxt(paths[ii]+exps[qq]+"/"+phafiles[slc])
+                        amp[slc, qq,:] = np.loadtxt(objpaths[ii]+exps[qq]+"/"+ampfiles[slc])
+                        cps[slc, qq,:] = np.loadtxt(objpaths[ii]+exps[qq]+"/"+cpfiles[slc])
+                        pha[slc, qq,:] = np.loadtxt(objpaths[ii]+exps[qq]+"/"+phafiles[slc])
                     # 10/14/2016 -- flag the exposure if we get amplitudes > 1
                     # Also flag the exposure if vflag is set, to reject fraction indicated
                     if True in (amp[:,qq,:]>1):
@@ -594,42 +598,21 @@ class Calibrate:
                             self.calib_steps(cps[slc,:,:], amp[slc,:,:], pha[slc,:,:], nexps, expflag=expflag)
 
                     else:
-                        # Fixed clunkiness!
                         # closure phases and visibilities
                         self.cp_mean_cal[ii-1,slc, :], self.cp_err_cal[ii-1,slc, :], \
                             self.v2_mean_cal[ii-1,slc,:], self.v2_err_cal[ii-1,slc,:], \
                             self.pha_mean_cal[ii-1,slc,:], self.pha_err_cal[ii-1, slc,:] = \
                             self.calib_steps(cps[slc,:,:], amp[slc,:,:], pha[slc,:,:], nexps, expflag=expflag)
-                        #print(cps[slc, :,:].shape)
-                        #print(self.cp_mean_cal[ii-1, slc,:].shape)
-                        #print(np.tile(self.cp_mean_cal[ii-1,slc,:],(nexps, 1)).shape)
 
-            """
-            ####################################
-            # calculate closure phase cov matrix
-            ####################################
-            # zero mean and stack wavelength+exposures
-            if ii ==0:
-                flatcps = (cps-self.cp_mean_tar[:,None,:]).reshape(nexps*self.naxis2, self.ncp)
-                self.cov_mat_tar = np.cov(flatcps)
-            else:
-                flatcps = (cps-self.cp_mean_cal[ii-1, :,None,:]).reshape(nexps*self.naxis2, self.ncp)
-                self.cov_mat_cal += np.cov(flatcps)
-            UPDATE: Oct 18 2016 -- trying to implement description from Kraus et al. 2008
-            C_r = sum_i (phi_frame - phi_mean)^T (phi_frame - phi_mean) / (n - 1)
-            Q: how do we get a "calibrated" covariance matrix?
-            add to phase uncertainties:
-            sig^2 = (2 sig_r^2 + (n_c - 1)sig_c*2 ) / (n_c + 1)
-            """
             nexp_c = self.sigmasquared_cal.shape[1]
 
         else:
             print("else")
             for ii in range(self.nobjs):
 
-                cpfiles = [f for f in os.listdir(paths[ii]) if "CPs" in f] 
-                ampfiles = [f for f in os.listdir(paths[ii]) if "amplitudes" in f]
-                phafiles = [f for f in os.listdir(paths[ii]) if "phase" in f]
+                cpfiles = [f for f in os.listdir(objpaths[ii]) if "CPs" in f] 
+                ampfiles = [f for f in os.listdir(objpaths[ii]) if "amplitudes" in f]
+                phafiles = [f for f in os.listdir(objpaths[ii]) if "phase" in f]
                 nexps = len(cpfiles)
                 print("nexp: "+str(nexps))
 
@@ -639,13 +622,13 @@ class Calibrate:
                 print(nexps)
                 expflag=[]
                 for qq in range(nexps):
-                    amp[qq,:] = np.loadtxt(paths[ii]+"/"+ampfiles[qq])
+                    amp[qq,:] = np.loadtxt(objpaths[ii]+"/"+ampfiles[qq])
                     if True in (amp[qq,:]>1):
                         print('amp > 1 for {}'.format(ampfiles[qq]))
                         expflag.append(qq)
                     print(cpfiles[qq])
-                    pha[qq,:] = np.loadtxt(paths[ii]+"/"+phafiles[qq])
-                    cps[qq,:] = np.loadtxt(paths[ii]+"/"+cpfiles[qq])
+                    pha[qq,:] = np.loadtxt(objpaths[ii]+"/"+phafiles[qq])
+                    cps[qq,:] = np.loadtxt(objpaths[ii]+"/"+cpfiles[qq])
 
                 # Covariance 06/27/2017
                 if ii == 0:
@@ -793,14 +776,15 @@ class Calibrate:
         print(kwargs)
 
         
-        from .misctools.write_oifits import OIfits
+        #####  AS moving to js_oifits  from .misctools.write_oifits import OIfits
+        from nrm_analysis.misctools import glue_js_oifits
 
         # look for kwargs, e.g., phaseceil, anything else?
         if "phaseceil" in list(kwargs.keys()):
             self.phaseceil = kwargs["phaseceil"]
         else:
             # default for flagging closure phases (deg)
-            self.phaseceil = 1.0e2
+            self.phaseceil = 1.0e2 # degrees
         if "clip" in kwargs.keys():
             self.clip_wls = kwargs["clip"]
             nwav = self.naxis2-2*self.clip_wls
@@ -825,6 +809,7 @@ class Calibrate:
                 'month':self.instrument_data.month,
                 'day':self.instrument_data.day,
                 'TEL':self.instrument_data.telname,\
+                'instrument':self.instrument_data.instrument, 
                 'arrname':self.instrument_data.arrname, 
                 'object':self.instrument_data.objname,
                 'RA':self.instrument_data.ra, 
@@ -835,7 +820,46 @@ class Calibrate:
                 'phaseceil':self.phaseceil,
                 'covariance':clippedcov}
 
-        oif = OIfits(self.instrument_data.mask,self.obskeywords)
+        print("Calibrate.save_to_oifits(): \n",
+        "\tv2",self.v2_calibrated.shape, "v2err",self.v2_err_calibrated.shape, '\n',
+        "\tcps",self.cp_calibrated_deg.shape, "cperr",self.cp_err_calibrated_deg.shape, '\n',
+        "\tpha",self.pha_calibrated_deg.shape, "phaerr",self.pha_err_calibrated_deg.shape,  '\n',
+        "\twave",self.instrument_data.lam_c[self.instrument_data.filt], '\n',
+        "\twave",self.instrument_data.lam_w[self.instrument_data.filt], '\n',
+        "\tnwave",self.instrument_data.nwav, '\n',
+        "\thole_size",self.instrument_data.mask.hdia, '\n',
+        "\tnholes",self.instrument_data.mask.ctrs.shape[0], '\n',
+        )
+        print("len(ctrs):", len(self.instrument_data.mask.ctrs))
+        for k in self.obskeywords.keys():
+            print("\t\t%s"%k, self.obskeywords[k])
+
+        print("\t mask.ctrs is of type: ", type(self.instrument_data.mask.ctrs))
+        #oif = OIfits(self.instrument_data.mask, self.obskeywords)
+        glue_js_oifits.write(
+                    obskeywords=self.obskeywords,
+                    v2=self.v2_calibrated[0,:], v2err=self.v2_err_calibrated[0,:],
+                    cps=self.cp_calibrated_deg[0,:], cperr=self.cp_err_calibrated_deg[0,:],
+                    pha=self.pha_calibrated_deg[0,:], phaerr=self.pha_err_calibrated_deg[0,:], 
+                    wave=self.instrument_data.lam_c[self.instrument_data.filt],
+                    bandwidth=self.instrument_data.lam_w[self.instrument_data.filt],
+                    nwave=self.instrument_data.nwav,
+                    hole_size=self.instrument_data.mask.hdia,
+                    nholes=self.instrument_data.mask.ctrs.shape[0],
+                    ctrs = self.instrument_data.mask.ctrs ,
+                    )
+        """ 
+        interface_oifits_js_writ(v2=self.v2_calibrated, v2err=self.v2_err_calibrated, \
+                    cps=self.cp_calibrated_deg, cperr=self.cp_err_calibrated_deg, \
+                    pha = self.pha_calibrated_deg, phaerr = self.pha_err_calibrated_deg) 
+        oif_js_write(v2=self.v2_calibrated, v2err=self.v2_err_calibrated, \
+                    cps=self.cp_calibrated_deg, cperr=self.cp_err_calibrated_deg, \
+                    pha = self.pha_calibrated_deg, phaerr = self.pha_err_calibrated_deg) 
+        mask='jwst'
+        instrument = 'NIRISS'
+        """
+
+        """
         oif.dummytables()
         # Option to clip out band edges for multiple wavelengths
         # clip can be scalar or 2-element. scalar will do symmetric clipping
@@ -844,7 +868,9 @@ class Calibrate:
         oif.oi_data(read_from_txt=False, v2=self.v2_calibrated, v2err=self.v2_err_calibrated, \
                     cps=self.cp_calibrated_deg, cperr=self.cp_err_calibrated_deg, \
                     pha = self.pha_calibrated_deg, phaerr = self.pha_err_calibrated_deg) 
+        print("oif.write in nrm_core: ")
         oif.write(fn_out)
+        """
 
     def txt_2_oifits():
         """
@@ -1250,6 +1276,7 @@ class BinaryAnalyze:
         """
         Is my data consistent with Null Hypothesis?
         """
+        pass
 
     def detection_limits(self, ntrials = 1, seplims = [20, 200],\
                          conlims = [0.0001, 0.99], anglims = [0,360],\
@@ -1326,21 +1353,6 @@ class BinaryAnalyze:
             print("Finished computing big grid, took", t2-t1, "s")
             print("modelcps shape:", modelcps.shape)
 
-            """
-            print "modelcps shape:", modelcps.shape
-            modelcps = np.tile(modelcps, (ntrials, 1, 1, 1, 1, 1))
-            print "modelcps shape:", modelcps.shape
-            simcps = modelcps + errors
-            print "simcps shape:", simcps.shape
-            chi2null = reduced_chi2(simcps, self.cperr, 0)
-            print "chi2null shape:", chi2null.shape, "and chi2null sum:",\
-                   chi2null.sum()
-            chi2bin = reduced_chi2(simcps, modelcps, self.cperr)
-            print "chi2bin shape:", chi2bin.shape, "and chi2bin sum:", chi2bin.sum()
-            self.detec_grid = ((chi2bin - chi2null)<0.0).sum(axis=(0,-1))\
-                                / float(ntrials*len(angs))
-            print "detec_grid shape:", self.detec_grid.shape
-            """
             t3 = time.time()
             print("setting up the dictionary...")
             store_dict = [{"self":self,"ntrials":ntrials, "model":modelcps, \

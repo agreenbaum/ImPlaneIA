@@ -391,14 +391,20 @@ class NIRISS:
         
 
         lam_w = {"F277W":0.2, "F380M": 0.1, "F430M": 0.0436, "F480M": 0.08}
-        lam_bin = {"F277W": 50, "F380M": 20, "F430M":40, "F480M":30}
+        # about 12 wavs in f430m lam_bin = {"F277W": 50, "F380M": 20, "F430M":40, "F480M":30}
+        lam_bin = {"F277W": 50, "F380M": 20, "F430M":150, "F480M":30}
+        self.lam_c = lam_c
+        self.lam_w = lam_w
+        self.lam_bin = lam_bin
         #############################
 
         # only one NRM on JWST:
+        self.instrument = "NIRISS"
         self.arrname = "jwst_g7s6c"
         self.pscale_mas = 65.6
         self.pscale_rad = utils.mas2rad(self.pscale_mas)
         self.mask = NRM_mask_definitions(maskname=self.arrname, chooseholes=chooseholes )
+        self.mask.hdia = self.mask.hdia
         self.mask.ctrs = np.array(self.mask.ctrs)
         # Hard code any rotations? 
         # (can be moved to NRM_mask_definitions later)
